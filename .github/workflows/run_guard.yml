@@ -1,6 +1,14 @@
 name: Run Guard
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - "CURRENT_RUN_LEDGER.yaml"
+      - "RUN_GUARD_POLICY.yaml"
+      - "validate_run_guard.py"
+      - "DECISION_LOG.jsonl"
+      - ".github/workflows/run_guard.yml"
   workflow_dispatch:
 
 permissions:
