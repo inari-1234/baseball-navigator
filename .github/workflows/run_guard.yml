@@ -1,0 +1,40 @@
+name: Run Guard
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: run-guard-main
+  cancel-in-progress: false
+
+jobs:
+  run-guard:
+    name: run-guard
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Checkout exact commit
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Validate repository state
+        shell: bash
+        run: |
+          set -uo pipefail
+          python3 validate_run_guard.py \
+            --repo "${GITHUB_REPOSITORY}" \
+            --sha "${GITHUB_SHA}" \
+            --mode guard \
+            --json-out "${RUNNER_TEMP}/GUARD_RESULT.json" \
+            | tee "${RUNNER_TEMP}/guard-output.txt"
+          validator_status=${PIPESTATUS[0]}
+          if [[ -f "${RUNNER_TEMP}/GUARD_RESULT.json" ]]; then
+            cat "${RUNNER_TEMP}/GUARD_RESULT.json" >> "${GITHUB_STEP_SUMMARY}"
+          else
+            echo '{"result":"NO_RESULT","guard_verified":false}' >> "${GITHUB_STEP_SUMMARY}"
+          fi
+          exit "${validator_status}"

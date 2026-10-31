@@ -1,0 +1,82 @@
+{
+  "policy_version": "1.0.0",
+  "schema_version": "1.0",
+  "data_format": "JSON-compatible YAML 1.2 subset",
+  "validator_contract": {
+    "contract_version": "1.0",
+    "input": [
+      "repository",
+      "commit_sha"
+    ],
+    "output": [
+      "result",
+      "checked_sha",
+      "ledger_version",
+      "policy_version",
+      "validator_version",
+      "checks",
+      "errors"
+    ]
+  },
+  "system_guards": {
+    "VERSION": {
+      "enabled": true,
+      "rule_id": "SYS-VERSION-001"
+    },
+    "PROVENANCE": {
+      "enabled": true,
+      "rule_id": "SYS-PROVENANCE-001"
+    },
+    "UNKNOWN": {
+      "enabled": true,
+      "rule_id": "SYS-UNKNOWN-001"
+    },
+    "ELIGIBILITY": {
+      "enabled": true,
+      "rule_id": "SYS-ELIGIBILITY-001"
+    }
+  },
+  "rule_classes": [
+    "GAME_RULE",
+    "INTERPRETATION_RULE",
+    "STRATEGY_POLICY"
+  ],
+  "rules": {
+    "GR-001": {
+      "class": "GAME_RULE",
+      "enabled": true,
+      "name": "Y1_KOSHIEN_INELIGIBLE",
+      "enforcement": "VALIDATOR"
+    },
+    "IR-001": {
+      "class": "INTERPRETATION_RULE",
+      "enabled": true,
+      "name": "DISPLAYED_DOES_NOT_IMPLY_ELIGIBLE",
+      "enforcement": "VALIDATOR"
+    },
+    "IR-003": {
+      "class": "INTERPRETATION_RULE",
+      "enabled": true,
+      "name": "INTERPRETED_OBSERVATION_REQUIRES_RAW_PROVENANCE",
+      "enforcement": "VALIDATOR"
+    },
+    "SP-001": {
+      "class": "STRATEGY_POLICY",
+      "enabled": false,
+      "name": "SPORTS_ZERO_IS_NOT_AN_OBJECTIVE",
+      "enforcement": "DOCUMENTED_NOT_YET_ENFORCED"
+    },
+    "SP-002": {
+      "class": "STRATEGY_POLICY",
+      "enabled": false,
+      "name": "RESET_ASSISTED_WIN_IS_NOT_STABLE",
+      "enforcement": "DOCUMENTED_NOT_YET_ENFORCED"
+    },
+    "SP-003": {
+      "class": "STRATEGY_POLICY",
+      "enabled": false,
+      "name": "TWO_SAME_STRATEGY_FAILURES_REQUIRE_ALTERNATIVE",
+      "enforcement": "DOCUMENTED_NOT_YET_ENFORCED"
+    }
+  }
+}

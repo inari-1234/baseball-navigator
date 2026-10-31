@@ -1,0 +1,119 @@
+{
+  "schema_version": "1.0",
+  "ledger_version": 1,
+  "run_id": "SAPPORO_RERUN_20261020",
+  "expected_parent_sha": "0b3a0c94540246d460941b0b4e342ccffb69f12a",
+  "goal": {
+    "primary": {
+      "id": "GOAL-Y1-SAPPOKO-B",
+      "description": "Y1 10月 さっぽこ高校B突破",
+      "locked": true
+    },
+    "secondary": []
+  },
+  "time": {
+    "year": 1,
+    "month": 8
+  },
+  "current_gate": {
+    "id": "NEXT_Y1_AUGUST_ACTION",
+    "status": "BLOCKED_UNKNOWN",
+    "reason_refs": [
+      "UNK-CURRENT-RESOURCES"
+    ]
+  },
+  "evidence": [
+    {
+      "evidence_id": "EV-MIGRATION-001",
+      "kind": "ARCHIVE",
+      "locator": "pre-repository conversation handoff summary",
+      "notes": "Bootstrap source only. This is not raw evidence and must not be reclassified as RAW_EVIDENCE."
+    },
+    {
+      "evidence_id": "EV-USER-KOSHIEN-001",
+      "kind": "USER_ASSERTION",
+      "statement": "Y1 cannot challenge Koshien."
+    },
+    {
+      "evidence_id": "EV-USER-CHOSHI-001",
+      "kind": "USER_ASSERTION",
+      "statement": "Choshi Commercial had already been cleared; Kondo was already recruited before the later 7-0 win."
+    },
+    {
+      "evidence_id": "EV-USER-MANRUI-001",
+      "kind": "USER_ASSERTION",
+      "statement": "Manrui result sequence was 0-0, 0-2 loss, then 2-0 win after resets."
+    }
+  ],
+  "facts": [
+    {
+      "fact_id": "FACT-TIME-YEAR",
+      "fact_type": "DERIVED",
+      "path": "time.year",
+      "value": 1,
+      "source_refs": [
+        "EV-MIGRATION-001"
+      ],
+      "usable_for_decision": true
+    },
+    {
+      "fact_id": "FACT-TIME-MONTH",
+      "fact_type": "DERIVED",
+      "path": "time.month",
+      "value": 8,
+      "source_refs": [
+        "EV-MIGRATION-001"
+      ],
+      "usable_for_decision": true
+    },
+    {
+      "fact_id": "FACT-CHOSHI-FIRST-CLEAR",
+      "fact_type": "OBSERVED",
+      "path": "opponents.choshi.first_clear",
+      "value": "VERIFIED",
+      "source_refs": [
+        "EV-USER-CHOSHI-001"
+      ],
+      "usable_for_decision": true
+    },
+    {
+      "fact_id": "FACT-MANRUI-STABILITY",
+      "fact_type": "OBSERVED",
+      "path": "opponents.manrui.stability",
+      "value": "UNSTABLE",
+      "source_refs": [
+        "EV-USER-MANRUI-001"
+      ],
+      "usable_for_decision": true
+    }
+  ],
+  "eligibility": {
+    "koshien_y1": {
+      "displayed": true,
+      "eligible": false,
+      "available_now": false,
+      "source_refs": [
+        "EV-USER-KOSHIEN-001",
+        "EV-MIGRATION-001"
+      ]
+    }
+  },
+  "opponents": {
+    "choshi": {
+      "first_clear": "VERIFIED"
+    },
+    "manrui": {
+      "first_clear": "VERIFIED",
+      "stability": "UNSTABLE"
+    }
+  },
+  "unknowns": [
+    {
+      "unknown_id": "UNK-CURRENT-RESOURCES",
+      "field": "resources.current",
+      "status": "OPEN",
+      "material_to_next_action": true,
+      "reason": "Exact current Study/Sports/Play/Nature/Cheer values were not reconstructed into the repository bootstrap."
+    }
+  ]
+}
