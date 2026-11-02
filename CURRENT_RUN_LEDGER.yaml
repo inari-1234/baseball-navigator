@@ -1,8 +1,8 @@
 {
   "schema_version": "1.0",
-  "ledger_version": 1,
+  "ledger_version": 2,
   "run_id": "SAPPORO_RERUN_20261020",
-  "expected_parent_sha": "0b3a0c94540246d460941b0b4e342ccffb69f12a",
+  "expected_parent_sha": "2e7a88ab479635a0e4bf016cb5aa0e5acae8e66d",
   "goal": {
     "primary": {
       "id": "GOAL-Y1-SAPPOKO-B",
@@ -13,14 +13,13 @@
   },
   "time": {
     "year": 1,
-    "month": 8
+    "month": 7,
+    "clock": "PM 3:20"
   },
   "current_gate": {
-    "id": "NEXT_Y1_AUGUST_ACTION",
-    "status": "BLOCKED_UNKNOWN",
-    "reason_refs": [
-      "UNK-CURRENT-RESOURCES"
-    ]
+    "id": "PREPARE_FOR_Y1_JULY_CHOSHI_1700",
+    "status": "READY",
+    "reason_refs": []
   },
   "evidence": [
     {
@@ -43,48 +42,153 @@
       "evidence_id": "EV-USER-MANRUI-001",
       "kind": "USER_ASSERTION",
       "statement": "Manrui result sequence was 0-0, 0-2 loss, then 2-0 win after resets."
+    },
+    {
+      "evidence_id": "EV-RAW-20261102-TOURNAMENT",
+      "kind": "RAW_EVIDENCE",
+      "locator": "ChatGPT conversation uploads IMG_8867.png and IMG_8868.png (2026-11-02)",
+      "notes": "Y1 July/August tournament screen; July Choshi Commercial at PM5:00 entered; August schedule displayed including Koshien row."
+    },
+    {
+      "evidence_id": "EV-RAW-20261102-STATUS",
+      "kind": "RAW_EVIDENCE",
+      "locator": "ChatGPT conversation upload IMG_8869.png (2026-11-02)",
+      "notes": "Y1 July PM3:10 school screen showing money, research points, cheer and school status."
+    },
+    {
+      "evidence_id": "EV-RAW-20261102-SCHOOL-ACTIVITY",
+      "kind": "RAW_EVIDENCE",
+      "locator": "ChatGPT conversation upload IMG_8870.png (2026-11-02)",
+      "notes": "School activity menu; handmade rice ball cost Play 15; knock-help cost Sports 21; cleaning already executed with Cheer +12."
+    },
+    {
+      "evidence_id": "EV-RAW-20261102-ITEMS",
+      "kind": "RAW_EVIDENCE",
+      "locator": "ChatGPT conversation uploads IMG_8871.png and IMG_8872.png (2026-11-02)",
+      "notes": "Item-use screen page 1/13 for Ashida Hajime; visible inventories include candy x6 and honey x3 plus several unverified item effects."
+    },
+    {
+      "evidence_id": "EV-RAW-20261102-LINEUP",
+      "kind": "RAW_EVIDENCE",
+      "locator": "ChatGPT conversation uploads IMG_8873.png and IMG_8874.png (2026-11-02)",
+      "notes": "Batting order, levels, visible batting/power/run grades and defensive positions."
+    },
+    {
+      "evidence_id": "EV-RAW-20261102-TRAINING",
+      "kind": "RAW_EVIDENCE",
+      "locator": "ChatGPT conversation upload IMG_8875.png (2026-11-02)",
+      "notes": "Special training list at Y1 July PM3:20; swing Lv1 Sports6, squat Lv2 Sports11, ball pickup Lv1 Sports7, shadow pitching Lv1 Sports6, study meeting Lv1 Study7."
+    },
+    {
+      "evidence_id": "EV-USER-SPECIAL-NO-TIME-001",
+      "kind": "USER_ASSERTION",
+      "statement": "Special training consumes no in-game time."
     }
   ],
   "facts": [
     {
       "fact_id": "FACT-TIME-YEAR",
-      "fact_type": "DERIVED",
+      "fact_type": "OBSERVED",
       "path": "time.year",
       "value": 1,
-      "source_refs": [
-        "EV-MIGRATION-001"
-      ],
+      "source_refs": ["EV-RAW-20261102-STATUS"],
       "usable_for_decision": true
     },
     {
       "fact_id": "FACT-TIME-MONTH",
-      "fact_type": "DERIVED",
+      "fact_type": "OBSERVED",
       "path": "time.month",
-      "value": 8,
-      "source_refs": [
-        "EV-MIGRATION-001"
-      ],
+      "value": 7,
+      "source_refs": ["EV-RAW-20261102-STATUS"],
       "usable_for_decision": true
     },
     {
-      "fact_id": "FACT-CHOSHI-FIRST-CLEAR",
+      "fact_id": "FACT-CURRENT-CLOCK",
       "fact_type": "OBSERVED",
+      "path": "time.clock",
+      "value": "PM 3:20",
+      "source_refs": ["EV-RAW-20261102-TRAINING"],
+      "usable_for_decision": true
+    },
+    {
+      "fact_id": "FACT-MONEY",
+      "fact_type": "OBSERVED",
+      "path": "resources.money_yen",
+      "value": 23120,
+      "source_refs": ["EV-RAW-20261102-STATUS"],
+      "usable_for_decision": true
+    },
+    {
+      "fact_id": "FACT-RESEARCH-STUDY",
+      "fact_type": "OBSERVED",
+      "path": "resources.research_points.study",
+      "value": 19,
+      "source_refs": ["EV-RAW-20261102-STATUS"],
+      "usable_for_decision": true
+    },
+    {
+      "fact_id": "FACT-RESEARCH-SPORTS",
+      "fact_type": "OBSERVED",
+      "path": "resources.research_points.sports",
+      "value": 16,
+      "source_refs": ["EV-RAW-20261102-STATUS"],
+      "usable_for_decision": true
+    },
+    {
+      "fact_id": "FACT-RESEARCH-PLAY",
+      "fact_type": "OBSERVED",
+      "path": "resources.research_points.play",
+      "value": 19,
+      "source_refs": ["EV-RAW-20261102-STATUS"],
+      "usable_for_decision": true
+    },
+    {
+      "fact_id": "FACT-RESEARCH-NATURE",
+      "fact_type": "OBSERVED",
+      "path": "resources.research_points.nature",
+      "value": 26,
+      "source_refs": ["EV-RAW-20261102-STATUS"],
+      "usable_for_decision": true
+    },
+    {
+      "fact_id": "FACT-CHEER",
+      "fact_type": "OBSERVED",
+      "path": "resources.cheer",
+      "value": 100,
+      "source_refs": ["EV-RAW-20261102-STATUS"],
+      "usable_for_decision": true
+    },
+    {
+      "fact_id": "FACT-NEXT-MATCH",
+      "fact_type": "OBSERVED",
+      "path": "schedule.next_match",
+      "value": "Y1 July PM5:00 Choshi Commercial High School / ENTERED",
+      "source_refs": ["EV-RAW-20261102-TOURNAMENT"],
+      "usable_for_decision": true
+    },
+    {
+      "fact_id": "FACT-SPECIAL-NO-TIME",
+      "fact_type": "OBSERVED",
+      "path": "training_options.special_training_no_time_cost",
+      "value": true,
+      "source_refs": ["EV-USER-SPECIAL-NO-TIME-001"],
+      "usable_for_decision": true
+    },
+    {
+      "fact_id": "FACT-CHOSHI-FIRST-CLEAR-PRIOR",
+      "fact_type": "HYPOTHESIS",
       "path": "opponents.choshi.first_clear",
-      "value": "VERIFIED",
-      "source_refs": [
-        "EV-USER-CHOSHI-001"
-      ],
-      "usable_for_decision": true
+      "value": "PRIOR-SNAPSHOT-CLAIM",
+      "source_refs": ["EV-USER-CHOSHI-001"],
+      "usable_for_decision": false
     },
     {
-      "fact_id": "FACT-MANRUI-STABILITY",
-      "fact_type": "OBSERVED",
+      "fact_id": "FACT-MANRUI-STABILITY-PRIOR",
+      "fact_type": "HYPOTHESIS",
       "path": "opponents.manrui.stability",
-      "value": "UNSTABLE",
-      "source_refs": [
-        "EV-USER-MANRUI-001"
-      ],
-      "usable_for_decision": true
+      "value": "PRIOR-SNAPSHOT-CLAIM",
+      "source_refs": ["EV-USER-MANRUI-001"],
+      "usable_for_decision": false
     }
   ],
   "eligibility": {
@@ -92,28 +196,88 @@
       "displayed": true,
       "eligible": false,
       "available_now": false,
-      "source_refs": [
-        "EV-USER-KOSHIEN-001",
-        "EV-MIGRATION-001"
-      ]
+      "source_refs": ["EV-USER-KOSHIEN-001", "EV-RAW-20261102-TOURNAMENT"]
     }
   },
   "opponents": {
-    "choshi": {
-      "first_clear": "VERIFIED"
+    "choshi": {"first_clear": "UNKNOWN_CURRENT_SAVE"},
+    "manrui": {"first_clear": "UNKNOWN_CURRENT_SAVE", "stability": "UNKNOWN_CURRENT_SAVE"}
+  },
+  "resources": {
+    "money_yen": 23120,
+    "cheer": 100,
+    "research_points": {"study": 19, "sports": 16, "play": 19, "nature": 26},
+    "school_status": {"study": 30, "sports": 95, "play": 77, "nature": 58},
+    "source_refs": ["EV-RAW-20261102-STATUS"]
+  },
+  "schedule": {
+    "next_match": {
+      "opponent": "Choshi Commercial High School",
+      "month": 7,
+      "time": "PM 5:00",
+      "entry_status": "ENTERED",
+      "source_refs": ["EV-RAW-20261102-TOURNAMENT"]
     },
-    "manrui": {
-      "first_clear": "VERIFIED",
-      "stability": "UNSTABLE"
-    }
+    "august_displayed": [
+      {"event": "Koshien", "time": "AM 10:00", "eligible": false},
+      {"opponent": "Ogasawara High School", "time": "AM 10:00", "entry_status": "ENTERED"},
+      {"opponent": "Ushinan High School", "time": "AM 11:00", "entry_status": "ENTERED"},
+      {"opponent": "Hanasaka High School", "time": "PM 2:00", "entry_status": "ENTERED"},
+      {"opponent": "Manrui High School", "time": "PM 4:00", "entry_status": "ENTERED"},
+      {"opponent": "Choshi Commercial High School", "time": "PM 5:00", "entry_status": "ENTERED"}
+    ],
+    "source_refs": ["EV-RAW-20261102-TOURNAMENT"]
+  },
+  "lineup": [
+    {"order": 1, "name": "Ashida Hajime", "level": 4, "position": "RF", "batting": "D", "power": "E", "run": "D"},
+    {"order": 2, "name": "Okaji Kazuhiko", "level": 3, "position": "3B", "batting": "E", "power": "E", "run": "E"},
+    {"order": 3, "name": "Irie Dokonjo", "level": 7, "position": "LF", "batting": "C", "power": "C", "run": "D"},
+    {"order": 4, "name": "Nagashima Tooru", "level": 4, "position": "C", "batting": "E", "power": "D", "run": "E"},
+    {"order": 5, "name": "Taki Tsubasa", "level": 6, "position": "SS", "batting": "D", "power": "D", "run": "E"},
+    {"order": 6, "name": "Imai Tattsun", "level": 6, "position": "2B", "batting": "D", "power": "D", "run": "E"},
+    {"order": 7, "name": "Nakayama Yusuke", "level": 4, "position": "1B", "batting": "D", "power": "E", "run": "E"},
+    {"order": 8, "name": "Takahashi Shon", "level": 4, "position": "CF", "batting": "E", "power": "E", "run": "E"},
+    {"order": 9, "name": "Ishiwata Shoto", "level": 4, "position": "P", "batting": "F", "power": "F", "run": "F"}
+  ],
+  "training_options": {
+    "special_training_no_time_cost": true,
+    "visible": [
+      {"name": "Swing", "level": 1, "cost_resource": "sports", "cost": 6},
+      {"name": "Squat", "level": 2, "cost_resource": "sports", "cost": 11},
+      {"name": "Ball pickup", "level": 1, "cost_resource": "sports", "cost": 7},
+      {"name": "Shadow pitching", "level": 1, "cost_resource": "sports", "cost": 6},
+      {"name": "Study meeting", "level": 1, "cost_resource": "study", "cost": 7}
+    ],
+    "source_refs": ["EV-RAW-20261102-TRAINING", "EV-USER-SPECIAL-NO-TIME-001"]
   },
   "unknowns": [
     {
       "unknown_id": "UNK-CURRENT-RESOURCES",
       "field": "resources.current",
+      "status": "RESOLVED",
+      "material_to_next_action": false,
+      "reason": "Resolved by 2026-11-02 current-screen RAW_EVIDENCE."
+    },
+    {
+      "unknown_id": "UNK-CHOSHI-FIRST-CLEAR-CURRENT-SAVE",
+      "field": "opponents.choshi.first_clear",
       "status": "OPEN",
-      "material_to_next_action": true,
-      "reason": "Exact current Study/Sports/Play/Nature/Cheer values were not reconstructed into the repository bootstrap."
+      "material_to_next_action": false,
+      "reason": "Prior claim is chronologically later than the current Y1 July snapshot and is not used for the immediate pre-match decision."
+    },
+    {
+      "unknown_id": "UNK-MANRUI-HISTORY-CURRENT-SAVE",
+      "field": "opponents.manrui",
+      "status": "OPEN",
+      "material_to_next_action": false,
+      "reason": "Prior Manrui result is chronologically later than the current Y1 July snapshot and is not used for the immediate pre-match decision."
+    },
+    {
+      "unknown_id": "UNK-ITEM-EFFECTS-VISIBLE-P1",
+      "field": "items.visible_page_1_effects",
+      "status": "OPEN",
+      "material_to_next_action": false,
+      "reason": "Visible item effects are not sufficiently verified; immediate recommendation avoids consuming them."
     }
   ]
 }
