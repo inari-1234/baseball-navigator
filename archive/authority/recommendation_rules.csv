@@ -1,5 +1,5 @@
 ﻿rule_id,priority,name,condition,action,rationale
-R01,1,Deadline first,期限付き公式大会/申込が迫る,公式大会を優先,取り返せない期限を最優先
+R01,1,Deadline first,期限付き公式大会/申込が迫る,公式大会を優先,叐り返せない期限を最優先
 R02,2,First-win value,未勝利校が候補,加入選手+次unlock+勝率を評価,試合1回で戦力とルートを開く
 R03,3,Use actual loss history,同校に実機敗戦あり,公開ランクだけでなく負け実績をriskへ加点,実機履歴が最強の難易度観測
 R04,4,Cheer threshold,Cheer<20かつ応援ON特訓をしたい,学校活動でCheer補充候補を評価,実測の応援ON特訓は効率差が大きい
