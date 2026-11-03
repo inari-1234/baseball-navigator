@@ -1,0 +1,11 @@
+﻿feature,meaning,range,importance
+deadline_urgency,期限/大会不可逆性,0-100,high
+first_win_value,未回収選手,0-30,high
+chain_unlock_value,次の対戦ルート,0-25,high
+weakness_alignment,現在課題との一致,0-25,high
+actual_history_risk,実機敗戦/内容,0 to -30,high
+grade_risk,公開ランク,0 to -20,medium
+resource_cost,消費とreserve,0 to -30,high
+hp_time_risk,試合直前/HP,0 to -30,high
+evidence_confidence,live/manual/public,0-10,high
+randomness_penalty,結果がランダム,0 to -10,medium
