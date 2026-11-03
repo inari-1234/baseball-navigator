@@ -1,0 +1,50 @@
+{
+  "stage": "FC-7F-R",
+  "version": "0.1",
+  "status": "CANDIDATE_PASS_PRACTICAL_CORRECTIVE",
+  "objective": "Maximize practical probability of Y2 Aug Public/Koshien title on iOS Ver1.42, using lower-confidence detailed guides as operational candidates while preserving evidence labels.",
+  "branch": "PRACTICAL_RESET_ALLOWED",
+  "supersedes_for_practical_play": ["FC7FP East/P1-reproduction launch identity"],
+  "does_not_invalidate": ["P1 achieved fast-run evidence", "FC7F calibration measurements", "FC7E P1 reproduction branch"],
+  "rules": [
+    {"id":"R00","rule":"Start region candidate is Hokkaido for practical success; this is not a proof of global fastest region."},
+    {"id":"R01","rule":"Protagonist baseline is pitcher / がんばり屋 / initial 30pt all velocity. This is an old detailed-guide candidate, not a Ver1.42 optimum. Record Creation Preview and Registered Initial separately."},
+    {"id":"R02","rule":"Cheer-OFF special training is prohibited by default. Accumulate Cheer to >=20 through normal progression/activities and use Cheer-ON on long-horizon core."},
+    {"id":"R03","rule":"Low-level-first principle: use justified ability items and special training on Y2-Aug core before mass match leveling. Current Wiki mechanic says level strongly affects training/item gains; Ver1.42 confirmation is still required."},
+    {"id":"R04","rule":"Batter development default is slugging/long-ball main and batting secondary. Initial training pair is long-ball then batting; thereafter failure-mode rules override the default."},
+    {"id":"R05","rule":"Do not spend scarce training merely to activate an affinity trio. Growth/remaining tenure/current role outrank affinity unless measured ROI says otherwise."},
+    {"id":"R06","rule":"Match density stays high, but opponent difficulty is capped by win reliability. New opponent tests are interleaved with farm blocks; do not chain clear losses upward."},
+    {"id":"R07","rule":"Operational match target: 3-4/month before recovery depth, 4-5/month after recovery depth, only when HP/calendar allow. This is a practical target synthesized from sources, not a fixed optimum."},
+    {"id":"R08","rule":"For otherwise-equal farm choices prefer a full 6-inning win over a mercy result because current Wiki reports post-match points equal outs recorded; live verification remains desirable."},
+    {"id":"R09","rule":"Opponent advance gate: after a loss/draw to a new opponent, farm a beaten lower/equal-grade opponent before retry. Two equivalent failed retries trigger method change."},
+    {"id":"R10","rule":"Pitcher investment is velocity-first by default because multiple guides prioritize velocity; control/shadow overrides when walks/control failure repeat. Breaking becomes secondary once velocity is no longer the binding failure."},
+    {"id":"R11","rule":"Baseball field removal is default GO once replacement construction is usable. Do not literally copy old-guide bath counts; recovery buildings scale only to observed HP bottlenecks."},
+    {"id":"R12","rule":"Y1 Sep county title is a practical hard milestone. Y1 Oct regional loss is acceptable for E2 and may unlock recovery facilities; do not intentionally lose."},
+    {"id":"R13","rule":"Reserve Study30 by principal-introduction timing unless live Ver1.42 presents a higher-value conflicting use."},
+    {"id":"R14","rule":"Practical branch permits selective reload on route-critical official close losses only. Never use repeated reloads to bridge a structural power gap."},
+    {"id":"R15","rule":"Live Ver1.42 overrides all public/old-guide claims on mechanics, timing, unlocks, costs, and numeric effects."}
+  ],
+  "failure_mode_rules": {
+    "offense_contact": "If repeated <=3 hits or heavy strikeout pattern against farm-grade teams, prioritize batting/contact training even if long-ball is default.",
+    "offense_conversion": "If 4-7 hits but repeated 0-1 run output, prioritize slugging/skills.",
+    "pitch_control": "If >=3 BB/HBP-equivalent control failures recur in two comparable games, prioritize control/shadow.",
+    "pitch_power": "If walks are controlled but repeated hard-contact/run allowance persists, prioritize velocity.",
+    "recovery": "If a valuable match/training action is blocked by HP twice in a short window, add recovery capacity or use recovery items."
+  },
+  "hard_gates": {
+    "Y1_Sep": "county/prefecture title preferred practical milestone",
+    "Y2_Apr": "summer county entry confirmed + C stable / B challengeable",
+    "Y2_Jun": "county title",
+    "Y2_Jul": "regional title",
+    "Y2_Aug": "Public/Koshien title"
+  },
+  "explicit_unknowns": [
+    "globally fastest start region",
+    "optimal initial 30pt allocation on Ver1.42",
+    "optimal regular-training intensity on Ver1.42",
+    "exact match-yield scaling by opponent grade",
+    "exact ideal matches per month",
+    "exact recovery facility count",
+    "exact skill acquisition rates"
+  ]
+}
