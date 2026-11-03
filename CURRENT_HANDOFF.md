@@ -1,7 +1,7 @@
 # CURRENT_HANDOFF
 
-Last updated: 2026-11-03
-State: ACTIVE_Y1_APRIL_INITIAL
+Last updated: 2026-11-04
+State: ACTIVE_Y1_MAY_SKILL_BASELINE
 
 ## Scope
 Fixed-name continuation authority for `inari-1234/baseball-navigator`.
@@ -18,9 +18,7 @@ Read in this order after `AGENTS.md`:
 
 ## Current state
 - Active objective: Y1 October Sapporo sprint.
-- Fresh run is active at Y1 April AM 9:10.
-- Initial live state: money 7,200 yen; Study 0 / Sports 1 / Play 6 / Nature 5; visible Cheer gauge 11.
-- Initial roster/state screenshots were captured before scarce development spending.
+- Fresh run is active at Y1 May.
 - Batting core: 入江ドゴンジ — locked from live initial capture under `DC-ROSTER-001`.
 - Pitching core: 石渡いなり — locked from live initial capture under `DC-ROSTER-001`.
 - Secondary development: 今井. Bridge power: 長島. Bridge table-setter: 芦田.
@@ -34,14 +32,27 @@ Read in this order after `AGENTS.md`:
 - 今井: Y1 3B, batting 10 / slugging 11 / running 4, growth D, ほがらか.
 - 芦田: Y2 CF, batting 33 / slugging 15 / running 44, growth E, でしゃばり.
 
-## Exact restart action
-Complete the initial formation correction, then build Sports/Cheer toward the first high-value low-level training opportunity without wasting scarce Sports.
-Current batting-order defect: 石渡 is displayed 4th despite batting 9 / slugging 4; 長島 is the immediate cleanup candidate from live slugging 102. 入江 remains the central hitter.
+## Y1 May skill-selection live evidence
+- Drill: 素振り Lv1.
+- Participant set used for reroll sampling: 入江 / 今井 / 芦田.
+- User performed approximately 40 SAVE/LOAD retries from the same pre-training state.
+- Accepted final branch: 入江 acquired `ミート力アップ` on approximately the 40th attempt; this branch is to be SAVED and used as the current run state.
+- 芦田 acquired no skill in the observed approximately-40-attempt sample.
+- 今井 produced skill-acquisition events during earlier retries, but those branches were not saved; do not use an exact count as canonical because the conversational counts were not recorded under a controlled attempt ledger.
+- No `ジャストミート` was observed in this approximately-40-attempt Lv1 sample.
+- Interpretation: this does NOT prove `ジャストミート` is unavailable at Lv1. It does show that targeted `specific player × specific high-tier skill` rerolling at Lv1 had poor observed efficiency in this live sample.
+- Operational consequence: do not continue brute-force Lv1 rerolling for a specific high-tier batting skill under the same conditions. Advance development while recording future skill events by drill level and player.
+
+## Exact next action
+1. SAVE the accepted 入江 `ミート力アップ` result.
+2. Stop further 素振りLv1 rerolling under the same conditions.
+3. Move to the next justified low-level development action; pitching-core development is the leading candidate, but the exact 3 participants and drill must be selected from ACTIVE rules and current resource state.
 
 ## Prohibitions / defaults
 - Do not reconstruct missing authority from conversation memory.
 - Do not directly execute archived FC7F/FC7FR/Authority rules; only ACTIVE `DECISION_CONTRACT.json` rules are executable.
-- Skill reroll evidence remains scoped to the observed Just Meet case (`sample_n=1`); do not claim universal probabilities.
+- Skill-reroll evidence remains scoped; do not infer universal probabilities from this sample.
+- Do not infer player-specific skill-rate causality from 芦田=0 occurrences in ~40 attempts; treat it as an observed sample only.
 - Practice matches used as combat gates are not match-result reloaded.
 - For route-critical official matches, preserve the first-attempt result as stability evidence; later reloads may pursue achievement but never satisfy STABLE.
 - Do not assume breaking-ball drills, recovery facilities, new-member reroll behavior, or exact Sapporo bracket order until resolved by live evidence/contract handling.
@@ -49,8 +60,9 @@ Current batting-order defect: 石渡 is displayed 4th despite batting 9 / sluggi
 ## Open UNKNOWNs that matter later
 - exact Sapporo October bracket/order — check route/tournament screens by Y1 July and before Sep/Oct;
 - new-member reroll reproducibility — small experiment only if a reproducible save point exists;
-- skill-reroll probability/generalization — record scoped samples only.
+- skill-reroll probability/generalization — continue scoped sampling by drill level/player; current Lv1 batting sample shows low targeted efficiency but does not establish a universal rate.
 
 ## Validation identity
 Initial capture was taken from live iOS Ver1.42 screenshots IMG_8894.png through IMG_8906.png on 2026-11-03.
-The accepted restart point is the latest `main` commit containing ledger v5, decision-log seq 5, and this handoff. Re-read remote main at BOOT rather than relying on conversation history.
+Y1 May accepted batting-skill branch is supported by live screenshot IMG_8912.png and the user's approximately-40-attempt report on 2026-11-04.
+The accepted continuation point is the latest `main` commit containing this handoff; re-read remote main at BOOT rather than relying on conversation history.
