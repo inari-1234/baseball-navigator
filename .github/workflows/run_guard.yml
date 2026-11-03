@@ -6,8 +6,13 @@ on:
     paths:
       - "CURRENT_RUN_LEDGER.yaml"
       - "RUN_GUARD_POLICY.yaml"
+      - "DECISION_CONTRACT.json"
+      - "DECISION_RULE_CROSSWALK.md"
       - "validate_run_guard.py"
+      - "validate_decision_contract.py"
       - "DECISION_LOG.jsonl"
+      - "AGENTS.md"
+      - "SAPPORO_SPRINT_STRATEGY.md"
       - ".github/workflows/run_guard.yml"
   workflow_dispatch:
 
@@ -46,3 +51,11 @@ jobs:
             echo '{"result":"NO_RESULT","guard_verified":false}' >> "${GITHUB_STEP_SUMMARY}"
           fi
           exit "${validator_status}"
+
+      - name: Validate decision contract trace
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 validate_decision_contract.py \
+            --json-out "${RUNNER_TEMP}/DECISION_CONTRACT_RESULT.json"
+          cat "${RUNNER_TEMP}/DECISION_CONTRACT_RESULT.json" >> "${GITHUB_STEP_SUMMARY}"
