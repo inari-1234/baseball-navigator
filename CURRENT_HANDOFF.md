@@ -1,7 +1,7 @@
 # CURRENT_HANDOFF
 
 Last updated: 2026-11-04
-State: ACTIVE_Y1_MAY_SKILL_BASELINE
+State: ACTIVE_Y1_MAY_AFTER_FIRST_MATCH
 
 ## Scope
 Fixed-name continuation authority for `inari-1234/baseball-navigator`.
@@ -18,13 +18,11 @@ Read in this order after `AGENTS.md`:
 
 ## Current state
 - Active objective: Y1 October Sapporo sprint.
-- Fresh run is active at Y1 May.
-- Latest live screen after accepted 入江 skill branch shows Study 0 / Sports 2 / Play 9 / Nature 8 and visible Cheer 13.
-- No additional special training is currently affordable from Sports 2.
+- Fresh run is active at Y1 May after the first observed practice-match result.
 - Batting core: 入江ドゴンジ — locked from live initial capture under `DC-ROSTER-001`.
 - Pitching core: 石渡いなり — locked from live initial capture under `DC-ROSTER-001`.
 - Secondary development: 今井. Bridge power: 長島. Bridge table-setter: 芦田.
-- FAST operation is mandatory for ordinary live-play decisions; FULL evaluation runs only on contract triggers.
+- FAST operation is mandatory for ordinary live-play decisions; FULL evaluation runs on configured checkpoint triggers such as AFTER_MATCH.
 - Every actionable recommendation must expose controlling ACTIVE `rule_id`(s) and a fallback/stop trigger.
 
 ## Initial live anchors
@@ -45,12 +43,19 @@ Read in this order after `AGENTS.md`:
 - Interpretation: this does NOT prove `ジャストミート` is unavailable at Lv1. It shows that targeted `specific player × specific high-tier skill` rerolling at Lv1 had poor observed efficiency in this live sample.
 - Operational consequence: do not continue brute-force Lv1 rerolling for a specific high-tier batting skill under the same conditions. Advance development while recording future skill events by drill level and player.
 
+## First Y1 May practice-match checkpoint
+- Result reported by user: 4-1 WIN versus the scheduled May opponent (花さか from the prior live schedule screen).
+- Pitching screenshot: 石渡 6 innings, 4 hits allowed, 1 run, 0 strikeouts, 3 walks; displayed ERA 1.50, W1-L0.
+- Batting screenshot after the game shows: 芦田 .333 / 1 RBI; たき .333 / 2 RBI; 入江 .333 / 0 RBI; 長島 .333 / 0 RBI; 高橋 .000; 今井 .000; 石高 .666; 中山 .000; 石渡 .000. No HR shown.
+- Derived team offense from displayed batting lines is consistent with 6 hits and 4 runs. This sample is not a contact-failure or conversion-failure case.
+- Pitching interpretation: 6 IP / 1 R is sufficient run prevention for this gate. 3 walks with 0 strikeouts is a warning signal only; `STRUCTURAL_CONTROL_FAIL` is NOT triggered from one sample because the contract requires repetition across two comparable games.
+- Match-result reload status was not explicitly stated in the report; do not mark this as STABLE_WIN in canonical evidence unless no match-result reload is confirmed.
+
 ## Exact next action
-1. Do NOT attempt another special training while Sports is 2.
-2. Continue normal time progression/resource acquisition toward the next scheduled match while preserving Sports.
-3. Do not spend scarce Sports on low-value school activity/measurement.
-4. Re-evaluate the next special training only after the live screen shows sufficient Sports for the intended drill; use the current displayed cost rather than archive cost assumptions.
-5. If a school-activity choice, new-member event, or match decision appears before Sports is rebuilt, apply FAST rules to that live choice instead of forcing a training plan.
+1. Return to the post-match/main screen and read the current live resource counters and next scheduled opponent/event.
+2. Do not spend Sports or force another special training until the current counters are re-read.
+3. Do not reactively invest in pitching from this one sample; keep the next comparable-game control line as the trigger check.
+4. If the next comparable match again has >=3 BB/HBP-equivalent control failures, `DC-PITCH-001` becomes the leading pitching response. If run prevention stays adequate and offense is the binding constraint, follow `DC-PITCH-003` and keep marginal resources on offense.
 
 ## Prohibitions / defaults
 - Do not reconstruct missing authority from conversation memory.
@@ -65,10 +70,12 @@ Read in this order after `AGENTS.md`:
 ## Open UNKNOWNs that matter later
 - exact Sapporo October bracket/order — check route/tournament screens by Y1 July and before Sep/Oct;
 - new-member reroll reproducibility — small experiment only if a reproducible save point exists;
-- skill-reroll probability/generalization — continue scoped sampling by drill level/player; current Lv1 batting sample shows low targeted efficiency but does not establish a universal rate.
+- skill-reroll probability/generalization — continue scoped sampling by drill level/player; current Lv1 batting sample shows low targeted efficiency but does not establish a universal rate;
+- first Y1 May practice-match reset status — classify as STABLE only if no match-result reload occurred.
 
 ## Validation identity
 Initial capture was taken from live iOS Ver1.42 screenshots IMG_8894.png through IMG_8906.png on 2026-11-03.
 Y1 May accepted batting-skill branch is supported by live screenshot IMG_8912.png and the user's approximately-40-attempt report on 2026-11-04.
-Latest resource correction is supported by IMG_8912.png: Study 0 / Sports 2 / Play 9 / Nature 8 / Cheer 13.
+Latest pre-match resource correction was supported by IMG_8912.png: Study 0 / Sports 2 / Play 9 / Nature 8 / Cheer 13.
+First May match checkpoint is supported by live screenshots IMG_8913.png and IMG_8914.png plus the user's 4-1 result report on 2026-11-04.
 The accepted continuation point is the latest `main` commit containing this handoff; re-read remote main at BOOT rather than relying on conversation history.
