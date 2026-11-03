@@ -1,0 +1,13 @@
+﻿rule_id,priority,name,condition,action,rationale
+R01,1,Deadline first,期限付き公式大会/申込が迫る,公式大会を優先,取り返せない期限を最優先
+R02,2,First-win value,未勝利校が候補,加入選手+次unlock+勝率を評価,試合1回で戦力とルートを開く
+R03,3,Use actual loss history,同校に実機敗戦あり,公開ランクだけでなく負け実績をriskへ加点,実機履歴が最強の難易度観測
+R04,4,Cheer threshold,Cheer<20かつ応援ON特訓をしたい,学校活動でCheer補充候補を評価,実測の応援ON特訓は効率差が大きい
+R05,5,Resource opportunity cost,同じ目的を複数資源で達成可能,現在の高価値資源を温存,Sports=打撃特訓通貨。Studyは次地域紹介/施設との機会費用を都度評価。固定reserveではなく現在工程で判断。
+R06,6,Random outcome recheck,校内活動のCheer獲得,固定値扱いせず1回後に再読取,攻略Wikiが入手数ランダムと明記
+R07,7,No pre-game HP burn,重要試合直前,HP消費特訓を避ける/回復確認,特訓はHPを消費
+R08,8,Weakness alignment,育成行動,現在の最大課題へ寄せる,現状は投手力より打撃
+R09,9,Live placement,施設配置,公開基本値より実機プレビュー総効果を優先,周囲/範囲で実効値が変動
+R10,10,Affinity experimental gate,公開相性が強い,既存実測組を置換せずA/B 1回で検証,成長ランク差/実効値を live で確認
+R11,11,Reverse-roadmap gate,対戦/育成方針を選ぶ,現在Gateに対する情報価値と前進量を評価,Y2 FebはE/D勝利後、Cで再現性を測る価値が高い
+R12,12,Generation longevity,特訓対象/スタメン候補を選ぶ,3年目に残る選手の投資価値を加点,現3年生依存をY2夏までに解消する必要がある
