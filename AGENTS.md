@@ -1,57 +1,64 @@
 # Baseball Navigator Agent Contract
 
-## Authority and precedence
-1. Live user-reported game state in the current chat is the highest authority for the current run.
-2. `CURRENT_RUN_LEDGER.yaml` is the canonical repository state for the latest committed checkpoint.
-3. `DECISION_LOG.jsonl` records irreversible or strategically material decisions and their provenance.
-4. `SAPPORO_SPRINT_STRATEGY.md` defines the current Y1 October Sapporo sprint strategy.
-5. Historical Authority/Handoff/Archive material may provide evidence and prior measurements, but must not silently override current live state or current strategy.
+## Purpose
+This repository is the canonical control surface for the current live run. Historical Authority/Project/Library material is evidence input, not executable policy until reconciled into `DECISION_CONTRACT.json`.
 
-## Boot contract
-At the start of a new chat or after context loss, read in this order before recommending actions:
+## BOOT
+At the start of a new chat or after context loss, read in this order before recommending an action:
 1. `RUN_GUARD_POLICY.yaml`
-2. `CURRENT_RUN_LEDGER.yaml`
-3. the latest entry in `DECISION_LOG.jsonl`
-4. `SAPPORO_SPRINT_STRATEGY.md`
+2. `DECISION_CONTRACT.json`
+3. `CURRENT_RUN_LEDGER.yaml`
+4. latest entry in `DECISION_LOG.jsonl`
+5. `SAPPORO_SPRINT_STRATEGY.md`
 
-Do not reconstruct the run from conversational memory if these repository files are available.
+Do not reconstruct decision logic from conversation memory when these files are available.
 
-After BOOT, use FAST operation: keep the loaded state and strategy in working context. Do not reread the whole repository or rerun broad web research for ordinary gameplay turns. Reread/research only when a contradiction, UNKNOWN, strategic redesign, or explicit user request requires it.
+## Decision execution requirement
+Every actionable recommendation must be traceable to the decision contract.
+For ordinary reversible gameplay recommendations, include the controlling `rule_id` in the response when practical.
+For irreversible/material decisions recorded in the repository, the decision record MUST contain either:
+- `decision_basis.rule_id`, referencing an ACTIVE rule in `DECISION_CONTRACT.json`; or
+- `decision_basis.override`, with reason and revisit condition.
 
-## Live delta rule
-For ordinary gameplay, ingest only the new delta supplied by the user (screen/report/result), combine it with the loaded canonical state, and recommend the next action.
+Material decisions include at least: run abandonment/restart, official-tournament reload policy use, facility demolition, primary-core replacement, goal/branch change, and other actions explicitly marked material by the contract.
 
-If a new user report conflicts with the committed ledger, the new live report controls the current answer, and the conflict must be treated as a pending ledger update rather than silently rewriting history.
+A decision with no applicable rule must be recorded as `NO_RULE` with the missing-rule description. Repeated `NO_RULE` of the same class is a candidate for contract amendment, not a license for silent improvisation.
 
-## Evidence discipline
-Do not convert one observation into a global rule.
-Do not convert DISPLAYED into ELIGIBLE.
-Do not treat reset-assisted outcomes as STABLE.
-Do not fill UNKNOWN values by inference when the value is material to the next action.
+## FAST mode
+Do not execute the full historical research pipeline every turn.
+Every turn must run the FAST core:
+1. ingest live delta;
+2. classify current failure mode when relevant;
+3. apply hard constraints and deadlines;
+4. select one primary action plus fallback trigger from ACTIVE rules.
 
-Evidence priority:
-1. iOS Ver1.42 live observation / explicit user report
+Run the FULL checkpoint evaluation only when triggered by the contract (for example after a match, at month boundary, after a material unlock, or when the user explicitly requests a full audit). FULL evaluation may refresh relation graph, opportunity-cost scoring, roster classification, and unresolved high-value UNKNOWNs.
+
+## Authority precedence
+1. live iOS Ver1.42 observation / explicit user report for the current run
 2. in-game Help/Manual
 3. Kairosoft official information
 4. current Japanese Wiki
 5. English Wiki/community
-6. archive/historical run as contextual evidence only
+6. archived historical runs and legacy Authority files
+
+Public/legacy evidence never silently overrides live Ver1.42.
+
+## Evidence discipline
+- One observation may establish that event; it does not prove global optimum or causality.
+- Preserve `scope` and `sample_n` for generalized empirical claims.
+- Do not fill material UNKNOWN values by inference.
+- `DISPLAYED` does not imply `ELIGIBLE`.
+- A reset-assisted match win is not a stable win.
 
 ## Recommendation output
-For ordinary gameplay recommendations, output the actionable decision first. If special training is recommended, always identify all three participants, Cheer ON/OFF, target skill when relevant, and whether to ACCEPT or RELOAD the result.
+Lead with the next action.
+When recommending special training, specify all three participants, Cheer ON/OFF, target skill when relevant, and ACCEPT/RELOAD criteria.
+When the same strategy reaches its contract-defined failure trigger, apply the alternative rule rather than brute-force repetition.
 
-Use the current sprint strategy's decision rules instead of improvising an unrelated route.
+## Repository write discipline
+Do not claim a checkpoint/strategy/decision was saved unless a real repository write completed.
+Keep `CURRENT_RUN_LEDGER.yaml`, `DECISION_LOG.jsonl`, `DECISION_CONTRACT.json`, and `RUN_GUARD_POLICY.yaml` mutually consistent.
 
-When the same strategy clearly fails twice, require an alternative rather than a third brute-force repetition.
-
-## Run-state semantics
-`STABLE` means the result is supported without match-result reset assistance under the strategy's current Gate definition.
-`RESET_ASSISTED` means a desired result was obtained only after match-result reset/retry.
-`DISPLAYED` means visible/selectable and does not imply participation eligibility.
-
-## Repository write rule
-Do not claim that gameplay state or strategy was saved to GitHub unless a real repository write was completed.
-When committing run state, keep `CURRENT_RUN_LEDGER.yaml` and `DECISION_LOG.jsonl` consistent with `RUN_GUARD_POLICY.yaml`.
-
-## Current objective
-The active branch objective is Y1 October Sapporo sprint, not the prior safe Y2/Y3 national-title route. Historical safe-route material is evidence, not the execution target.
+## Active objective
+The active execution objective is the Y1 October Sapporo sprint. Legacy Y2/Y3 safe-route material is evidence only unless an ACTIVE contract rule explicitly imports it.
