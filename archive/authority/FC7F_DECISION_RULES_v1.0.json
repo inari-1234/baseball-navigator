@@ -1,0 +1,37 @@
+{
+  "stage": "FC-7F",
+  "version": "1.0",
+  "decision_contract": [
+    {"rule_id":"D00","rule":"Preserve FC-7E baseline identity. Measurement serves the route; the route is not distorted to serve measurement."},
+    {"rule_id":"D01","rule":"A single observation may confirm a mechanic/value for that event, but does not prove global optimum or causality."},
+    {"rule_id":"D02","rule":"A within-run low-level vs later-level pair may support a level-effect candidate only if drill, drill level and Cheer setting are comparable; full route-order causality is deferred to FC-7G."},
+    {"rule_id":"D03","rule":"Match value is state-dependent. Never convert observed samples into a fixed matches-per-month rule in FC-7F."},
+    {"rule_id":"D04","rule":"Roster decisions classify players as CORE_DEVELOP, BRIDGE_START, FUNCTIONAL, or REPLACE_CANDIDATE; low growth alone never forces benching."},
+    {"rule_id":"D05","rule":"Batter training follows observed failure mode: insufficient contact/strikeout problem -> batting; contact without run conversion -> middle-order slugging/skill candidate; adequate scoring -> stop marginal training and return to matches."},
+    {"rule_id":"D06","rule":"Pitcher training follows observed failure mode: walk/control collapse -> control; low K/contact problem -> breaking; broad power gap after control/breaking are adequate -> velocity candidate; if pitching keeps C-grade games winnable while offense binds, stop pitching investment."},
+    {"rule_id":"D07","rule":"Sports is not spent on school activities solely to generate calibration data. Point ROI is measured from strategically justified actions."},
+    {"rule_id":"D08","rule":"Items are measured only when strategically justified. Recovery ROI is primarily whether an otherwise blocked high-value action becomes available; broad equipment spending remains unresolved."},
+    {"rule_id":"D09","rule":"Facility count is never pre-fixed. Add capacity only when an observed recovery/movement/resource bottleneck blocks high-value activity; record before/after throughput."},
+    {"rule_id":"D10","rule":"Two equivalent failed attempts to extract a usable calibration signal trigger method change, not repeated brute-force measurement."},
+    {"rule_id":"D11","rule":"Current historical run may supply mechanic/control examples but may not be used as the fastest-route chronology or resource-allocation authority."},
+    {"rule_id":"D12","rule":"FC-7F outputs are calibration candidates. Global route selection and start/branch comparison remain FC-7G; combat thresholds remain FC-7H."}
+  ],
+  "release_gate_to_FC7G": {
+    "required": [
+      "FC7E start header complete",
+      "first representative match value captured",
+      "at least one low-level training measurement captured",
+      "roster decisions are logged with growth/fit/personality/current-ability context",
+      "batter and pitcher failure modes can be classified from live evidence",
+      "resource/item/facility modules contain observed rows if and only if those actions were strategically justified"
+    ],
+    "not_required": [
+      "all eight modules having equal sample counts",
+      "all growth grades observed",
+      "every opponent grade sampled",
+      "an item purchase solely for measurement",
+      "a second/third shower solely for measurement",
+      "a globally optimal numeric threshold"
+    ]
+  }
+}
