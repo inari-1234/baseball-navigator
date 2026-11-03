@@ -1,237 +1,68 @@
 {
   "schema_version": "1.0",
-  "ledger_version": 3,
+  "ledger_version": 4,
   "run_id": "SAPPORO_SPRINT_RESTART_20261103",
-  "expected_parent_sha": "f88c5e87ab81f43a000781f023fc8c66f4e966ed",
+  "expected_parent_sha": "02db1583718326631761cf7a2a64f819c4607ab6",
   "run_status": {
     "previous_run": "ABANDONED_FOR_REDESIGN",
     "new_run": "RESET_PLANNED_NOT_YET_STARTED",
-    "reason": "Y1 August Ogasawara required two resets before a 2-1 win; this is incompatible with the desired Y1 October Sapporo combat curve."
+    "reason": "Y1 August Ogasawara required two resets before a 2-1 win; incompatible with the desired Y1 October Sapporo stability curve."
   },
   "goal": {
     "primary": {
-      "id": "GOAL-Y1-SAPPOKO-B",
+      "id": "GOAL-Y1-SAPPOKO",
       "description": "Y1 10月 さっぽこ高校撃破",
       "locked": true,
-      "legacy_label": "B"
+      "published_profile_note": "Public tables describe Sapporo as overall C with strong pitching/defense; live run overrides public details."
     },
     "secondary": [
-      "Use practice matches as no-reset combat gates.",
-      "Exploit confirmed SAVE/LOAD skill rerolls for targeted special-training skills."
+      "Preserve first-attempt match results for stability measurement.",
+      "Use targeted skill SAVE/LOAD only under the scoped reroll evidence and current contract."
     ]
   },
-  "time": {
-    "year": 1,
-    "month": 8,
-    "clock": "POST-OGASAWARA / EXACT CLOCK NOT CAPTURED"
-  },
-  "current_gate": {
-    "id": "RESET_NEW_RUN_AND_CAPTURE_INITIAL_STATE",
-    "status": "READY",
-    "reason_refs": []
-  },
-  "canonical_strategy": {
-    "document": "SAPPORO_SPRINT_STRATEGY.md",
-    "boot_document": "AGENTS.md",
-    "mode": "Y1_OCTOBER_SAPPORO_SPRINT"
-  },
+  "time": {"year":1,"month":8,"clock":"PREVIOUS RUN ABANDONED / NEW RUN NOT STARTED"},
+  "current_gate": {"id":"RESET_NEW_RUN_AND_CAPTURE_INITIAL_STATE","status":"READY","reason_refs":[]},
+  "canonical_strategy": {"document":"SAPPORO_SPRINT_STRATEGY.md","boot_document":"AGENTS.md","decision_contract":"DECISION_CONTRACT.json","contract_version":"1.0.0","mode":"Y1_OCTOBER_SAPPORO_SPRINT"},
   "evidence": [
-    {
-      "evidence_id": "EV-ARCHIVE-BOOTSTRAP-001",
-      "kind": "ARCHIVE",
-      "locator": "pre-repository conversation handoff and prior Authority corpus",
-      "notes": "Historical support only; live user reports and current raw screens take precedence."
-    },
-    {
-      "evidence_id": "EV-USER-KOSHIEN-001",
-      "kind": "USER_ASSERTION",
-      "statement": "Y1 cannot challenge Koshien."
-    },
-    {
-      "evidence_id": "EV-RAW-OGASAWARA-20261103",
-      "kind": "RAW_EVIDENCE",
-      "locator": "ChatGPT conversation uploads IMG_8881.png, IMG_8882.png, IMG_8883.png (2026-11-03)",
-      "notes": "Ogasawara match/result screens from the abandoned run."
-    },
-    {
-      "evidence_id": "EV-USER-OGASAWARA-20261103",
-      "kind": "USER_ASSERTION",
-      "statement": "Ogasawara ended 2-1 after two resets; earlier branches were 0-0 and 0-2."
-    },
-    {
-      "evidence_id": "EV-USER-HP-ITEMS-20261103",
-      "kind": "USER_ASSERTION",
-      "statement": "Before Ogasawara, Taki and Ishiwata were around 60% HP; two candies each restored them to around 80%. Taki used sakuramochi and gained +4 long-hit."
-    },
-    {
-      "evidence_id": "EV-RAW-SKILL-REROLL-20261103",
-      "kind": "RAW_EVIDENCE",
-      "locator": "ChatGPT conversation upload IMG_8888.png (2026-11-03)",
-      "notes": "Special-training result screen showing Just Meet skill acquisition."
-    },
-    {
-      "evidence_id": "EV-USER-SKILL-REROLL-20261103",
-      "kind": "USER_ASSERTION",
-      "statement": "Reloading the same pre-training save produced Just Meet on the fifth attempt."
-    },
-    {
-      "evidence_id": "EV-DERIVED-SKILL-REROLL-20261103",
-      "kind": "VERIFIED_DERIVATION",
-      "source_refs": [
-        "EV-RAW-SKILL-REROLL-20261103",
-        "EV-USER-SKILL-REROLL-20261103"
-      ],
-      "notes": "At least one special-training skill acquisition is rerollable by SAVE/LOAD from the same pre-training state."
-    },
-    {
-      "evidence_id": "EV-DERIVED-OGASAWARA-UNSTABLE-20261103",
-      "kind": "VERIFIED_DERIVATION",
-      "source_refs": [
-        "EV-USER-OGASAWARA-20261103",
-        "EV-RAW-OGASAWARA-20261103"
-      ],
-      "notes": "The final win is not a stable no-reset clear."
-    }
+    {"evidence_id":"EV-ARCHIVE-BOOTSTRAP-001","kind":"ARCHIVE","locator":"pre-repository conversation handoff and prior Authority corpus","notes":"Historical support only; live user reports and current raw screens take precedence."},
+    {"evidence_id":"EV-USER-KOSHIEN-001","kind":"USER_ASSERTION","statement":"Y1 cannot challenge Koshien."},
+    {"evidence_id":"EV-RAW-OGASAWARA-20261103","kind":"RAW_EVIDENCE","locator":"ChatGPT conversation uploads IMG_8881.png, IMG_8882.png, IMG_8883.png (2026-11-03)","notes":"Ogasawara match/result screens from abandoned run."},
+    {"evidence_id":"EV-USER-OGASAWARA-20261103","kind":"USER_ASSERTION","statement":"Ogasawara ended 2-1 after two resets; earlier branches were 0-0 and 0-2."},
+    {"evidence_id":"EV-USER-HP-ITEMS-20261103","kind":"USER_ASSERTION","statement":"Before Ogasawara, Taki and Ishiwata were around 60% HP; two candies each restored them to around 80%. Taki used sakuramochi and gained +4 long-hit."},
+    {"evidence_id":"EV-RAW-SKILL-REROLL-20261103","kind":"RAW_EVIDENCE","locator":"ChatGPT conversation upload IMG_8888.png (2026-11-03)","notes":"Special-training result screen showing Just Meet acquisition."},
+    {"evidence_id":"EV-USER-SKILL-REROLL-20261103","kind":"USER_ASSERTION","statement":"Reloading the same pre-training save produced Just Meet on the fifth attempt."},
+    {"evidence_id":"EV-DERIVED-SKILL-REROLL-20261103","kind":"VERIFIED_DERIVATION","source_refs":["EV-RAW-SKILL-REROLL-20261103","EV-USER-SKILL-REROLL-20261103"],"notes":"Scoped statement only: at least one observed training/skill result changed across SAVE/LOAD retries from the same pre-training state."},
+    {"evidence_id":"EV-DERIVED-OGASAWARA-UNSTABLE-20261103","kind":"VERIFIED_DERIVATION","source_refs":["EV-USER-OGASAWARA-20261103","EV-RAW-OGASAWARA-20261103"],"notes":"Final win is not a stable no-reset clear."},
+    {"evidence_id":"EV-ARCHIVE-DECISION-ENGINE-20261103","kind":"ARCHIVE","locator":"archive/authority/ plus DECISION_RULE_CROSSWALK.md","notes":"Legacy FC7F/FC7FR/Authority recommendation engine preserved without automatic activation."}
   ],
   "facts": [
-    {
-      "fact_id": "FACT-SKILL-REROLL-CONFIRMED",
-      "fact_type": "DERIVED",
-      "path": "mechanics.skill_reroll_by_save_load",
-      "value": true,
-      "source_refs": [
-        "EV-DERIVED-SKILL-REROLL-20261103"
-      ],
-      "usable_for_decision": true
-    },
-    {
-      "fact_id": "FACT-JUST-MEET-REROLL-ATTEMPT",
-      "fact_type": "OBSERVED",
-      "path": "mechanics.skill_reroll_sample.just_meet_attempt",
-      "value": 5,
-      "source_refs": [
-        "EV-USER-SKILL-REROLL-20261103"
-      ],
-      "usable_for_decision": true
-    },
-    {
-      "fact_id": "FACT-OGASAWARA-FINAL-RESULT",
-      "fact_type": "OBSERVED",
-      "path": "previous_run.ogasawara.final_result",
-      "value": "2-1 WIN",
-      "source_refs": [
-        "EV-USER-OGASAWARA-20261103",
-        "EV-RAW-OGASAWARA-20261103"
-      ],
-      "usable_for_decision": true
-    },
-    {
-      "fact_id": "FACT-OGASAWARA-RESET-COUNT",
-      "fact_type": "OBSERVED",
-      "path": "previous_run.ogasawara.reset_count_before_win",
-      "value": 2,
-      "source_refs": [
-        "EV-USER-OGASAWARA-20261103"
-      ],
-      "usable_for_decision": true
-    },
-    {
-      "fact_id": "FACT-OGASAWARA-STABLE-CLEAR",
-      "fact_type": "DERIVED",
-      "path": "previous_run.ogasawara.stable_clear",
-      "value": false,
-      "source_refs": [
-        "EV-DERIVED-OGASAWARA-UNSTABLE-20261103"
-      ],
-      "usable_for_decision": true
-    },
-    {
-      "fact_id": "FACT-TAKI-SAKURAMOCHI-LONGHIT",
-      "fact_type": "OBSERVED",
-      "path": "previous_run.items.taki_sakuramochi_longhit_delta",
-      "value": 4,
-      "source_refs": [
-        "EV-USER-HP-ITEMS-20261103"
-      ],
-      "usable_for_decision": true
-    }
+    {"fact_id":"FACT-SKILL-REROLL-OBSERVED-CASE","fact_type":"DERIVED","path":"mechanics.skill_reroll.observed_case","value":{"skill":"Just Meet","attempt":5,"same_pretraining_save":true,"sample_n":1},"source_refs":["EV-DERIVED-SKILL-REROLL-20261103"],"usable_for_decision":true},
+    {"fact_id":"FACT-SKILL-REROLL-GENERALIZATION","fact_type":"HYPOTHESIS","path":"mechanics.skill_reroll.generalizes_to_other_drills_skills","value":"PLAUSIBLE_NOT_VERIFIED","source_refs":["EV-DERIVED-SKILL-REROLL-20261103"],"usable_for_decision":true},
+    {"fact_id":"FACT-OGASAWARA-FINAL-RESULT","fact_type":"OBSERVED","path":"previous_run.ogasawara.final_result","value":"2-1 WIN","source_refs":["EV-USER-OGASAWARA-20261103","EV-RAW-OGASAWARA-20261103"],"usable_for_decision":true},
+    {"fact_id":"FACT-OGASAWARA-RESET-COUNT","fact_type":"OBSERVED","path":"previous_run.ogasawara.reset_count_before_win","value":2,"source_refs":["EV-USER-OGASAWARA-20261103"],"usable_for_decision":true},
+    {"fact_id":"FACT-OGASAWARA-STABLE-CLEAR","fact_type":"DERIVED","path":"previous_run.ogasawara.stable_clear","value":false,"source_refs":["EV-DERIVED-OGASAWARA-UNSTABLE-20261103"],"usable_for_decision":true},
+    {"fact_id":"FACT-TAKI-SAKURAMOCHI-LONGHIT","fact_type":"OBSERVED","path":"previous_run.items.taki_sakuramochi_longhit_delta","value":4,"source_refs":["EV-USER-HP-ITEMS-20261103"],"usable_for_decision":true}
   ],
   "strategy_policy": {
-    "fixed_cores": {
-      "batting": "Irie Dokonjo",
-      "pitching": "Ishiwata Shoto"
-    },
-    "training_participant_priority": [
-      "fixed_core_for_this_training",
-      "ability_match",
-      "type_affinity_bonus",
-      "growth_rank",
-      "Y1_October_lineup_contribution",
-      "future_roster_value"
-    ],
-    "skill_reroll": {
-      "enabled": true,
-      "method": "SAVE before special training; LOAD and retry until target/acceptable skill outcome; only accepted attempt consumes committed resources.",
-      "scope": "Targeted core skills, not indiscriminate infinite rerolls."
-    },
-    "match_reset": {
-      "practice": "PROHIBITED_FOR_GATE_MEASUREMENT",
-      "official": "ONE_SELECTIVE_RELOAD_ONLY_FOR_CLOSE_CLEARLY_STOCHASTIC_REQUIRED_LOSS",
-      "sapporo": "A reset-assisted win is WIN_UNSTABLE and must be recorded separately."
-    },
-    "level1_policy": "Do not stall at Lv1 merely to preserve its skill pool. Use cheap early Lv1 opportunities to secure high-value minimum-level skills, then progress.",
-    "response_mode": "FAST_AFTER_BOOT"
+    "core_candidates": {"batting":"Irie Dokonjo","pitching":"Ishiwata Shoto","lock_status":"PENDING_NEW_RUN_INITIAL_CAPTURE","rule_id":"DC-ROSTER-001"},
+    "training_participant_factors": ["mandatory_core_need","low_level_efficiency","drill_fit_current_ability","growth","type_affinity_bonus","Y1_October_lineup_contribution"],
+    "excluded_factor": "post_October_future_roster_value",
+    "skill_reroll": {"enabled":"TARGETED_SCOPED","claim_id":"CLAIM-SKILL-REROLL-001","rule_id":"DC-TRAIN-001","note":"Observed sample_n=1; do not claim universal probabilities."},
+    "match_reset": {"practice":"PROHIBITED_FOR_GATE_MEASUREMENT","official":"FIRST_ATTEMPT_IS_STABILITY_EVIDENCE; LATER_RELOADS_MAY_PURSUE_ACHIEVEMENT","sapporo":"RESET_ASSISTED never equals STABLE","rule_ids":["DC-RESET-001","DC-RESET-002"]},
+    "response_mode": "FAST_WITH_RULE_REFS"
   },
   "milestone_gates": [
-    {
-      "window": "Y1 Jun end",
-      "required": "F-grade no-reset stability; >=1 high-value Irie skill target"
-    },
-    {
-      "window": "Y1 Jul end",
-      "required": "E-grade no-reset stability and repeated >=2-run offense",
-      "failure_state": "BEHIND_PLAN"
-    },
-    {
-      "window": "Y1 Aug end",
-      "required": "Upper E/D no-reset credible wins; Ishiwata 0-1 run band; offense reproducibly 2-3 runs",
-      "failure_state": "HIGH_RISK"
-    },
-    {
-      "window": "Y1 Sep",
-      "required": "Prefectural official advancement/title; protect ace HP",
-      "failure_state": "ROUTE_CRITICAL"
-    },
-    {
-      "window": "Y1 Oct",
-      "required": "Regional progression and Sapporo defeat",
-      "failure_state": "GOAL_FAIL"
-    }
+    {"window":"Y1 Jun end","required":"F-grade no-reset wins sufficiently reliable; no persistent zero-run branch; meaningful low-level core development completed"},
+    {"window":"Y1 Jul end","required":"E-grade credible no-reset wins; repeated >=2-run offense; Sapporo/regional route screen checked","failure_state":"BEHIND_PLAN"},
+    {"window":"Y1 Aug end","required":"Upper-E/D credible no-reset wins; repeated 0-run branches absent; pitching makes benchmark winnable","failure_state":"HIGH_RISK"},
+    {"window":"Y1 Sep","required":"Prefectural official advancement/title; official-series HP protected","failure_state":"ROUTE_CRITICAL"},
+    {"window":"Y1 Oct","required":"Regional progression and Sapporo defeat","failure_state":"GOAL_FAIL"}
   ],
-  "eligibility": {
-    "koshien_y1": {
-      "displayed": true,
-      "eligible": false,
-      "available_now": false,
-      "source_refs": [
-        "EV-USER-KOSHIEN-001"
-      ]
-    }
-  },
+  "eligibility": {"koshien_y1":{"displayed":true,"eligible":false,"available_now":false,"source_refs":["EV-USER-KOSHIEN-001"]}},
   "unknowns": [
-    {
-      "unknown_id": "UNK-NEW-RUN-INITIAL-STATE",
-      "field": "new_run.initial_state",
-      "status": "OPEN",
-      "material_to_next_action": false,
-      "reason": "The new run has not yet been started; the next action is precisely to reset and capture the initial screen."
-    },
-    {
-      "unknown_id": "UNK-SKILL-REROLL-PROBABILITIES",
-      "field": "mechanics.skill_reroll_probability_distribution",
-      "status": "OPEN",
-      "material_to_next_action": false,
-      "reason": "Reroll feasibility is established; exact probabilities are not required to start the sprint run."
-    }
+    {"unknown_id":"UNK-NEW-RUN-INITIAL-STATE","field":"new_run.initial_state","status":"OPEN","material_to_next_action":false,"material_to_goal":true,"default":"Do not hard-lock roster/core before capture.","resolve_by":"Start fresh run and capture initial roster/state."},
+    {"unknown_id":"UNK-SAPPORO-ROUTE-ORDER","field":"route.sapporo.exact_october_bracket_order","status":"OPEN","material_to_next_action":false,"material_to_goal":true,"default":"Historical encounter supports Y1-Oct reachability, but exact bracket/order is not assumed.","resolve_by":"Check route/tournament screens by Y1 July and again before September/October."},
+    {"unknown_id":"UNK-NEW-MEMBER-REROLL","field":"mechanics.new_member_reroll","status":"OPEN","material_to_next_action":false,"material_to_goal":false,"default":"Do not assume entrant reroll changes identity/quality.","resolve_by":"At reproducible new-member save point, compare 2-3 reload outcomes."},
+    {"unknown_id":"UNK-SKILL-REROLL-PROBABILITIES","field":"mechanics.skill_reroll_probability_distribution","status":"OPEN","material_to_next_action":false,"material_to_goal":false,"default":"Use only targeted scoped rerolls; no probability assumptions.","resolve_by":"Record accepted/rejected attempts across early new-run training."}
   ]
 }
