@@ -1,0 +1,65 @@
+name: Archive Byte Restore
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "archive/authority/_byte_sources/entity_relations.csv.b64.part*"
+      - ".github/workflows/archive_byte_restore.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: archive-byte-restore-main
+  cancel-in-progress: false
+
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Reconstruct and verify exact archive bytes
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import base64, hashlib
+
+          root = Path('archive/authority')
+          parts = sorted((root / '_byte_sources').glob('entity_relations.csv.b64.part*'))
+          if len(parts) != 7:
+              raise SystemExit(f'expected 7 parts, found {len(parts)}')
+          encoded = ''.join(p.read_text(encoding='ascii').strip() for p in parts)
+          data = base64.b64decode(encoded, validate=True)
+          expected_size = 27073
+          expected_sha = '6e8a84e41d3bc438851ea8b9738132d5651f25c5ea7e2ee393fa8c4c5805613d'
+          actual_sha = hashlib.sha256(data).hexdigest()
+          if len(data) != expected_size:
+              raise SystemExit(f'size mismatch: {len(data)} != {expected_size}')
+          if actual_sha != expected_sha:
+              raise SystemExit(f'sha256 mismatch: {actual_sha} != {expected_sha}')
+          (root / 'entity_relations.csv').write_bytes(data)
+          print(f'verified {len(data)} bytes sha256={actual_sha}')
+          PY
+
+      - name: Commit exact restored file if changed
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- archive/authority/entity_relations.csv; then
+            echo "archive file already exact"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add archive/authority/entity_relations.csv
+          git commit -m "Restore exact entity-relations archive bytes"
+          git push origin HEAD:main
