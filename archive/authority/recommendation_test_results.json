@@ -1,0 +1,59 @@
+[
+  {
+    "case": "current_cheer13",
+    "expected": "手作りおにぎり",
+    "actual": "手作りおにぎり",
+    "pass": true,
+    "detail": {
+      "primary": "手作りおにぎり",
+      "score": 65,
+      "trace": {
+        "remain": 42,
+        "need_cheer": 7,
+        "random": true,
+        "empirical": 0
+      },
+      "fallback": "実行後に応援ptを再確認。20未満なら時間/試合/資源を再評価し固定連打しない。",
+      "all_candidates": [
+        [65,"手作りおにぎり",{"remain":42,"need_cheer":7,"random":true,"empirical":0}],
+        [42,"清掃活動",{"remain":29,"need_cheer":7,"random":true,"empirical":4}],
+        [35,"ノックのお手伝い",{"remain":107,"need_cheer":7,"random":true,"empirical":0}]
+      ]
+    }
+  },
+  {
+    "case": "safe_opponent_current",
+    "expected": "調子商業高校",
+    "actual": "調子商業高校",
+    "pass": true,
+    "detail": {
+      "primary": "調子商業高校",
+      "all_candidates": [
+        [40,"調子商業高校",{"school":"調子商業高校","time":"14:00","grade":"F","prize_yen":2000,"fee_yen":200,"first_win":true}],
+        [37,"貞京第五高校",{"school":"貞京第五高校","time":"11:00","grade":"E","prize_yen":3000,"fee_yen":300,"first_win":true}]
+      ],
+      "fallback": "安全優先なら実機敗戦歴の少ない/低ランク未勝利校。ルート速度優先時はchain価値を上げる。"
+    }
+  },
+  {
+    "case": "study_reserve_december",
+    "expected": "do_not_spend_below30",
+    "actual": "37-30=7 would violate reserve; region introduction itself is allowed when selected",
+    "pass": true,
+    "detail": "Ordinary study-cost action is penalized if it reduces study below30; explicit principal region unlock is a goal action, not reserve violation."
+  },
+  {
+    "case": "affinity_current_team",
+    "expected": "協力プレイ and パーティピープル available",
+    "actual": "ファイト一発,ファイト一発,ファイト一発,ファイト一発,ポジティブ,ポジティブ,ポジティブ,ポジティブ,ポケベル,オンステージ,オンステージ,パーティピープル,パーティピープル,ユニゾン,協力プレイ,協力プレイ",
+    "pass": true,
+    "detail": "A/B gate required before replacing proven 入江/今井/芦田 group"
+  },
+  {
+    "case": "water_fountain",
+    "expected": "adjacent shower if live preview comparable",
+    "actual": "rule present",
+    "pass": true,
+    "detail": "live preview overrides combo geometry when material difference"
+  }
+]
