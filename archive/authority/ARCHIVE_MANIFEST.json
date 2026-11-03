@@ -1,0 +1,16 @@
+{
+  "archive_status": "IMMUTABLE_EVIDENCE_NOT_EXECUTABLE",
+  "source": "ChatGPT Library / Authority v1.3 CORE + FC7F/FC7FR Library files",
+  "files": [
+    {"name":"Authority_v1_3.json","sha256":"489ef527c82da82ce9eff57b157ad3eb74150f5e91a79e3bbc23b47f7c50a0f6","bytes":5250},
+    {"name":"RECOMMENDATION_ENGINE_v1_3.md","sha256":"195c90d624568144adec4a72ba2a27d94b9160a605b0dbbe7eace69028b1a6da","bytes":1561},
+    {"name":"recommendation_engine.py","sha256":"8e808cd29296a4e0359900d61e5290eff3ecc57462850ed65c7a6678360602b0","bytes":2887},
+    {"name":"decision_features.csv","sha256":"2123375b940b9bc58dc76929605cd656af0cc78ab5e2337a29d1f7c4c6e9b03c","bytes":539},
+    {"name":"recommendation_rules.csv","sha256":"49132e9a23352b7782e3c30ab3759236f936b275db849bc871fa1be8ff923ed8","bytes":1856},
+    {"name":"entity_relations.csv","sha256":"6e8a84e41d3bc438851ea8b9738132d5651f25c5ea7e2ee393fa8c4c5805613d","bytes":27073},
+    {"name":"recommendation_test_cases.csv","sha256":"a2079149a0f1d92364b1803d2229596df674b04190d98d5cd5dffda4d587fc75","bytes":281},
+    {"name":"recommendation_test_results.json","sha256":"d60deeb510afcf0d35ecb6bfc13f92c561ead05771dfaccea88e55bbb8f04653","bytes":3169},
+    {"name":"FC7F_DECISION_RULES_v1.0.json","sha256":"88e3317a9c19f981ba3fab5c6fbcf3daa6dd74990996ed7f3f7bde9cad0c16cd","bytes":3381},
+    {"name":"FC7FR_DECISION_RULES_v0.1.json","sha256":"a4e2bd58bcf4b561e331e1672fcf6ca2fa997038deec6642623754fa7fb52022","bytes":4936}
+  ]
+}
