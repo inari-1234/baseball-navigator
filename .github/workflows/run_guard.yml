@@ -2,7 +2,7 @@ name: Run Guard
 
 on:
   push:
-    branches: [main, "fix/**", "feature/formation-screenshot-reader-v1"]
+    branches: [main, "fix/**", "feature/formation-screenshot-reader-v1", "feature/result-number-reader-v1"]
     paths:
       - "CURRENT_RUN_LEDGER.yaml"
       - "RUN_GUARD_POLICY.yaml"
@@ -17,6 +17,7 @@ on:
       - "LIVE_EVENTS.jsonl"
       - "live_state_engine.py"
       - "screen_reader.py"
+      - "score_digits.py"
       - "tests/**"
       - "docs/LIVE_OBSERVATION_CONTRACT.md"
       - "docs/SCREEN_READER.md"
