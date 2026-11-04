@@ -205,6 +205,103 @@ def read_roster_page(image: Image.Image) -> dict[str, Any] | None:
             "player_stats_verified":False, "visible_rows_not_identified":True}
 
 
+# Source-verified native v1.42 player-list batting-value glyphs.
+# Compact, exact five-by-seven silhouette masks from actual pixels. 9 has
+# no trusted source and is deliberately absent; do not infer a font-wide OCR.
+_ROSTER_BATTING_FONT = {
+    "0": (0x7e35ad63f,),
+    "1": (0x7294b4adc, 0x7296b4adc),
+    "2": (0x7e3d8de3f,),
+    "3": (0x7e378de3f,),
+    "4": (0x72978d6bf, 0x72d78d6bf),
+    "5": (0x7e378f63f,),
+    "6": (0x7e358f63f,),
+    "7": (0x7294bd63f,),
+    "8": (0x7e358d63f,),
+}
+_ROSTER_BATTING_ROW_Y = (361, 452, 542, 633, 723, 813, 904)
+_ROSTER_BATTING_COLUMNS = {
+    "batting": (1492, 2),
+    "slugging": (1668, 3),
+    "running": (1843, 2),
+}
+_ROSTER_NUMERIC_INK = (23, 34, 53)
+
+
+def _roster_numeric_glyph(image: Image.Image, right: int, top: int,
+                          place: int) -> tuple[int, int]:
+    """Return recognized silhouette plus raw-ink count for one fixed slot."""
+    left = right - 24 - 25*place
+    crop = image.crop((left, top, left+25, top+36)).convert("RGB")
+    pix = list(crop.getdata())
+    mask = [pixel == _ROSTER_NUMERIC_INK for pixel in pix]
+    count = sum(mask)
+    bits = 0
+    for by in range(7):
+        for bx in range(5):
+            coverage = sum(mask[y*25+x]
+                           for y in range(by*5, by*5+5)
+                           for x in range(bx*5, bx*5+5))
+            if coverage >= 12:
+                bits |= 1 << (by*5+bx)
+    return bits, count
+
+
+def _read_roster_batting_number(image: Image.Image, right: int,
+                                top: int, max_digits: int) -> int | None:
+    """Exact known digits only; a present unknown glyph is never omitted."""
+    numbers = []
+    seen_blank = False
+    for place in range(max_digits):
+        bits, ink_count = _roster_numeric_glyph(image, right, top, place)
+        # The source has <=52 stray outline pixels in an empty leading slot.
+        if ink_count < 100:
+            if not numbers:
+                return None
+            seen_blank = True
+            continue
+        if seen_blank:
+            return None
+        matches = [digit for digit, patterns in _ROSTER_BATTING_FONT.items()
+                   if bits in patterns]
+        if len(matches) != 1:
+            return None
+        numbers.append(matches[0])
+    if not numbers:
+        return None
+    # A third or fourth glyph outside the supported digit width must not
+    # silently truncate the actual value.
+    if _roster_numeric_glyph(image, right, top, max_digits)[1] >= 100:
+        return None
+    return int("".join(reversed(numbers)))
+
+
+def read_roster_batting_values(image: Image.Image) -> dict[str, Any]:
+    """Position-indexed batting numbers only, with no claimed player mapping.
+
+    This does not read player names, attributes of other pages, E/F grades,
+    season/date, or actual live state. Rows may be scrolled between captures.
+    """
+    if image.size != (BASE_W, BASE_H):
+        return {"status": "UNSUPPORTED_SCALE", "rows": []}
+    page = read_roster_page(image)
+    if page is None or page.get("page_index") != 2:
+        return {"status": "UNSUPPORTED_PAGE", "rows": []}
+    im = image.convert("RGB")
+    rows = []
+    errors = []
+    for row_index, top in enumerate(_ROSTER_BATTING_ROW_Y, 1):
+        fields = {field: _read_roster_batting_number(im, right, top, digits)
+                  for field, (right, digits) in _ROSTER_BATTING_COLUMNS.items()}
+        if any(value is None for value in fields.values()):
+            errors.append(f"UNKNOWN_BATTING_GLYPH_ROW:{row_index}")
+        rows.append({"visible_row": row_index, **fields})
+    return {"status": "PASS" if not errors else "NEEDS_REVIEW",
+            "page_index": 2, "rows": rows, "errors": errors,
+            "names_verified": False, "player_identities_verified": False,
+            "ability_grades_verified": False, "live_state_current": False}
+
+
 def read_image(path: str | Path) -> dict[str, Any]:
     path = Path(path)
     raw = path.read_bytes()
@@ -215,6 +312,8 @@ def read_image(path: str | Path) -> dict[str, Any]:
             if roster is not None:
                 result={"screen_type":"ROSTER_LIST", "positions":{},
                         "roster_page":roster}
+                if roster["page_index"]==2:
+                    result["roster_batting_values"]=read_roster_batting_values(im)
             else:
                 result["screen_type"] = _other_screen_type(im.convert("RGB"))
         if result["screen_type"]=="BATTER_RESULTS":
