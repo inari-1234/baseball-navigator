@@ -160,13 +160,63 @@ def _other_screen_type(image: Image.Image) -> str:
     return "UNSUPPORTED"
 
 
+# Source-derived title and page-digit masks from native iOS v1.42 roster
+# screenshots (pages 1-6). These classify the VIEW only; they do not decode
+# Japanese names, numbers, traits, scroll offset, or player identities.
+_ROSTER_TITLE_MASK = 0x1000000000126000078ff41280000406680820000402080820007fe2480823ff0407e80003ff04024c01f0000407e003f000040128
+_ROSTER_PAGE_MASKS = {
+    1: 0xc00840840040040040040040040040040,
+    2: 0xc008f88180100300600400c00c0080080,
+    3: 0xc008f88c81801801800c00700c0080180,
+    4: 0xc008c08c00c01fc0cc0c80d80d00d00e0,
+    5: 0xc008788c81801801800800d8078018018,
+    6: 0xc008f08d81881881881881980f8008018,
+}
+
+
+def _roster_blue_mask(image: Image.Image, box: tuple[int,int,int,int],
+                      size: tuple[int,int]) -> int:
+    crop=image.crop(box).convert("RGB")
+    ink=Image.new("L",crop.size)
+    ink.putdata([255 if r<45 and 25<=g<=75 and 120<=b<=185 else 0
+                 for r,g,b in crop.getdata()])
+    sampled=ink.resize(size,Image.Resampling.NEAREST)
+    return sum(1<<i for i,val in enumerate(sampled.getdata()) if val>127)
+
+
+def read_roster_page(image: Image.Image) -> dict[str, Any] | None:
+    """Recognize a verified native roster-list page, not the roster contents.
+
+    Unknown fonts, page indicators, or scales fail closed. In particular,
+    a row position is NOT an identity when a list has been scrolled.
+    """
+    if image.size!=(BASE_W,BASE_H):
+        return None
+    title=_roster_blue_mask(image,(1120,160,1375,220),(48,12))
+    if (title^_ROSTER_TITLE_MASK).bit_count()>5:
+        return None
+    number=_roster_blue_mask(image,(1390,163,1435,218),(12,16))
+    distances=sorted(((number^bits).bit_count(),page)
+                     for page,bits in _ROSTER_PAGE_MASKS.items())
+    if distances[0][0]>4 or distances[1][0]-distances[0][0]<6:
+        return None
+    return {"page_index":distances[0][1], "page_count":6,
+            "status":"PAGE_ONLY", "names_verified":False,
+            "player_stats_verified":False, "visible_rows_not_identified":True}
+
+
 def read_image(path: str | Path) -> dict[str, Any]:
     path = Path(path)
     raw = path.read_bytes()
     with Image.open(io.BytesIO(raw)) as im:
         result = read_formation(im)
         if result["screen_type"] == "UNSUPPORTED":
-            result["screen_type"] = _other_screen_type(im.convert("RGB"))
+            roster=read_roster_page(im)
+            if roster is not None:
+                result={"screen_type":"ROSTER_LIST", "positions":{},
+                        "roster_page":roster}
+            else:
+                result["screen_type"] = _other_screen_type(im.convert("RGB"))
         if result["screen_type"]=="BATTER_RESULTS":
             result["batter_stats"]=read_batter_stats(im)
         elif result["screen_type"]=="PITCHER_RESULTS":
