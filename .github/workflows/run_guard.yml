@@ -2,7 +2,7 @@ name: Run Guard
 
 on:
   push:
-    branches: [main]
+    branches: [main, fix/live-state-ingestion-v1]
     paths:
       - "CURRENT_RUN_LEDGER.yaml"
       - "RUN_GUARD_POLICY.yaml"
@@ -12,6 +12,12 @@ on:
       - "validate_decision_contract.py"
       - "DECISION_LOG.jsonl"
       - "AGENTS.md"
+      - "CURRENT_HANDOFF.md"
+      - "CURRENT_LIVE_STATE.json"
+      - "LIVE_EVENTS.jsonl"
+      - "live_state_engine.py"
+      - "tests/**"
+      - "docs/LIVE_OBSERVATION_CONTRACT.md"
       - "SAPPORO_SPRINT_STRATEGY.md"
       - ".github/workflows/run_guard.yml"
   workflow_dispatch:
@@ -59,3 +65,13 @@ jobs:
           python3 validate_decision_contract.py \
             --json-out "${RUNNER_TEMP}/DECISION_CONTRACT_RESULT.json"
           cat "${RUNNER_TEMP}/DECISION_CONTRACT_RESULT.json" >> "${GITHUB_STEP_SUMMARY}"
+
+      - name: Test live state ingestion and replay
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests -v
+          python3 live_state_engine.py \
+            --events LIVE_EVENTS.jsonl \
+            --snapshot CURRENT_LIVE_STATE.json \
+            --contract DECISION_CONTRACT.json

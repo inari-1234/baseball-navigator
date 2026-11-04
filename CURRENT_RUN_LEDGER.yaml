@@ -1,12 +1,12 @@
 {
   "schema_version": "1.0",
-  "ledger_version": 5,
+  "ledger_version": 6,
   "run_id": "SAPPORO_SPRINT_RESTART_20261103",
-  "expected_parent_sha": "accf87668e8ccd2b98e576157070b90247e3aca5",
+  "expected_parent_sha": "059924e7106eb0424d1f23c95ddda3fed1ac6a73",
   "run_status": {
     "previous_run": "ABANDONED_FOR_REDESIGN",
-    "new_run": "ACTIVE_INITIALIZED",
-    "reason": "Fresh Y1 April run started; initial roster/state captured from live iOS Ver1.42 screenshots."
+    "new_run": "ACTIVE_AFTER_JULY_MATCHES_REPORTED_COMPLETE",
+    "reason": "Current exact time/resources unknown after user reports July matches completed. LIVE_EVENTS is the event authority, ledger retains provenance."
   },
   "goal": {
     "primary": {
@@ -20,56 +20,438 @@
       "Use targeted skill SAVE/LOAD only under the scoped reroll evidence and current contract."
     ]
   },
-  "time": {"year":1,"month":4,"clock":"AM 9:10"},
-  "current_gate": {"id":"INITIAL_FORMATION_AND_RESOURCE_BUILD","status":"READY","reason_refs":[]},
-  "canonical_strategy": {"document":"SAPPORO_SPRINT_STRATEGY.md","boot_document":"AGENTS.md","decision_contract":"DECISION_CONTRACT.json","contract_version":"1.0.0","mode":"Y1_OCTOBER_SAPPORO_SPRINT"},
+  "time": {
+    "year": 1,
+    "month": null,
+    "clock": "UNKNOWN",
+    "earliest_confirmed_period": "Y1-07",
+    "interpretation": "7月 matches reported completed; current exact calendar/date not observed"
+  },
+  "current_gate": {
+    "id": "POST_JULY_LIVE_STATE_RECONCILE",
+    "status": "BLOCKED_UNKNOWN",
+    "reason_refs": [
+      "UNK-POST-JULY-CURRENT-SCREEN"
+    ]
+  },
+  "canonical_strategy": {
+    "document": "SAPPORO_SPRINT_STRATEGY.md",
+    "boot_document": "AGENTS.md",
+    "decision_contract": "DECISION_CONTRACT.json",
+    "contract_version": "1.1.0",
+    "mode": "Y1_OCTOBER_SAPPORO_SPRINT",
+    "live_events": "LIVE_EVENTS.jsonl",
+    "current_live_state": "CURRENT_LIVE_STATE.json"
+  },
   "evidence": [
-    {"evidence_id":"EV-ARCHIVE-BOOTSTRAP-001","kind":"ARCHIVE","locator":"pre-repository conversation handoff and prior Authority corpus","notes":"Historical support only; live user reports and current raw screens take precedence."},
-    {"evidence_id":"EV-USER-KOSHIEN-001","kind":"USER_ASSERTION","statement":"Y1 cannot challenge Koshien."},
-    {"evidence_id":"EV-RAW-OGASAWARA-20261103","kind":"RAW_EVIDENCE","locator":"ChatGPT conversation uploads IMG_8881.png, IMG_8882.png, IMG_8883.png (2026-11-03)","notes":"Ogasawara match/result screens from abandoned run."},
-    {"evidence_id":"EV-USER-OGASAWARA-20261103","kind":"USER_ASSERTION","statement":"Ogasawara ended 2-1 after two resets; earlier branches were 0-0 and 0-2."},
-    {"evidence_id":"EV-USER-HP-ITEMS-20261103","kind":"USER_ASSERTION","statement":"Before Ogasawara, Taki and Ishiwata were around 60% HP; two candies each restored them to around 80%. Taki used sakuramochi and gained +4 long-hit."},
-    {"evidence_id":"EV-RAW-SKILL-REROLL-20261103","kind":"RAW_EVIDENCE","locator":"ChatGPT conversation upload IMG_8888.png (2026-11-03)","notes":"Special-training result screen showing Just Meet acquisition."},
-    {"evidence_id":"EV-USER-SKILL-REROLL-20261103","kind":"USER_ASSERTION","statement":"Reloading the same pre-training save produced Just Meet on the fifth attempt."},
-    {"evidence_id":"EV-DERIVED-SKILL-REROLL-20261103","kind":"VERIFIED_DERIVATION","source_refs":["EV-RAW-SKILL-REROLL-20261103","EV-USER-SKILL-REROLL-20261103"],"notes":"Scoped statement only: at least one observed training/skill result changed across SAVE/LOAD retries from the same pre-training state."},
-    {"evidence_id":"EV-DERIVED-OGASAWARA-UNSTABLE-20261103","kind":"VERIFIED_DERIVATION","source_refs":["EV-USER-OGASAWARA-20261103","EV-RAW-OGASAWARA-20261103"],"notes":"Final win is not a stable no-reset clear."},
-    {"evidence_id":"EV-ARCHIVE-DECISION-ENGINE-20261103","kind":"ARCHIVE","locator":"archive/authority/ plus DECISION_RULE_CROSSWALK.md","notes":"Legacy FC7F/FC7FR/Authority recommendation engine preserved without automatic activation."},
-    {"evidence_id":"EV-RAW-NEW-RUN-INITIAL-20261103","kind":"RAW_EVIDENCE","locator":"ChatGPT conversation uploads IMG_8894.png through IMG_8906.png (2026-11-03)","notes":"Fresh-run initial lineup, batting, pitching, fielding/basic stats, personality/growth and Y1 Apr AM9:10 resource screen."}
+    {
+      "evidence_id": "EV-ARCHIVE-BOOTSTRAP-001",
+      "kind": "ARCHIVE",
+      "locator": "pre-repository conversation handoff and prior Authority corpus",
+      "notes": "Historical support only; live user reports and current raw screens take precedence."
+    },
+    {
+      "evidence_id": "EV-USER-KOSHIEN-001",
+      "kind": "USER_ASSERTION",
+      "statement": "Y1 cannot challenge Koshien."
+    },
+    {
+      "evidence_id": "EV-RAW-OGASAWARA-20261103",
+      "kind": "RAW_EVIDENCE",
+      "locator": "ChatGPT conversation uploads IMG_8881.png, IMG_8882.png, IMG_8883.png (2026-11-03)",
+      "notes": "Ogasawara match/result screens from abandoned run."
+    },
+    {
+      "evidence_id": "EV-USER-OGASAWARA-20261103",
+      "kind": "USER_ASSERTION",
+      "statement": "Ogasawara ended 2-1 after two resets; earlier branches were 0-0 and 0-2."
+    },
+    {
+      "evidence_id": "EV-USER-HP-ITEMS-20261103",
+      "kind": "USER_ASSERTION",
+      "statement": "Before Ogasawara, Taki and Ishiwata were around 60% HP; two candies each restored them to around 80%. Taki used sakuramochi and gained +4 long-hit."
+    },
+    {
+      "evidence_id": "EV-RAW-SKILL-REROLL-20261103",
+      "kind": "RAW_EVIDENCE",
+      "locator": "ChatGPT conversation upload IMG_8888.png (2026-11-03)",
+      "notes": "Special-training result screen showing Just Meet acquisition."
+    },
+    {
+      "evidence_id": "EV-USER-SKILL-REROLL-20261103",
+      "kind": "USER_ASSERTION",
+      "statement": "Reloading the same pre-training save produced Just Meet on the fifth attempt."
+    },
+    {
+      "evidence_id": "EV-DERIVED-SKILL-REROLL-20261103",
+      "kind": "VERIFIED_DERIVATION",
+      "source_refs": [
+        "EV-RAW-SKILL-REROLL-20261103",
+        "EV-USER-SKILL-REROLL-20261103"
+      ],
+      "notes": "Scoped statement only: at least one observed training/skill result changed across SAVE/LOAD retries from the same pre-training state."
+    },
+    {
+      "evidence_id": "EV-DERIVED-OGASAWARA-UNSTABLE-20261103",
+      "kind": "VERIFIED_DERIVATION",
+      "source_refs": [
+        "EV-USER-OGASAWARA-20261103",
+        "EV-RAW-OGASAWARA-20261103"
+      ],
+      "notes": "Final win is not a stable no-reset clear."
+    },
+    {
+      "evidence_id": "EV-ARCHIVE-DECISION-ENGINE-20261103",
+      "kind": "ARCHIVE",
+      "locator": "archive/authority/ plus DECISION_RULE_CROSSWALK.md",
+      "notes": "Legacy FC7F/FC7FR/Authority recommendation engine preserved without automatic activation."
+    },
+    {
+      "evidence_id": "EV-RAW-NEW-RUN-INITIAL-20261103",
+      "kind": "RAW_EVIDENCE",
+      "locator": "ChatGPT conversation uploads IMG_8894.png through IMG_8906.png (2026-11-03)",
+      "notes": "Fresh-run initial lineup, batting, pitching, fielding/basic stats, personality/growth and Y1 Apr AM9:10 resource screen."
+    },
+    {
+      "evidence_id": "EV-USER-JULY-MATCHES-DONE-20261104",
+      "kind": "USER_ASSERTION",
+      "statement": "User explicitly corrected assistant: July matches are already completed; individual July match scores are not established in this captured event log."
+    },
+    {
+      "evidence_id": "EV-RAW-JUNE-RESOURCE-20261104",
+      "kind": "RAW_EVIDENCE",
+      "locator": "ChatGPT current-conversation screenshot IMG_8931.png",
+      "notes": "Y1 June PM5:40, Sports28 / Cheer100 etc; historical and NOT fresh after July match completion."
+    }
   ],
   "facts": [
-    {"fact_id":"FACT-SKILL-REROLL-OBSERVED-CASE","fact_type":"DERIVED","path":"mechanics.skill_reroll.observed_case","value":{"skill":"Just Meet","attempt":5,"same_pretraining_save":true,"sample_n":1},"source_refs":["EV-DERIVED-SKILL-REROLL-20261103"],"usable_for_decision":true},
-    {"fact_id":"FACT-SKILL-REROLL-GENERALIZATION","fact_type":"HYPOTHESIS","path":"mechanics.skill_reroll.generalizes_to_other_drills_skills","value":"PLAUSIBLE_NOT_VERIFIED","source_refs":["EV-DERIVED-SKILL-REROLL-20261103"],"usable_for_decision":true},
-    {"fact_id":"FACT-OGASAWARA-FINAL-RESULT","fact_type":"OBSERVED","path":"previous_run.ogasawara.final_result","value":"2-1 WIN","source_refs":["EV-USER-OGASAWARA-20261103","EV-RAW-OGASAWARA-20261103"],"usable_for_decision":true},
-    {"fact_id":"FACT-OGASAWARA-RESET-COUNT","fact_type":"OBSERVED","path":"previous_run.ogasawara.reset_count_before_win","value":2,"source_refs":["EV-USER-OGASAWARA-20261103"],"usable_for_decision":true},
-    {"fact_id":"FACT-OGASAWARA-STABLE-CLEAR","fact_type":"DERIVED","path":"previous_run.ogasawara.stable_clear","value":false,"source_refs":["EV-DERIVED-OGASAWARA-UNSTABLE-20261103"],"usable_for_decision":true},
-    {"fact_id":"FACT-TAKI-SAKURAMOCHI-LONGHIT","fact_type":"OBSERVED","path":"previous_run.items.taki_sakuramochi_longhit_delta","value":4,"source_refs":["EV-USER-HP-ITEMS-20261103"],"usable_for_decision":true},
-    {"fact_id":"FACT-NEW-RUN-INITIAL-RESOURCES","fact_type":"OBSERVED","path":"new_run.initial.resources","value":{"money_yen":7200,"research_points":{"study":0,"sports":1,"play":6,"nature":5},"cheer_visible":11},"source_refs":["EV-RAW-NEW-RUN-INITIAL-20261103"],"usable_for_decision":true},
-    {"fact_id":"FACT-IRIE-INITIAL","fact_type":"OBSERVED","path":"new_run.initial.roster.irie","value":{"year":2,"position":"LF","batting":80,"slugging":46,"running":30,"pitch_velocity_kmh":81,"control":17,"breaking":12,"stamina":11,"wisdom":22,"personality":"がんばり屋","growth":"C"},"source_refs":["EV-RAW-NEW-RUN-INITIAL-20261103"],"usable_for_decision":true},
-    {"fact_id":"FACT-ISHIWATA-INITIAL","fact_type":"OBSERVED","path":"new_run.initial.roster.ishiwata","value":{"year":1,"position":"P","batting":9,"slugging":4,"running":4,"pitch_velocity_kmh":87,"control":18,"breaking":16,"stamina":17,"wisdom":8,"personality":"がんばり屋","growth":"C"},"source_refs":["EV-RAW-NEW-RUN-INITIAL-20261103"],"usable_for_decision":true},
-    {"fact_id":"FACT-NAGASHIMA-INITIAL","fact_type":"OBSERVED","path":"new_run.initial.roster.nagashima","value":{"year":2,"position":"C","batting":15,"slugging":102,"running":25,"stamina":4,"wisdom":64,"personality":"おっとり","growth":"F"},"source_refs":["EV-RAW-NEW-RUN-INITIAL-20261103"],"usable_for_decision":true},
-    {"fact_id":"FACT-IMAI-INITIAL","fact_type":"OBSERVED","path":"new_run.initial.roster.imai","value":{"year":1,"position":"3B","batting":10,"slugging":11,"running":4,"stamina":4,"wisdom":11,"personality":"ほがらか","growth":"D"},"source_refs":["EV-RAW-NEW-RUN-INITIAL-20261103"],"usable_for_decision":true},
-    {"fact_id":"FACT-ASHIDA-INITIAL","fact_type":"OBSERVED","path":"new_run.initial.roster.ashida","value":{"year":2,"position":"CF","batting":33,"slugging":15,"running":44,"stamina":16,"wisdom":15,"personality":"でしゃばり","growth":"E"},"source_refs":["EV-RAW-NEW-RUN-INITIAL-20261103"],"usable_for_decision":true}
+    {
+      "fact_id": "FACT-SKILL-REROLL-OBSERVED-CASE",
+      "fact_type": "DERIVED",
+      "path": "mechanics.skill_reroll.observed_case",
+      "value": {
+        "skill": "Just Meet",
+        "attempt": 5,
+        "same_pretraining_save": true,
+        "sample_n": 1
+      },
+      "source_refs": [
+        "EV-DERIVED-SKILL-REROLL-20261103"
+      ],
+      "usable_for_decision": true
+    },
+    {
+      "fact_id": "FACT-SKILL-REROLL-GENERALIZATION",
+      "fact_type": "HYPOTHESIS",
+      "path": "mechanics.skill_reroll.generalizes_to_other_drills_skills",
+      "value": "PLAUSIBLE_NOT_VERIFIED",
+      "source_refs": [
+        "EV-DERIVED-SKILL-REROLL-20261103"
+      ],
+      "usable_for_decision": true
+    },
+    {
+      "fact_id": "FACT-OGASAWARA-FINAL-RESULT",
+      "fact_type": "OBSERVED",
+      "path": "previous_run.ogasawara.final_result",
+      "value": "2-1 WIN",
+      "source_refs": [
+        "EV-USER-OGASAWARA-20261103",
+        "EV-RAW-OGASAWARA-20261103"
+      ],
+      "usable_for_decision": true
+    },
+    {
+      "fact_id": "FACT-OGASAWARA-RESET-COUNT",
+      "fact_type": "OBSERVED",
+      "path": "previous_run.ogasawara.reset_count_before_win",
+      "value": 2,
+      "source_refs": [
+        "EV-USER-OGASAWARA-20261103"
+      ],
+      "usable_for_decision": true
+    },
+    {
+      "fact_id": "FACT-OGASAWARA-STABLE-CLEAR",
+      "fact_type": "DERIVED",
+      "path": "previous_run.ogasawara.stable_clear",
+      "value": false,
+      "source_refs": [
+        "EV-DERIVED-OGASAWARA-UNSTABLE-20261103"
+      ],
+      "usable_for_decision": true
+    },
+    {
+      "fact_id": "FACT-TAKI-SAKURAMOCHI-LONGHIT",
+      "fact_type": "OBSERVED",
+      "path": "previous_run.items.taki_sakuramochi_longhit_delta",
+      "value": 4,
+      "source_refs": [
+        "EV-USER-HP-ITEMS-20261103"
+      ],
+      "usable_for_decision": true
+    },
+    {
+      "fact_id": "FACT-NEW-RUN-INITIAL-RESOURCES",
+      "fact_type": "OBSERVED",
+      "path": "new_run.initial.resources",
+      "value": {
+        "money_yen": 7200,
+        "research_points": {
+          "study": 0,
+          "sports": 1,
+          "play": 6,
+          "nature": 5
+        },
+        "cheer_visible": 11
+      },
+      "source_refs": [
+        "EV-RAW-NEW-RUN-INITIAL-20261103"
+      ],
+      "usable_for_decision": true
+    },
+    {
+      "fact_id": "FACT-IRIE-INITIAL",
+      "fact_type": "OBSERVED",
+      "path": "new_run.initial.roster.irie",
+      "value": {
+        "year": 2,
+        "position": "LF",
+        "batting": 80,
+        "slugging": 46,
+        "running": 30,
+        "pitch_velocity_kmh": 81,
+        "control": 17,
+        "breaking": 12,
+        "stamina": 11,
+        "wisdom": 22,
+        "personality": "がんばり屋",
+        "growth": "C"
+      },
+      "source_refs": [
+        "EV-RAW-NEW-RUN-INITIAL-20261103"
+      ],
+      "usable_for_decision": true
+    },
+    {
+      "fact_id": "FACT-ISHIWATA-INITIAL",
+      "fact_type": "OBSERVED",
+      "path": "new_run.initial.roster.ishiwata",
+      "value": {
+        "year": 1,
+        "position": "P",
+        "batting": 9,
+        "slugging": 4,
+        "running": 4,
+        "pitch_velocity_kmh": 87,
+        "control": 18,
+        "breaking": 16,
+        "stamina": 17,
+        "wisdom": 8,
+        "personality": "がんばり屋",
+        "growth": "C"
+      },
+      "source_refs": [
+        "EV-RAW-NEW-RUN-INITIAL-20261103"
+      ],
+      "usable_for_decision": true
+    },
+    {
+      "fact_id": "FACT-NAGASHIMA-INITIAL",
+      "fact_type": "OBSERVED",
+      "path": "new_run.initial.roster.nagashima",
+      "value": {
+        "year": 2,
+        "position": "C",
+        "batting": 15,
+        "slugging": 102,
+        "running": 25,
+        "stamina": 4,
+        "wisdom": 64,
+        "personality": "おっとり",
+        "growth": "F"
+      },
+      "source_refs": [
+        "EV-RAW-NEW-RUN-INITIAL-20261103"
+      ],
+      "usable_for_decision": true
+    },
+    {
+      "fact_id": "FACT-IMAI-INITIAL",
+      "fact_type": "OBSERVED",
+      "path": "new_run.initial.roster.imai",
+      "value": {
+        "year": 1,
+        "position": "3B",
+        "batting": 10,
+        "slugging": 11,
+        "running": 4,
+        "stamina": 4,
+        "wisdom": 11,
+        "personality": "ほがらか",
+        "growth": "D"
+      },
+      "source_refs": [
+        "EV-RAW-NEW-RUN-INITIAL-20261103"
+      ],
+      "usable_for_decision": true
+    },
+    {
+      "fact_id": "FACT-ASHIDA-INITIAL",
+      "fact_type": "OBSERVED",
+      "path": "new_run.initial.roster.ashida",
+      "value": {
+        "year": 2,
+        "position": "CF",
+        "batting": 33,
+        "slugging": 15,
+        "running": 44,
+        "stamina": 16,
+        "wisdom": 15,
+        "personality": "でしゃばり",
+        "growth": "E"
+      },
+      "source_refs": [
+        "EV-RAW-NEW-RUN-INITIAL-20261103"
+      ],
+      "usable_for_decision": true
+    },
+    {
+      "fact_id": "FACT-JULY-MATCHES-COMPLETE-REPORT",
+      "fact_type": "OBSERVED",
+      "path": "new_run.july.all_registered_matches_reported_completed",
+      "value": true,
+      "source_refs": [
+        "EV-USER-JULY-MATCHES-DONE-20261104"
+      ],
+      "usable_for_decision": true
+    },
+    {
+      "fact_id": "FACT-POST-JULY-LIVE-RESOURCES",
+      "fact_type": "UNKNOWN",
+      "path": "new_run.current.resources",
+      "value": null,
+      "usable_for_decision": false
+    }
   ],
   "strategy_policy": {
-    "core_candidates": {"batting":"Irie Dokonjo","pitching":"Ishiwata Inari","lock_status":"LOCKED_FROM_LIVE_INITIAL_CAPTURE","rule_id":"DC-ROSTER-001","secondary_development":"Imai","bridge_power":"Nagashima","bridge_table_setter":"Ashida"},
-    "training_participant_factors": ["mandatory_core_need","low_level_efficiency","drill_fit_current_ability","growth","type_affinity_bonus","Y1_October_lineup_contribution"],
+    "core_candidates": {
+      "batting": "Irie Dokonjo",
+      "pitching": "Ishiwata Inari",
+      "lock_status": "LOCKED_FROM_LIVE_INITIAL_CAPTURE",
+      "rule_id": "DC-ROSTER-001",
+      "secondary_development": "Imai",
+      "bridge_power": "Nagashima",
+      "bridge_table_setter": "Ashida"
+    },
+    "training_participant_factors": [
+      "mandatory_core_need",
+      "low_level_efficiency",
+      "drill_fit_current_ability",
+      "growth",
+      "type_affinity_bonus",
+      "Y1_October_lineup_contribution"
+    ],
     "excluded_factor": "post_October_future_roster_value",
-    "skill_reroll": {"enabled":"TARGETED_SCOPED","claim_id":"CLAIM-SKILL-REROLL-001","rule_id":"DC-TRAIN-001","note":"Observed sample_n=1; do not claim universal probabilities."},
-    "match_reset": {"practice":"PROHIBITED_FOR_GATE_MEASUREMENT","official":"FIRST_ATTEMPT_IS_STABILITY_EVIDENCE; LATER_RELOADS_MAY_PURSUE_ACHIEVEMENT","sapporo":"RESET_ASSISTED never equals STABLE","rule_ids":["DC-RESET-001","DC-RESET-002"]},
+    "skill_reroll": {
+      "enabled": "TARGETED_SCOPED",
+      "claim_id": "CLAIM-SKILL-REROLL-001",
+      "rule_id": "DC-TRAIN-001",
+      "note": "Observed sample_n=1; do not claim universal probabilities."
+    },
+    "match_reset": {
+      "practice": "PROHIBITED_FOR_GATE_MEASUREMENT",
+      "official": "FIRST_ATTEMPT_IS_STABILITY_EVIDENCE; LATER_RELOADS_MAY_PURSUE_ACHIEVEMENT",
+      "sapporo": "RESET_ASSISTED never equals STABLE",
+      "rule_ids": [
+        "DC-RESET-001",
+        "DC-RESET-002"
+      ]
+    },
     "response_mode": "FAST_WITH_RULE_REFS"
   },
   "milestone_gates": [
-    {"window":"Y1 Jun end","required":"F-grade no-reset wins sufficiently reliable; no persistent zero-run branch; meaningful low-level core development completed"},
-    {"window":"Y1 Jul end","required":"E-grade credible no-reset wins; repeated >=2-run offense; Sapporo/regional route screen checked","failure_state":"BEHIND_PLAN"},
-    {"window":"Y1 Aug end","required":"Upper-E/D credible no-reset wins; repeated 0-run branches absent; pitching makes benchmark winnable","failure_state":"HIGH_RISK"},
-    {"window":"Y1 Sep","required":"Prefectural official advancement/title; official-series HP protected","failure_state":"ROUTE_CRITICAL"},
-    {"window":"Y1 Oct","required":"Regional progression and Sapporo defeat","failure_state":"GOAL_FAIL"}
+    {
+      "window": "Y1 Jun end",
+      "required": "F-grade no-reset wins sufficiently reliable; no persistent zero-run branch; meaningful low-level core development completed"
+    },
+    {
+      "window": "Y1 Jul end",
+      "required": "E-grade credible no-reset wins; repeated >=2-run offense; Sapporo/regional route screen checked",
+      "failure_state": "BEHIND_PLAN"
+    },
+    {
+      "window": "Y1 Aug end",
+      "required": "Upper-E/D credible no-reset wins; repeated 0-run branches absent; pitching makes benchmark winnable",
+      "failure_state": "HIGH_RISK"
+    },
+    {
+      "window": "Y1 Sep",
+      "required": "Prefectural official advancement/title; official-series HP protected",
+      "failure_state": "ROUTE_CRITICAL"
+    },
+    {
+      "window": "Y1 Oct",
+      "required": "Regional progression and Sapporo defeat",
+      "failure_state": "GOAL_FAIL"
+    }
   ],
-  "eligibility": {"koshien_y1":{"displayed":true,"eligible":false,"available_now":false,"source_refs":["EV-USER-KOSHIEN-001"]}},
+  "eligibility": {
+    "koshien_y1": {
+      "displayed": true,
+      "eligible": false,
+      "available_now": false,
+      "source_refs": [
+        "EV-USER-KOSHIEN-001"
+      ]
+    }
+  },
   "unknowns": [
-    {"unknown_id":"UNK-NEW-RUN-INITIAL-STATE","field":"new_run.initial_state","status":"RESOLVED","material_to_next_action":false,"material_to_goal":true,"default":"Do not hard-lock roster/core before capture.","resolve_by":"Start fresh run and capture initial roster/state.","resolved_by":"EV-RAW-NEW-RUN-INITIAL-20261103"},
-    {"unknown_id":"UNK-SAPPORO-ROUTE-ORDER","field":"route.sapporo.exact_october_bracket_order","status":"OPEN","material_to_next_action":false,"material_to_goal":true,"default":"Historical encounter supports Y1-Oct reachability, but exact bracket/order is not assumed.","resolve_by":"Check route/tournament screens by Y1 July and again before September/October."},
-    {"unknown_id":"UNK-NEW-MEMBER-REROLL","field":"mechanics.new_member_reroll","status":"OPEN","material_to_next_action":false,"material_to_goal":false,"default":"Do not assume entrant reroll changes identity/quality.","resolve_by":"At reproducible new-member save point, compare 2-3 reload outcomes."},
-    {"unknown_id":"UNK-SKILL-REROLL-PROBABILITIES","field":"mechanics.skill_reroll_probability_distribution","status":"OPEN","material_to_next_action":false,"material_to_goal":false,"default":"Use only targeted scoped rerolls; no probability assumptions.","resolve_by":"Record accepted/rejected attempts across early new-run training."}
+    {
+      "unknown_id": "UNK-NEW-RUN-INITIAL-STATE",
+      "field": "new_run.initial_state",
+      "status": "RESOLVED",
+      "material_to_next_action": false,
+      "material_to_goal": true,
+      "default": "Do not hard-lock roster/core before capture.",
+      "resolve_by": "Start fresh run and capture initial roster/state.",
+      "resolved_by": "EV-RAW-NEW-RUN-INITIAL-20261103"
+    },
+    {
+      "unknown_id": "UNK-SAPPORO-ROUTE-ORDER",
+      "field": "route.sapporo.exact_october_bracket_order",
+      "status": "OPEN",
+      "material_to_next_action": false,
+      "material_to_goal": true,
+      "default": "Historical encounter supports Y1-Oct reachability, but exact bracket/order is not assumed.",
+      "resolve_by": "Check route/tournament screens by Y1 July and again before September/October."
+    },
+    {
+      "unknown_id": "UNK-NEW-MEMBER-REROLL",
+      "field": "mechanics.new_member_reroll",
+      "status": "OPEN",
+      "material_to_next_action": false,
+      "material_to_goal": false,
+      "default": "Do not assume entrant reroll changes identity/quality.",
+      "resolve_by": "At reproducible new-member save point, compare 2-3 reload outcomes."
+    },
+    {
+      "unknown_id": "UNK-SKILL-REROLL-PROBABILITIES",
+      "field": "mechanics.skill_reroll_probability_distribution",
+      "status": "OPEN",
+      "material_to_next_action": false,
+      "material_to_goal": false,
+      "default": "Use only targeted scoped rerolls; no probability assumptions.",
+      "resolve_by": "Record accepted/rejected attempts across early new-run training."
+    },
+    {
+      "unknown_id": "UNK-POST-JULY-CURRENT-SCREEN",
+      "field": "new_run.current.exact_calendar_and_resources",
+      "status": "OPEN",
+      "material_to_next_action": true,
+      "material_to_goal": false,
+      "default": "Never treat June resource screenshot or July entries as current. Do not authorize paid training until a new accepted runtime resource snapshot is available.",
+      "resolve_by": "Fresh in-game main screen displaying current period, currency, resource counters, and next match."
+    }
   ]
 }

@@ -7,12 +7,22 @@ This repository is the canonical control surface for the current live run. Histo
 At the start of a new chat or after context loss, read in this order before recommending an action:
 1. `RUN_GUARD_POLICY.yaml`
 2. `DECISION_CONTRACT.json`
-3. `CURRENT_HANDOFF.md`
-4. `CURRENT_RUN_LEDGER.yaml`
-5. latest entry in `DECISION_LOG.jsonl`
-6. `SAPPORO_SPRINT_STRATEGY.md`
+3. `CURRENT_LIVE_STATE.json` — validated projection of `LIVE_EVENTS.jsonl`; check its `last_event_seq`
+4. `CURRENT_HANDOFF.md`
+5. `CURRENT_RUN_LEDGER.yaml` — provenance, strategy, and historical baseline; do not assume its last initial screenshot is current
+6. latest entry in `DECISION_LOG.jsonl`
+7. `SAPPORO_SPRINT_STRATEGY.md`
 
 If any required BOOT authority cannot be read, do not reconstruct it from conversation memory and do not recommend gameplay actions. State the missing authority.
+
+## Live observation state gate
+Screenshots and user reports must be structured as source-linked observations before making recommendations. Use `LIVE_EVENTS.jsonl` as the append-only live event history and `CURRENT_LIVE_STATE.json` as the validated derived runtime state. This is not an automatic OCR tool: the assistant must read screenshots, mark uncertain fields UNKNOWN, and retain provenance.
+
+An event saying a match is *scheduled* is not proof of a played result. A user report that the July matches have finished closes those schedule entries even when individual scores are unavailable. A discarded first-attempt loss/draw and an accepted reset-assisted win are separate observations; never promote the latter to STABLE.
+
+Before actionable advice, check `CURRENT_LIVE_STATE.last_event_seq`, event ordering, completed periods, and resource freshness. Never reuse June resources after July match completion. On a match result, time change, reload, material resource spending, or correction, ingest the delta before recommending anything. If counters are stale, do not propose resource-paid training; request only the fresh counters actually needed.
+
+Every actionable recommendation must be checked against `live_state_engine.validate_recommendation` semantics: ACTIVE rules, current state revision, not-yet-completed target, and available fresh resources. If the check fails, no action should be issued. The check is operationally required in chat; repository CI validates the event replay and regression tests, not the pixels of a screenshot or all ordinary chat replies.
 
 ## Decision execution requirement
 Every actionable recommendation MUST be traceable to the decision contract and MUST expose the controlling ACTIVE `rule_id`(s) in the response.

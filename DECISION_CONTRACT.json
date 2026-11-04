@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0",
-  "contract_version": "1.0.0",
+  "contract_version": "1.1.0",
   "status": "ACTIVE",
   "built_from": {
     "legacy_sources": [
@@ -26,11 +26,31 @@
     "LEGACY_ARCHIVE"
   ],
   "layer_precedence": [
-    {"rank":1,"layer":"LIVE_EVIDENCE","rule":"Live Ver1.42 observations override public and legacy claims on mechanics/state."},
-    {"rank":2,"layer":"HARD_CONSTRAINT","rule":"Eligibility, deadlines, committed-resource availability and explicit user constraints."},
-    {"rank":3,"layer":"BRANCH_GOAL","rule":"Y1 October Sapporo branch policies override legacy Y2/Y3 route policies only when supersedes is explicit."},
-    {"rank":4,"layer":"PROCESS","rule":"Decision pipeline and traceability rules."},
-    {"rank":5,"layer":"HEURISTIC_THRESHOLD","rule":"Operational gates and scoring guidance; never promoted to game rules without evidence."}
+    {
+      "rank": 1,
+      "layer": "LIVE_EVIDENCE",
+      "rule": "Live Ver1.42 observations override public and legacy claims on mechanics/state."
+    },
+    {
+      "rank": 2,
+      "layer": "HARD_CONSTRAINT",
+      "rule": "Eligibility, deadlines, committed-resource availability and explicit user constraints."
+    },
+    {
+      "rank": 3,
+      "layer": "BRANCH_GOAL",
+      "rule": "Y1 October Sapporo branch policies override legacy Y2/Y3 route policies only when supersedes is explicit."
+    },
+    {
+      "rank": 4,
+      "layer": "PROCESS",
+      "rule": "Decision pipeline and traceability rules."
+    },
+    {
+      "rank": 5,
+      "layer": "HEURISTIC_THRESHOLD",
+      "rule": "Operational gates and scoring guidance; never promoted to game rules without evidence."
+    }
   ],
   "conflict_resolution": {
     "explicit_supersedes_required": true,
@@ -39,20 +59,55 @@
   },
   "decision_log_enforcement": {
     "start_seq": 4,
-    "basis_modes": ["RULE_APPLIED","RULE_OVERRIDDEN","NO_RULE"],
+    "basis_modes": [
+      "RULE_APPLIED",
+      "RULE_OVERRIDDEN",
+      "NO_RULE"
+    ],
     "require_basis_for_all_new_log_records": true,
-    "rule_applied_requires": ["rule_ids"],
-    "rule_overridden_requires": ["rule_ids","reason","revisit_condition"],
-    "no_rule_requires": ["description"],
+    "rule_applied_requires": [
+      "rule_ids"
+    ],
+    "rule_overridden_requires": [
+      "rule_ids",
+      "reason",
+      "revisit_condition"
+    ],
+    "no_rule_requires": [
+      "description"
+    ],
     "note": "DECISION_LOG is reserved for material/irreversible decisions; ordinary FAST actions are not logged."
   },
   "fast_mode": {
-    "always_run": ["ingest_live_delta","classify_failure_mode_if_relevant","apply_hard_constraints_deadlines","select_primary_action_and_fallback_from_active_rules","emit_rule_refs"],
-    "do_not_run_every_turn": ["full_relation_graph_refresh","global_opportunity_cost_rescore","historical_full_scan"]
+    "always_run": [
+      "ingest_live_delta",
+      "classify_failure_mode_if_relevant",
+      "apply_hard_constraints_deadlines",
+      "select_primary_action_and_fallback_from_active_rules",
+      "emit_rule_refs"
+    ],
+    "do_not_run_every_turn": [
+      "full_relation_graph_refresh",
+      "global_opportunity_cost_rescore",
+      "historical_full_scan"
+    ]
   },
   "full_checkpoint": {
-    "triggers": ["AFTER_MATCH","MONTH_BOUNDARY","MATERIAL_UNLOCK","MATERIAL_DECISION","USER_REQUESTED_FULL_AUDIT","CONFLICT_OR_MATERIAL_UNKNOWN"],
-    "run": ["refresh_relation_graph","refresh_roster_classification","refresh_opportunity_cost","resolve_material_unknowns","recheck_milestone_gate"]
+    "triggers": [
+      "AFTER_MATCH",
+      "MONTH_BOUNDARY",
+      "MATERIAL_UNLOCK",
+      "MATERIAL_DECISION",
+      "USER_REQUESTED_FULL_AUDIT",
+      "CONFLICT_OR_MATERIAL_UNKNOWN"
+    ],
+    "run": [
+      "refresh_relation_graph",
+      "refresh_roster_classification",
+      "refresh_opportunity_cost",
+      "resolve_material_unknowns",
+      "recheck_milestone_gate"
+    ]
   },
   "definitions": {
     "STABLE_WIN": "A win obtained on the first match-result branch without match-result reload assistance.",
@@ -64,45 +119,390 @@
     "STRUCTURAL_CONTROL_FAIL": "At least 3 BB/HBP-equivalent control failures in each of two comparable games.",
     "MATERIAL_DECISION": "Run restart/abandonment, branch or goal change, official-tournament reload-policy use, facility demolition, primary-core replacement, or another action explicitly marked material by an ACTIVE rule."
   },
-  "empirical_claims": [{
-    "claim_id":"CLAIM-SKILL-REROLL-001",
-    "status":"PLAUSIBLE_GENERALIZATION",
-    "scope":{"version":"iOS Ver1.42","observed_skill":"Just Meet","condition":"same pre-training save","observed_attempt":5},
-    "sample_n":1,
-    "supported_statement":"At least one observed special-training skill acquisition changed across SAVE/LOAD retries from the same pre-training state.",
-    "not_yet_proven":"All drills/skills share the same reroll behavior or probability distribution."
-  }],
-  "rules": [
-    {"rule_id":"DC-EV-001","status":"ACTIVE","type":"EVIDENCE","layer":"LIVE_EVIDENCE","rule":"Live iOS Ver1.42 state/mechanics override conflicting public or legacy claims.","legacy_refs":["FC7FR:R15"]},
-    {"rule_id":"DC-EV-002","status":"ACTIVE","type":"EVIDENCE","layer":"PROCESS","rule":"A single observation is scoped to that event; generalized claims must retain scope and sample_n and cannot establish global optimum/causality.","legacy_refs":["FC7F:D01","FC7F:D02"]},
-    {"rule_id":"DC-PROC-001","status":"ACTIVE","type":"PROCESS","layer":"PROCESS","rule":"Every live recommendation runs FAST mode and emits controlling rule_refs plus one fallback trigger.","legacy_refs":["Authority1.3:pipeline"]},
-    {"rule_id":"DC-PROC-002","status":"ACTIVE","type":"PROCESS","layer":"PROCESS","rule":"Run FULL checkpoint only on configured triggers; do not rescan/recompute the full model every turn.","legacy_refs":["Authority1.3:pipeline"]},
-    {"rule_id":"DC-TRACE-001","status":"ACTIVE","type":"PROCESS","layer":"PROCESS","material":true,"rule":"Every new DECISION_LOG record must declare RULE_APPLIED, RULE_OVERRIDDEN, or NO_RULE according to decision_log_enforcement.","legacy_refs":[]},
-    {"rule_id":"DC-REGION-001","status":"ACTIVE","type":"HEURISTIC","layer":"BRANCH_GOAL","rule":"Hokkaido is the practical baseline for this run, not a claim of global fastest region.","legacy_refs":["FC7FR:R00"]},
-    {"rule_id":"DC-START-001","status":"EXPERIMENTAL","type":"HEURISTIC","layer":"BRANCH_GOAL","rule":"Pitcher / がんばり屋 / initial velocity +30 is a baseline candidate, not a proven optimum; capture Creation Preview and Registered Initial separately.","legacy_refs":["FC7FR:R01"]},
-    {"rule_id":"DC-ROSTER-001","status":"ACTIVE","type":"PROCESS","layer":"BRANCH_GOAL","rule":"Before hard-locking batting/pitching cores, capture the new-run roster; classify players CORE_DEVELOP, BRIDGE_START, FUNCTIONAL, or REPLACE_CANDIDATE. Sprint scoring excludes post-October tenure value.","legacy_refs":["FC7F:D04","EngineCSV:R12"],"supersedes":["legacy future-roster-value scoring"]},
-    {"rule_id":"DC-ROSTER-002","status":"EXPERIMENTAL","type":"PROCESS","layer":"BRANCH_GOAL","rule":"If a reproducible pre-new-member save point exists, test 2-3 reloads to determine whether entrant identity/quality changes. Exploit only after live confirmation.","legacy_refs":[]},
-    {"rule_id":"DC-TRAIN-001","status":"ACTIVE","type":"HEURISTIC","layer":"BRANCH_GOAL","rule":"Low-level-first: apply justified special training/ability items to October core before mass match leveling when opportunity cost is favorable. Targeted skill SAVE/LOAD may be used where reroll behavior is observed/credible.","legacy_refs":["FC7FR:R03"],"supersedes":["Y2-Aug-core wording"]},
-    {"rule_id":"DC-TRAIN-002","status":"ACTIVE","type":"HEURISTIC","layer":"BRANCH_GOAL","rule":"Special-training participant choice evaluates mandatory core need, low-level efficiency, drill fit/current ability, growth, affinity bonus, and Y1-October lineup contribution. Affinity is material but not absolute. Post-October tenure is excluded.","legacy_refs":["FC7FR:R05"]},
-    {"rule_id":"DC-CHEER-001","status":"ACTIVE","type":"HEURISTIC","layer":"BRANCH_GOAL","rule":"Cheer ON is for high-value committed development; Cheer OFF is allowed for drill progression/resource preservation. ON is not assumed to raise skill-roll probability.","legacy_refs":["FC7FR:R02"],"supersedes":["FC7FR:R02 Cheer-OFF prohibition"]},
-    {"rule_id":"DC-OFF-001","status":"ACTIVE","type":"THRESHOLD","layer":"HEURISTIC_THRESHOLD","rule":"If STRUCTURAL_OFFENSE_CONTACT_FAIL, prioritize batting/contact even if slugging was the default.","legacy_refs":["FC7F:D05","FC7FR:failure_mode.offense_contact"]},
-    {"rule_id":"DC-OFF-002","status":"ACTIVE","type":"THRESHOLD","layer":"HEURISTIC_THRESHOLD","rule":"If STRUCTURAL_OFFENSE_CONVERSION_FAIL, prioritize slugging and high-impact batting skills.","legacy_refs":["FC7F:D05","FC7FR:failure_mode.offense_conversion"]},
-    {"rule_id":"DC-OFF-003","status":"ACTIVE","type":"HEURISTIC","layer":"HEURISTIC_THRESHOLD","rule":"When scoring is adequate for the current gate, stop marginal hitter training and return to valuable matches.","legacy_refs":["FC7F:D05"]},
-    {"rule_id":"DC-PITCH-001","status":"ACTIVE","type":"THRESHOLD","layer":"HEURISTIC_THRESHOLD","rule":"If STRUCTURAL_CONTROL_FAIL, prioritize control/shadow.","legacy_refs":["FC7F:D06","FC7FR:failure_mode.pitch_control"]},
-    {"rule_id":"DC-PITCH-002","status":"ACTIVE","type":"HEURISTIC","layer":"HEURISTIC_THRESHOLD","rule":"If control is acceptable but repeated hard contact/run allowance persists, evaluate velocity/available run-prevention skills. Breaking-ball investment is conditional on actual pre-October unlock and observed K/contact need, not assumed available.","legacy_refs":["FC7F:D06","FC7FR:R10","FC7FR:failure_mode.pitch_power"]},
-    {"rule_id":"DC-PITCH-003","status":"ACTIVE","type":"HEURISTIC","layer":"HEURISTIC_THRESHOLD","rule":"If pitching keeps the relevant grade winnable while offense binds, stop marginal pitching investment and move resources to offense.","legacy_refs":["FC7F:D06"]},
-    {"rule_id":"DC-MATCH-001","status":"ACTIVE","type":"HEURISTIC","layer":"BRANCH_GOAL","rule":"Maintain high match density only against opponents the team can reliably beat; do not use a fixed matches-per-month target as an optimum.","legacy_refs":["FC7F:D03","FC7FR:R06","FC7FR:R07"],"supersedes":["fixed monthly match quota"]},
-    {"rule_id":"DC-MATCH-002","status":"ACTIVE","type":"PROCESS","layer":"BRANCH_GOAL","rule":"After a loss/draw to a new benchmark, interleave farm/development before retest. Two equivalent failures under the same method require a method change before a third meaningful retest.","legacy_refs":["FC7F:D10","FC7FR:R09"]},
-    {"rule_id":"DC-MATCH-003","status":"EXPERIMENTAL","type":"HEURISTIC","layer":"HEURISTIC_THRESHOLD","rule":"If farm choices are otherwise equal, a full 6-inning win may be preferred over mercy for point yield; keep experimental until live verified.","legacy_refs":["FC7FR:R08"]},
-    {"rule_id":"DC-RESET-001","status":"ACTIVE","type":"PROCESS","layer":"BRANCH_GOAL","rule":"Practice matches used as combat gates are not match-result reloaded.","legacy_refs":["Sprint:practice-reset"]},
-    {"rule_id":"DC-RESET-002","status":"ACTIVE","type":"PROCESS","layer":"BRANCH_GOAL","material":true,"rule":"For route-critical official matches, preserve the first-attempt result as stability evidence. Subsequent reload attempts may pursue the achievement goal, but every reset-assisted win remains UNSTABLE and cannot satisfy stability gates. No arbitrary one-reload cap is imposed.","legacy_refs":["FC7FR:R14"],"supersedes":["one selective reload numeric cap"]},
-    {"rule_id":"DC-ITEM-001","status":"ACTIVE","type":"HEURISTIC","layer":"BRANCH_GOAL","rule":"Use ability items early on low-level October core when marginal gain is valuable; use recovery items when they unlock an otherwise blocked high-value action. Treat observed item deltas as samples, not constants.","legacy_refs":["FC7F:D08","FC7FR:R03"]},
-    {"rule_id":"DC-ACTIVITY-001","status":"ACTIVE","type":"HEURISTIC","layer":"HEURISTIC_THRESHOLD","rule":"School activities are resource conversion; do not spend scarce Sports solely for measurement. Re-read random rewards after each activity.","legacy_refs":["FC7F:D07","EngineCSV:R06"]},
-    {"rule_id":"DC-FAC-001","status":"ACTIVE","type":"PROCESS","layer":"BRANCH_GOAL","material":true,"rule":"Facility count is not pre-fixed. Field demolition/expansion requires observed replacement value or throughput bottleneck and must be logged with rule basis.","legacy_refs":["FC7F:D09","FC7FR:R11"]},
-    {"rule_id":"DC-GOAL-001","status":"ACTIVE","type":"HARD_CONSTRAINT","layer":"BRANCH_GOAL","rule":"Y1 September prefectural advancement/title is route-critical and Y1 October Sapporo defeat is the terminal sprint goal; an October regional loss is not acceptable as branch success.","legacy_refs":["FC7FR:R12"],"supersedes":["FC7FR:R12 October-loss-acceptable clause"]},
-    {"rule_id":"DC-GATE-001","status":"ACTIVE","type":"THRESHOLD","layer":"HEURISTIC_THRESHOLD","rule":"Monthly combat gates are operational heuristics, not game rules; no reset-assisted match may satisfy a stability gate.","legacy_refs":["Sprint:milestone-gates"]},
-    {"rule_id":"DC-UNKNOWN-001","status":"ACTIVE","type":"PROCESS","layer":"PROCESS","rule":"Every material UNKNOWN must state interim default handling and resolve_by evidence/action; unresolved conflicts cannot be silently guessed.","legacy_refs":[]},
-    {"rule_id":"DC-STUDY-LEGACY","status":"SUPERSEDED","type":"HEURISTIC","layer":"HEURISTIC_THRESHOLD","rule":"Legacy Study30 reserve for December principal timing is not an active constraint in the Y1-October sprint.","legacy_refs":["FC7FR:R13"]}
+  "empirical_claims": [
+    {
+      "claim_id": "CLAIM-SKILL-REROLL-001",
+      "status": "PLAUSIBLE_GENERALIZATION",
+      "scope": {
+        "version": "iOS Ver1.42",
+        "observed_skill": "Just Meet",
+        "condition": "same pre-training save",
+        "observed_attempt": 5
+      },
+      "sample_n": 1,
+      "supported_statement": "At least one observed special-training skill acquisition changed across SAVE/LOAD retries from the same pre-training state.",
+      "not_yet_proven": "All drills/skills share the same reroll behavior or probability distribution."
+    }
   ],
-  "material_event_names": ["RUN_RESTART","RUN_ABANDON","BRANCH_CHANGE","GOAL_CHANGE","OFFICIAL_RELOAD_POLICY_USE","FACILITY_DEMOLITION","PRIMARY_CORE_CHANGE","DECISION_CONTRACT_CHANGE"]
+  "rules": [
+    {
+      "rule_id": "DC-EV-001",
+      "status": "ACTIVE",
+      "type": "EVIDENCE",
+      "layer": "LIVE_EVIDENCE",
+      "rule": "Live iOS Ver1.42 state/mechanics override conflicting public or legacy claims.",
+      "legacy_refs": [
+        "FC7FR:R15"
+      ]
+    },
+    {
+      "rule_id": "DC-EV-002",
+      "status": "ACTIVE",
+      "type": "EVIDENCE",
+      "layer": "PROCESS",
+      "rule": "A single observation is scoped to that event; generalized claims must retain scope and sample_n and cannot establish global optimum/causality.",
+      "legacy_refs": [
+        "FC7F:D01",
+        "FC7F:D02"
+      ]
+    },
+    {
+      "rule_id": "DC-PROC-001",
+      "status": "ACTIVE",
+      "type": "PROCESS",
+      "layer": "PROCESS",
+      "rule": "Every live recommendation runs FAST mode and emits controlling rule_refs plus one fallback trigger.",
+      "legacy_refs": [
+        "Authority1.3:pipeline"
+      ]
+    },
+    {
+      "rule_id": "DC-PROC-002",
+      "status": "ACTIVE",
+      "type": "PROCESS",
+      "layer": "PROCESS",
+      "rule": "Run FULL checkpoint only on configured triggers; do not rescan/recompute the full model every turn.",
+      "legacy_refs": [
+        "Authority1.3:pipeline"
+      ]
+    },
+    {
+      "rule_id": "DC-TRACE-001",
+      "status": "ACTIVE",
+      "type": "PROCESS",
+      "layer": "PROCESS",
+      "material": true,
+      "rule": "Every new DECISION_LOG record must declare RULE_APPLIED, RULE_OVERRIDDEN, or NO_RULE according to decision_log_enforcement.",
+      "legacy_refs": []
+    },
+    {
+      "rule_id": "DC-REGION-001",
+      "status": "ACTIVE",
+      "type": "HEURISTIC",
+      "layer": "BRANCH_GOAL",
+      "rule": "Hokkaido is the practical baseline for this run, not a claim of global fastest region.",
+      "legacy_refs": [
+        "FC7FR:R00"
+      ]
+    },
+    {
+      "rule_id": "DC-START-001",
+      "status": "EXPERIMENTAL",
+      "type": "HEURISTIC",
+      "layer": "BRANCH_GOAL",
+      "rule": "Pitcher / がんばり屋 / initial velocity +30 is a baseline candidate, not a proven optimum; capture Creation Preview and Registered Initial separately.",
+      "legacy_refs": [
+        "FC7FR:R01"
+      ]
+    },
+    {
+      "rule_id": "DC-ROSTER-001",
+      "status": "ACTIVE",
+      "type": "PROCESS",
+      "layer": "BRANCH_GOAL",
+      "rule": "Before hard-locking batting/pitching cores, capture the new-run roster; classify players CORE_DEVELOP, BRIDGE_START, FUNCTIONAL, or REPLACE_CANDIDATE. Sprint scoring excludes post-October tenure value.",
+      "legacy_refs": [
+        "FC7F:D04",
+        "EngineCSV:R12"
+      ],
+      "supersedes": [
+        "legacy future-roster-value scoring"
+      ]
+    },
+    {
+      "rule_id": "DC-ROSTER-002",
+      "status": "EXPERIMENTAL",
+      "type": "PROCESS",
+      "layer": "BRANCH_GOAL",
+      "rule": "If a reproducible pre-new-member save point exists, test 2-3 reloads to determine whether entrant identity/quality changes. Exploit only after live confirmation.",
+      "legacy_refs": []
+    },
+    {
+      "rule_id": "DC-TRAIN-001",
+      "status": "ACTIVE",
+      "type": "HEURISTIC",
+      "layer": "BRANCH_GOAL",
+      "rule": "Low-level-first: apply justified special training/ability items to October core before mass match leveling when opportunity cost is favorable. Targeted skill SAVE/LOAD may be used where reroll behavior is observed/credible.",
+      "legacy_refs": [
+        "FC7FR:R03"
+      ],
+      "supersedes": [
+        "Y2-Aug-core wording"
+      ]
+    },
+    {
+      "rule_id": "DC-TRAIN-002",
+      "status": "ACTIVE",
+      "type": "HEURISTIC",
+      "layer": "BRANCH_GOAL",
+      "rule": "Special-training participant choice evaluates mandatory core need, low-level efficiency, drill fit/current ability, growth, affinity bonus, and Y1-October lineup contribution. Affinity is material but not absolute. Post-October tenure is excluded.",
+      "legacy_refs": [
+        "FC7FR:R05"
+      ]
+    },
+    {
+      "rule_id": "DC-CHEER-001",
+      "status": "ACTIVE",
+      "type": "HEURISTIC",
+      "layer": "BRANCH_GOAL",
+      "rule": "Cheer ON is for high-value committed development; Cheer OFF is allowed for drill progression/resource preservation. ON is not assumed to raise skill-roll probability.",
+      "legacy_refs": [
+        "FC7FR:R02"
+      ],
+      "supersedes": [
+        "FC7FR:R02 Cheer-OFF prohibition"
+      ]
+    },
+    {
+      "rule_id": "DC-OFF-001",
+      "status": "ACTIVE",
+      "type": "THRESHOLD",
+      "layer": "HEURISTIC_THRESHOLD",
+      "rule": "If STRUCTURAL_OFFENSE_CONTACT_FAIL, prioritize batting/contact even if slugging was the default.",
+      "legacy_refs": [
+        "FC7F:D05",
+        "FC7FR:failure_mode.offense_contact"
+      ]
+    },
+    {
+      "rule_id": "DC-OFF-002",
+      "status": "ACTIVE",
+      "type": "THRESHOLD",
+      "layer": "HEURISTIC_THRESHOLD",
+      "rule": "If STRUCTURAL_OFFENSE_CONVERSION_FAIL, prioritize slugging and high-impact batting skills.",
+      "legacy_refs": [
+        "FC7F:D05",
+        "FC7FR:failure_mode.offense_conversion"
+      ]
+    },
+    {
+      "rule_id": "DC-OFF-003",
+      "status": "ACTIVE",
+      "type": "HEURISTIC",
+      "layer": "HEURISTIC_THRESHOLD",
+      "rule": "When scoring is adequate for the current gate, stop marginal hitter training and return to valuable matches.",
+      "legacy_refs": [
+        "FC7F:D05"
+      ]
+    },
+    {
+      "rule_id": "DC-PITCH-001",
+      "status": "ACTIVE",
+      "type": "THRESHOLD",
+      "layer": "HEURISTIC_THRESHOLD",
+      "rule": "If STRUCTURAL_CONTROL_FAIL, prioritize control/shadow.",
+      "legacy_refs": [
+        "FC7F:D06",
+        "FC7FR:failure_mode.pitch_control"
+      ]
+    },
+    {
+      "rule_id": "DC-PITCH-002",
+      "status": "ACTIVE",
+      "type": "HEURISTIC",
+      "layer": "HEURISTIC_THRESHOLD",
+      "rule": "If control is acceptable but repeated hard contact/run allowance persists, evaluate velocity/available run-prevention skills. Breaking-ball investment is conditional on actual pre-October unlock and observed K/contact need, not assumed available.",
+      "legacy_refs": [
+        "FC7F:D06",
+        "FC7FR:R10",
+        "FC7FR:failure_mode.pitch_power"
+      ]
+    },
+    {
+      "rule_id": "DC-PITCH-003",
+      "status": "ACTIVE",
+      "type": "HEURISTIC",
+      "layer": "HEURISTIC_THRESHOLD",
+      "rule": "If pitching keeps the relevant grade winnable while offense binds, stop marginal pitching investment and move resources to offense.",
+      "legacy_refs": [
+        "FC7F:D06"
+      ]
+    },
+    {
+      "rule_id": "DC-MATCH-001",
+      "status": "ACTIVE",
+      "type": "HEURISTIC",
+      "layer": "BRANCH_GOAL",
+      "rule": "Maintain high match density only against opponents the team can reliably beat; do not use a fixed matches-per-month target as an optimum.",
+      "legacy_refs": [
+        "FC7F:D03",
+        "FC7FR:R06",
+        "FC7FR:R07"
+      ],
+      "supersedes": [
+        "fixed monthly match quota"
+      ]
+    },
+    {
+      "rule_id": "DC-MATCH-002",
+      "status": "ACTIVE",
+      "type": "PROCESS",
+      "layer": "BRANCH_GOAL",
+      "rule": "After a loss/draw to a new benchmark, interleave farm/development before retest. Two equivalent failures under the same method require a method change before a third meaningful retest.",
+      "legacy_refs": [
+        "FC7F:D10",
+        "FC7FR:R09"
+      ]
+    },
+    {
+      "rule_id": "DC-MATCH-003",
+      "status": "EXPERIMENTAL",
+      "type": "HEURISTIC",
+      "layer": "HEURISTIC_THRESHOLD",
+      "rule": "If farm choices are otherwise equal, a full 6-inning win may be preferred over mercy for point yield; keep experimental until live verified.",
+      "legacy_refs": [
+        "FC7FR:R08"
+      ]
+    },
+    {
+      "rule_id": "DC-RESET-001",
+      "status": "ACTIVE",
+      "type": "PROCESS",
+      "layer": "BRANCH_GOAL",
+      "rule": "Practice matches used as combat gates are not match-result reloaded.",
+      "legacy_refs": [
+        "Sprint:practice-reset"
+      ]
+    },
+    {
+      "rule_id": "DC-RESET-002",
+      "status": "ACTIVE",
+      "type": "PROCESS",
+      "layer": "BRANCH_GOAL",
+      "material": true,
+      "rule": "For route-critical official matches, preserve the first-attempt result as stability evidence. Subsequent reload attempts may pursue the achievement goal, but every reset-assisted win remains UNSTABLE and cannot satisfy stability gates. No arbitrary one-reload cap is imposed.",
+      "legacy_refs": [
+        "FC7FR:R14"
+      ],
+      "supersedes": [
+        "one selective reload numeric cap"
+      ]
+    },
+    {
+      "rule_id": "DC-ITEM-001",
+      "status": "ACTIVE",
+      "type": "HEURISTIC",
+      "layer": "BRANCH_GOAL",
+      "rule": "Use ability items early on low-level October core when marginal gain is valuable; use recovery items when they unlock an otherwise blocked high-value action. Treat observed item deltas as samples, not constants.",
+      "legacy_refs": [
+        "FC7F:D08",
+        "FC7FR:R03"
+      ]
+    },
+    {
+      "rule_id": "DC-ACTIVITY-001",
+      "status": "ACTIVE",
+      "type": "HEURISTIC",
+      "layer": "HEURISTIC_THRESHOLD",
+      "rule": "School activities are resource conversion; do not spend scarce Sports solely for measurement. Re-read random rewards after each activity.",
+      "legacy_refs": [
+        "FC7F:D07",
+        "EngineCSV:R06"
+      ]
+    },
+    {
+      "rule_id": "DC-FAC-001",
+      "status": "ACTIVE",
+      "type": "PROCESS",
+      "layer": "BRANCH_GOAL",
+      "material": true,
+      "rule": "Facility count is not pre-fixed. Field demolition/expansion requires observed replacement value or throughput bottleneck and must be logged with rule basis.",
+      "legacy_refs": [
+        "FC7F:D09",
+        "FC7FR:R11"
+      ]
+    },
+    {
+      "rule_id": "DC-GOAL-001",
+      "status": "ACTIVE",
+      "type": "HARD_CONSTRAINT",
+      "layer": "BRANCH_GOAL",
+      "rule": "Y1 September prefectural advancement/title is route-critical and Y1 October Sapporo defeat is the terminal sprint goal; an October regional loss is not acceptable as branch success.",
+      "legacy_refs": [
+        "FC7FR:R12"
+      ],
+      "supersedes": [
+        "FC7FR:R12 October-loss-acceptable clause"
+      ]
+    },
+    {
+      "rule_id": "DC-GATE-001",
+      "status": "ACTIVE",
+      "type": "THRESHOLD",
+      "layer": "HEURISTIC_THRESHOLD",
+      "rule": "Monthly combat gates are operational heuristics, not game rules; no reset-assisted match may satisfy a stability gate.",
+      "legacy_refs": [
+        "Sprint:milestone-gates"
+      ]
+    },
+    {
+      "rule_id": "DC-UNKNOWN-001",
+      "status": "ACTIVE",
+      "type": "PROCESS",
+      "layer": "PROCESS",
+      "rule": "Every material UNKNOWN must state interim default handling and resolve_by evidence/action; unresolved conflicts cannot be silently guessed.",
+      "legacy_refs": []
+    },
+    {
+      "rule_id": "DC-STUDY-LEGACY",
+      "status": "SUPERSEDED",
+      "type": "HEURISTIC",
+      "layer": "HEURISTIC_THRESHOLD",
+      "rule": "Legacy Study30 reserve for December principal timing is not an active constraint in the Y1-October sprint.",
+      "legacy_refs": [
+        "FC7FR:R13"
+      ]
+    },
+    {
+      "rule_id": "DC-INGEST-001",
+      "status": "ACTIVE",
+      "type": "PROCESS",
+      "layer": "LIVE_EVIDENCE",
+      "rule": "Before applying screenshot/user reports, extract only visible or explicitly stated observations with source locator, period, and accepted/rejected branch. Missing fields remain UNKNOWN; corrections reference the original event. Never infer game state from earlier screenshots."
+    },
+    {
+      "rule_id": "DC-STATE-001",
+      "status": "ACTIVE",
+      "type": "PROCESS",
+      "layer": "HARD_CONSTRAINT",
+      "rule": "Derive current state from ordered live events. A schedule is not a completed match. Explicit user completion closes that period's scheduled matches even when scores are UNKNOWN. Preserve first-attempt branches separately from reset-assisted accepted branches. Invalidate stale resource counters after a later match or rollback."
+    },
+    {
+      "rule_id": "DC-ACTION-001",
+      "status": "ACTIVE",
+      "type": "HARD_CONSTRAINT",
+      "layer": "HARD_CONSTRAINT",
+      "rule": "Before issuing an actionable recommendation, use the latest live event revision, ACTIVE rule IDs, and validated match/resource constraints. Reject actions targeting already completed matches and paid training when resource counters are stale or insufficient."
+    }
+  ],
+  "material_event_names": [
+    "RUN_RESTART",
+    "RUN_ABANDON",
+    "BRANCH_CHANGE",
+    "GOAL_CHANGE",
+    "OFFICIAL_RELOAD_POLICY_USE",
+    "FACILITY_DEMOLITION",
+    "PRIMARY_CORE_CHANGE",
+    "DECISION_CONTRACT_CHANGE"
+  ],
+  "live_observation_contract": {
+    "event_log": "LIVE_EVENTS.jsonl",
+    "runtime_snapshot": "CURRENT_LIVE_STATE.json",
+    "replay_validator": "live_state_engine.py",
+    "snapshot_must_equal_replay": true,
+    "unknown_resource_action": "BLOCK",
+    "period_level_completion": "CLOSE_REGISTERED_MATCHES_WITH_SCORE_UNKNOWN",
+    "screenshot_reading": "MANUAL_SOURCE_LINKED_NOT_AUTOMATIC_OCR",
+    "recommendation_requires_latest_event_seq": true
+  }
 }

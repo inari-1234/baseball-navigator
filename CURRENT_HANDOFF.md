@@ -1,81 +1,33 @@
 # CURRENT_HANDOFF
 
 Last updated: 2026-11-04
-State: ACTIVE_Y1_MAY_AFTER_FIRST_MATCH
+State: ACTIVE_POST_JULY_RECONCILIATION — BLOCKED_ON_CURRENT_COUNTERS
 
-## Scope
-Fixed-name continuation authority for `inari-1234/baseball-navigator`.
-This file carries current restart state only. Historical FC7F/FC7FR/Authority material is evidence in `archive/authority/` and is not executable unless reconciled into `DECISION_CONTRACT.json`.
+## Canonical runtime
+Read `AGENTS.md`, `RUN_GUARD_POLICY.yaml`, `DECISION_CONTRACT.json`, `CURRENT_LIVE_STATE.json`, this handoff, ledger/log, then Sprint strategy. The event log `LIVE_EVENTS.jsonl` is the underlying evidence, not a separate conflicting current state.
 
-## Current authorities
-Read in this order after `AGENTS.md`:
-1. `RUN_GUARD_POLICY.yaml`
-2. `DECISION_CONTRACT.json` — active contract version 1.0.0
-3. this `CURRENT_HANDOFF.md`
-4. `CURRENT_RUN_LEDGER.yaml` — ledger version 5
-5. latest `DECISION_LOG.jsonl` entry — seq 5 (`NEW_RUN_INITIAL_CAPTURE_AND_CORE_LOCK`)
-6. `SAPPORO_SPRINT_STRATEGY.md`
+## Confirmed
+- Objective: Y1 October Sapporo.
+- User explicitly confirmed **all July matches are already over**. July tournament registrations for まんるい・花さか・生南 are historical, never upcoming.
+- Two grounded June reset pairs: 生南 initial 0-1, accepted 3-0; 花さか initial 0-0, accepted 6-1. Both count as RESET_ASSISTED, not STABLE.
+- Latest older resource screenshot: Y1 June PM5:40, money 15,980; Study 4 / Sports 28 / Play 25 / Nature 18 / Cheer 100. These numbers are **STALE** after July.
+- Current exact month/time, Sports, Cheer, HP and next match: **UNKNOWN**, do not reconstruct from June or assume current month is July.
+- Initial batting core 入江, pitching core 石渡, secondary 今井; these are older roster anchors and not newly measured current stats.
+- Skill-point accumulation / 4th committed drill threshold is an EXPERIMENTAL user hypothesis, not a verified hidden mechanic.
 
-## Current state
-- Active objective: Y1 October Sapporo sprint.
-- Fresh run is active at Y1 May after the first observed practice-match result.
-- Batting core: 入江ドゴンジ — locked from live initial capture under `DC-ROSTER-001`.
-- Pitching core: 石渡いなり — locked from live initial capture under `DC-ROSTER-001`.
-- Secondary development: 今井. Bridge power: 長島. Bridge table-setter: 芦田.
-- FAST operation is mandatory for ordinary live-play decisions; FULL evaluation runs on configured checkpoint triggers such as AFTER_MATCH.
-- Every actionable recommendation must expose controlling ACTIVE `rule_id`(s) and a fallback/stop trigger.
+## Why prior gameplay advice failed
+AI analyzed screenshots and match reports but never committed their temporal deltas to an executable current-state model. It subsequently advised preparing for July matches already finished and reused June points for unverified later actions.
 
-## Initial live anchors
-- 入江: Y2 LF, batting 80 / slugging 46 / running 30, growth C, がんばり屋.
-- 石渡: Y1 P, 87 km/h / control 18 / breaking 16, batting 9 / slugging 4 / running 4, growth C, がんばり屋.
-- 長島: Y2 C, batting 15 / slugging 102 / running 25, growth F, おっとり.
-- 今井: Y1 3B, batting 10 / slugging 11 / running 4, growth D, ほがらか.
-- 芦田: Y2 CF, batting 33 / slugging 15 / running 44, growth E, でしゃばり.
+## First safe continuation
+Do not recommend a training with cost or a July match. Ask only for a **current** resource/calendar snapshot when gameplay resumes, then append its sourced SCREEN event, re-run the event projection, update handoff and use the latest revision for the next action. No repeated request for historical July scores is required to establish July completion.
 
-## Y1 May skill-selection live evidence
-- Drill: 素振り Lv1.
-- Participant set used for reroll sampling: 入江 / 今井 / 芦田.
-- User performed approximately 40 SAVE/LOAD retries from the same pre-training state.
-- Accepted final branch: 入江 acquired `ミート力アップ` on approximately the 40th attempt; this branch is SAVED and is the current run state.
-- 芦田 acquired no skill in the observed approximately-40-attempt sample.
-- 今井 produced skill-acquisition events during earlier retries, but those branches were not saved; do not use an exact count as canonical because the conversational counts were not recorded under a controlled attempt ledger.
-- No `ジャストミート` was observed in this approximately-40-attempt Lv1 sample.
-- Interpretation: this does NOT prove `ジャストミート` is unavailable at Lv1. It shows that targeted `specific player × specific high-tier skill` rerolling at Lv1 had poor observed efficiency in this live sample.
-- Operational consequence: do not continue brute-force Lv1 rerolling for a specific high-tier batting skill under the same conditions. Advance development while recording future skill events by drill level and player.
+## Non-negotiable FAST checks
+1. Treat screen reading as manually extracted observations, not automated OCR.
+2. Keep planned/played and first/reloaded branch separate.
+3. Respect explicit later user corrections.
+4. Old resource counters expire after any later match or rollback.
+5. Every recommendation must use latest event revision, ACTIVE rule IDs and fallback.
+6. A validator PASS proves structured files obey these invariants; it does not independently prove the screen was read correctly.
 
-## First Y1 May practice-match checkpoint
-- Result reported by user: 4-1 WIN versus the scheduled May opponent (花さか from the prior live schedule screen).
-- Pitching screenshot: 石渡 6 innings, 4 hits allowed, 1 run, 0 strikeouts, 3 walks; displayed ERA 1.50, W1-L0.
-- Batting screenshot after the game shows: 芦田 .333 / 1 RBI; たき .333 / 2 RBI; 入江 .333 / 0 RBI; 長島 .333 / 0 RBI; 高橋 .000; 今井 .000; 石高 .666; 中山 .000; 石渡 .000. No HR shown.
-- Derived team offense from displayed batting lines is consistent with 6 hits and 4 runs. This sample is not a contact-failure or conversion-failure case.
-- Pitching interpretation: 6 IP / 1 R is sufficient run prevention for this gate. 3 walks with 0 strikeouts is a warning signal only; `STRUCTURAL_CONTROL_FAIL` is NOT triggered from one sample because the contract requires repetition across two comparable games.
-- Match-result reload status was not explicitly stated in the report; do not mark this as STABLE_WIN in canonical evidence unless no match-result reload is confirmed.
-
-## Exact next action
-1. Return to the post-match/main screen and read the current live resource counters and next scheduled opponent/event.
-2. Do not spend Sports or force another special training until the current counters are re-read.
-3. Do not reactively invest in pitching from this one sample; keep the next comparable-game control line as the trigger check.
-4. If the next comparable match again has >=3 BB/HBP-equivalent control failures, `DC-PITCH-001` becomes the leading pitching response. If run prevention stays adequate and offense is the binding constraint, follow `DC-PITCH-003` and keep marginal resources on offense.
-
-## Prohibitions / defaults
-- Do not reconstruct missing authority from conversation memory.
-- Do not directly execute archived FC7F/FC7FR/Authority rules; only ACTIVE `DECISION_CONTRACT.json` rules are executable.
-- Latest live resource counters override stale pre-training values and archived drill-cost assumptions.
-- Skill-reroll evidence remains scoped; do not infer universal probabilities from this sample.
-- Do not infer player-specific skill-rate causality from 芦田=0 occurrences in ~40 attempts; treat it as an observed sample only.
-- Practice matches used as combat gates are not match-result reloaded.
-- For route-critical official matches, preserve the first-attempt result as stability evidence; later reloads may pursue achievement but never satisfy STABLE.
-- Do not assume breaking-ball drills, recovery facilities, new-member reroll behavior, or exact Sapporo bracket order until resolved by live evidence/contract handling.
-
-## Open UNKNOWNs that matter later
-- exact Sapporo October bracket/order — check route/tournament screens by Y1 July and before Sep/Oct;
-- new-member reroll reproducibility — small experiment only if a reproducible save point exists;
-- skill-reroll probability/generalization — continue scoped sampling by drill level/player; current Lv1 batting sample shows low targeted efficiency but does not establish a universal rate;
-- first Y1 May practice-match reset status — classify as STABLE only if no match-result reload occurred.
-
-## Validation identity
-Initial capture was taken from live iOS Ver1.42 screenshots IMG_8894.png through IMG_8906.png on 2026-11-03.
-Y1 May accepted batting-skill branch is supported by live screenshot IMG_8912.png and the user's approximately-40-attempt report on 2026-11-04.
-Latest pre-match resource correction was supported by IMG_8912.png: Study 0 / Sports 2 / Play 9 / Nature 8 / Cheer 13.
-First May match checkpoint is supported by live screenshots IMG_8913.png and IMG_8914.png plus the user's 4-1 result report on 2026-11-04.
-The accepted continuation point is the latest `main` commit containing this handoff; re-read remote main at BOOT rather than relying on conversation history.
+## Boundary
+Repo change is the ingestion/reconciliation owner; `Excel-Tests` is not mutated. Re-read remote main on restart.
