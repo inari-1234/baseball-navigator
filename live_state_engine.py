@@ -42,6 +42,31 @@ def apply_corrections(events):
         base[target].update(patch)
     return [base[e["event_id"]] for e in events if e["kind"]!="CORRECTION"]
 
+def select_active_timeline(events):
+    """Preserve event audit, but exclude operations undone by restoring an earlier save."""
+    active=[];discarded=[];unanchored=None
+    for event in events:
+        if event["kind"]!="ROLLBACK":
+            active.append(event)
+            continue
+        restore=event.get("restore_to_event_id")
+        if restore is None:
+            discarded.extend(x["event_id"] for x in active if x["kind"]!="ROLLBACK")
+            active=[]
+            unanchored=event["event_id"]
+        else:
+            positions=[i for i,x in enumerate(active) if x["event_id"]==restore]
+            if len(positions)!=1:
+                raise ObservationError(f'{event["event_id"]}: rollback restore point is missing or discarded')
+            i=positions[0]
+            discarded.extend(x["event_id"] for x in active[i+1:] if x["kind"]!="ROLLBACK")
+            active=active[:i+1]
+            if unanchored and not any(x["event_id"]==unanchored for x in active):
+                unanchored=None
+        active.append(event)
+    return active,discarded,unanchored
+
+
 def replay(events):
     ids=set();seqs=[]
     for e in events:
@@ -54,15 +79,19 @@ def replay(events):
             raise ObservationError(f"{eid}: missing source kind/locator")
         if e["kind"]!="CORRECTION":period(e)
     if seqs!=list(range(1,len(events)+1)):raise ObservationError("event seq must be contiguous starting at 1")
-    state={"schema_version":"1.0","last_event_seq":len(events),"period_floor":None,"last_seen_screen_period":None,
+    active_events,discarded,unanchored=select_active_timeline(events)
+    state={"schema_version":"1.1","last_event_seq":len(events),"period_floor":None,"last_seen_screen_period":None,
            "resources":{"fresh":False,"values":None,"last_observed":None},
-           "matches":{},"completed_match_periods":[],"skills":[],
+           "matches":{},"completed_match_periods":[],"skills":[],"item_uses":[],
+           "discarded_branch_event_ids":discarded,"timeline_status":"UNKNOWN_AFTER_ROLLBACK" if unanchored else "TRUSTED",
            "observations_ignored_as_stale":[],"current_exact_time":"UNKNOWN"}
-    floor=None;closed=set();matches={};seen_attempts=set()
-    def invalidate():
+    floor=None;closed=set();matches={};seen_attempts=set();resource_anchor=None
+    def invalidate(event_id):
+        nonlocal resource_anchor
+        resource_anchor=event_id
         state["resources"]["fresh"]=False
         state["resources"]["values"]=None
-    for e in apply_corrections(events):
+    for e in apply_corrections(active_events):
         kind=e["kind"];p=period(e);pk=label(p);eid=e["event_id"]
         historical=bool(floor and p<floor)
         if kind=="SCREEN":
@@ -73,11 +102,13 @@ def replay(events):
                 raise ObservationError(f"{eid}: invalid resource counter")
             if "money_yen" in e and (type(e["money_yen"]) is not int or e["money_yen"]<0):
                 raise ObservationError(f"{eid}: invalid money")
-            if historical or e.get("branch")!="ACCEPTED" or (pk in closed and e.get("confirmed_after_period_completion") is not True):
+            if historical or e.get("branch")!="ACCEPTED" or (resource_anchor is not None and e.get("after_event_id")!=resource_anchor):
                 state["observations_ignored_as_stale"].append(eid);continue
             state["last_seen_screen_period"]=pk
             state["resources"]={"fresh":True,"values":dict(vals),"last_observed":eid}
             state["current_exact_time"]=e.get("clock") or "UNKNOWN"
+            if unanchored and e.get("after_event_id")==unanchored:
+                state["timeline_status"]="RECAPTURED_AFTER_UNANCHORED_ROLLBACK"
             floor=max(floor,p) if floor else p
         elif kind=="MATCH_SCHEDULE":
             if not isinstance(e.get("entries"),list):raise ObservationError(f"{eid}: entries required")
@@ -107,7 +138,7 @@ def replay(events):
                 if m["accepted_attempt"] is not None:raise ObservationError(f"{eid}: multiple accepted branches")
                 m["accepted_attempt"]=result;m["status"]="PLAYED"
                 m["classification"]=("STABLE_WIN" if n==1 else "RESET_ASSISTED_WIN") if a>b else ("DRAW" if a==b else "LOSS")
-                if not historical:invalidate();state["current_exact_time"]="UNKNOWN"
+                if not historical:invalidate(eid);state["current_exact_time"]="UNKNOWN"
                 floor=max(floor,p) if floor else p
         elif kind=="MATCHES_COMPLETED":
             if e["source"]["kind"] not in {"USER_REPORT","USER_CORRECTION"}:
@@ -115,16 +146,20 @@ def replay(events):
             closed.add(pk)
             for m in matches.values():
                 if m["period"]==pk and m["status"]=="SCHEDULED":m["status"]="COMPLETED_SCORE_UNKNOWN"
-            if not historical:invalidate();state["current_exact_time"]="UNKNOWN"
+            if not historical:invalidate(eid);state["current_exact_time"]="UNKNOWN"
             floor=max(floor,p) if floor else p
         elif kind=="TRAINING":
             if e.get("branch")!="ACCEPTED":continue
             if not e.get("player") or not e.get("drill"):raise ObservationError(f"{eid}: training needs player/drill")
             if e.get("skill"):state["skills"].append({"player":e["player"],"skill":e["skill"],"evidence_id":eid})
-            if not historical:invalidate()
-        elif kind in {"ITEM_USE","ROLLBACK"}:
-            if not historical and (kind=="ROLLBACK" or e.get("branch")=="ACCEPTED"):invalidate()
-            if not historical:state["current_exact_time"]="UNKNOWN"
+            if not historical:invalidate(eid)
+        elif kind=="ITEM_USE":
+            if e.get("branch") not in BRANCHES:raise ObservationError(f"{eid}: item use needs ACCEPTED or REJECTED branch")
+            if e["branch"]=="ACCEPTED":
+                state["item_uses"].append({"evidence_id":eid,"items":e.get("items"),"observed_delta":e.get("observed_delta")})
+                if not historical:invalidate(eid)
+        elif kind=="ROLLBACK":
+            if not historical:invalidate(eid);state["current_exact_time"]="UNKNOWN"
     state["period_floor"]=label(floor) if floor else None
     state["completed_match_periods"]=sorted(closed)
     state["matches"]=dict(sorted(matches.items()))
@@ -134,6 +169,8 @@ def validate_recommendation(rec,state,contract):
     errors=[]
     if rec.get("based_on_event_seq")!=state["last_event_seq"]:
         errors.append("STALE_REVISION")
+    if state.get("timeline_status")=="UNKNOWN_AFTER_ROLLBACK":
+        errors.append("UNRESOLVED_ROLLBACK")
     active={r["rule_id"] for r in contract.get("rules",[]) if r.get("status")=="ACTIVE"}
     ids=rec.get("rule_ids")
     if not isinstance(ids,list) or not ids or any(r not in active for r in ids):
@@ -145,11 +182,15 @@ def validate_recommendation(rec,state,contract):
         errors.append("MATCH_ID_REQUIRED")
     if action_type=="MATCH" and rec.get("target_period") in state["completed_match_periods"]:
         errors.append("COMPLETED_PERIOD_MATCH")
+    if action_type=="MATCH" and rec.get("target_period") and state["period_floor"] and rec["target_period"]<state["period_floor"]:
+        errors.append("PAST_PERIOD_MATCH")
     if action_type=="TRAIN":
         if rec.get("cheer") not in {"ON","OFF"} or not isinstance(rec.get("participants"),list) or len(rec["participants"])!=3 or len(set(rec["participants"]))!=3:
             errors.append("TRAINING_DETAILS_REQUIRED")
-        if not isinstance(rec.get("spend"),dict) or "sports" not in rec["spend"]:
+        if not isinstance(rec.get("spend"),dict) or "sports" not in rec["spend"] or type(rec["spend"]["sports"]) is not int or rec["spend"]["sports"]<=0:
             errors.append("TRAINING_COST_REQUIRED")
+        if rec.get("cheer")=="ON" and (not isinstance(rec.get("spend"),dict) or type(rec["spend"].get("cheer")) is not int or rec["spend"]["cheer"]<=0):
+            errors.append("CHEER_COST_REQUIRED")
         if not state["resources"]["fresh"]:
             errors.append("STALE_RESOURCES")
     mid=rec.get("target_match_id")
@@ -158,6 +199,12 @@ def validate_recommendation(rec,state,contract):
         if m is None:errors.append("UNKNOWN_MATCH")
         elif m["status"]!="SCHEDULED" or m["period"] in state["completed_match_periods"]:
             errors.append("ALREADY_COMPLETED_MATCH")
+        elif state["period_floor"] and m["period"]<state["period_floor"]:
+            errors.append("PAST_PERIOD_MATCH")
+        if m is not None and rec.get("target_period") and rec["target_period"]!=m["period"]:
+            errors.append("MATCH_PERIOD_CONFLICT")
+    if action_type=="ITEM":
+        errors.append("ITEM_INVENTORY_NOT_VERIFIED")  # no canonical item-count snapshot yet; fail closed
     spend=rec.get("spend",{})
     if not isinstance(spend,dict):errors.append("INVALID_SPEND")
     elif spend:
