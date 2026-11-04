@@ -21,13 +21,15 @@ Required for each event: contiguous `seq`, unique `event_id`, `kind`, `source.ki
 A recommendation must pass `validate_recommendation` checks:
 - `based_on_event_seq` equals latest accepted event revision
 - nonempty `rule_ids`, all ACTIVE in Decision Contract
+- `action_type` is explicit; MATCH requires `target_match_id`, and `target_period` cannot be a completed period
+- TRAIN requires three distinct participants, Cheer ON/OFF and explicit Sports cost, not an omitted cost
 - `target_match_id` exists and is still SCHEDULED
 - `spend` is within fresh visible resource counters
 
 Example blocked request: `{"based_on_event_seq":7,"rule_ids":["DC-TRAIN-001"],"spend":{"sports":7}}` because post-July Sports is UNKNOWN.
 
 ## Confidence and precedence
-A raw screenshot proves only visible UI; a user report may correct opponent, match completion, or reset provenance. No screenshot of June is automatically a snapshot of July. When only 'July matches finished' is known, scores and current month remain UNKNOWN. Do not claim a player gained a skill merely because an earlier discarded branch displayed it.
+A screenshot captured in a month already marked 'matches complete' is treated as historical unless the observation explicitly sets `confirmed_after_period_completion=true`. This permits a genuinely fresh same-month screen while refusing an older reposted screen. A raw screenshot proves only visible UI; a user report may correct opponent, match completion, or reset provenance. No screenshot of June is automatically a snapshot of July. When only 'July matches finished' is known, scores and current month remain UNKNOWN. Do not claim a player gained a skill merely because an earlier discarded branch displayed it.
 
 ## Operating sequence
 1. Extract factual visible fields into an event and quote its locator.

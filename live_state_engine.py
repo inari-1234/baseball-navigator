@@ -73,7 +73,7 @@ def replay(events):
                 raise ObservationError(f"{eid}: invalid resource counter")
             if "money_yen" in e and (type(e["money_yen"]) is not int or e["money_yen"]<0):
                 raise ObservationError(f"{eid}: invalid money")
-            if historical or e.get("branch")!="ACCEPTED":
+            if historical or e.get("branch")!="ACCEPTED" or (pk in closed and e.get("confirmed_after_period_completion") is not True):
                 state["observations_ignored_as_stale"].append(eid);continue
             state["last_seen_screen_period"]=pk
             state["resources"]={"fresh":True,"values":dict(vals),"last_observed":eid}
@@ -138,6 +138,20 @@ def validate_recommendation(rec,state,contract):
     ids=rec.get("rule_ids")
     if not isinstance(ids,list) or not ids or any(r not in active for r in ids):
         errors.append("INVALID_RULE_ID")
+    action_type=rec.get("action_type")
+    if action_type not in {"MATCH","TRAIN","ITEM","ACTIVITY","OTHER"}:
+        errors.append("ACTION_TYPE_REQUIRED")
+    if action_type=="MATCH" and not rec.get("target_match_id"):
+        errors.append("MATCH_ID_REQUIRED")
+    if action_type=="MATCH" and rec.get("target_period") in state["completed_match_periods"]:
+        errors.append("COMPLETED_PERIOD_MATCH")
+    if action_type=="TRAIN":
+        if rec.get("cheer") not in {"ON","OFF"} or not isinstance(rec.get("participants"),list) or len(rec["participants"])!=3 or len(set(rec["participants"]))!=3:
+            errors.append("TRAINING_DETAILS_REQUIRED")
+        if not isinstance(rec.get("spend"),dict) or "sports" not in rec["spend"]:
+            errors.append("TRAINING_COST_REQUIRED")
+        if not state["resources"]["fresh"]:
+            errors.append("STALE_RESOURCES")
     mid=rec.get("target_match_id")
     if mid:
         m=state["matches"].get(mid)

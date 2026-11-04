@@ -25,14 +25,14 @@ class LiveStateRegression(unittest.TestCase):
         s=replay([e(1,"MATCH_SCHEDULE",7,entries=[{"match_id":"J1","opponent":"まんるい"}]),
                   e(2,"MATCHES_COMPLETED",7)])
         self.assertEqual(s["matches"]["J1"]["status"],"COMPLETED_SCORE_UNKNOWN")
-        errors=validate_recommendation({"based_on_event_seq":2,"rule_ids":["DC-PROC-001"],
+        errors=validate_recommendation({"based_on_event_seq":2,"action_type":"MATCH","rule_ids":["DC-PROC-001"],
                                         "target_match_id":"J1"},s,{"rules":[{"rule_id":"DC-PROC-001","status":"ACTIVE"}]})
         self.assertIn("ALREADY_COMPLETED_MATCH",errors)
     def test_screen_resources_expire_after_later_game(self):
         s=replay([screen(1),e(2,"MATCHES_COMPLETED",7)])
         self.assertIsNone(s["resources"]["values"])
         self.assertFalse(s["resources"]["fresh"])
-        errors=validate_recommendation({"based_on_event_seq":2,"rule_ids":["DC-TRAIN-001"],
+        errors=validate_recommendation({"based_on_event_seq":2,"action_type":"TRAIN","cheer":"ON","participants":["入江","今井","芦田"],"rule_ids":["DC-TRAIN-001"],
                                         "spend":{"sports":7}},s,{"rules":[{"rule_id":"DC-TRAIN-001","status":"ACTIVE"}]})
         self.assertIn("STALE_RESOURCES",errors)
     def test_old_june_screenshot_ignored_after_july_complete(self):
@@ -54,13 +54,38 @@ class LiveStateRegression(unittest.TestCase):
         self.assertEqual(s["matches"]["M"]["classification"],"RESET_ASSISTED_WIN")
     def test_stale_state_revision_rejected(self):
         s=replay([e(1,"MATCHES_COMPLETED",7)])
-        errors=validate_recommendation({"based_on_event_seq":0,"rule_ids":["DC-PROC-001"]},s,
+        errors=validate_recommendation({"based_on_event_seq":0,"action_type":"OTHER","rule_ids":["DC-PROC-001"]},s,
                                        {"rules":[{"rule_id":"DC-PROC-001","status":"ACTIVE"}]})
         self.assertIn("STALE_REVISION",errors)
     def test_late_historical_game_preserves_new_snapshot(self):
         s=replay([screen(1,8),
                  e(2,"MATCH_ATTEMPT",7,match_id="J",opponent="まんるい",attempt=1,our_runs=3,their_runs=1,branch="ACCEPTED")])
         self.assertTrue(s["resources"]["fresh"])
+    def test_match_without_id_cannot_bypass_completion(self):
+        state=replay([e(1,"MATCHES_COMPLETED",7)])
+        errors=validate_recommendation({"based_on_event_seq":1,"action_type":"MATCH",
+                "target_period":"Y1-07","rule_ids":["DC-PROC-001"]},state,
+                {"rules":[{"rule_id":"DC-PROC-001","status":"ACTIVE"}]})
+        self.assertIn("MATCH_ID_REQUIRED",errors)
+        self.assertIn("COMPLETED_PERIOD_MATCH",errors)
+    def test_training_without_cost_cannot_bypass_stale_resource(self):
+        state=replay([e(1,"MATCHES_COMPLETED",7)])
+        errors=validate_recommendation({"based_on_event_seq":1,"action_type":"TRAIN",
+                "participants":["石渡","たき","芦田"],"cheer":"ON","rule_ids":["DC-TRAIN-001"]},state,
+                {"rules":[{"rule_id":"DC-TRAIN-001","status":"ACTIVE"}]})
+        self.assertIn("TRAINING_COST_REQUIRED",errors)
+        self.assertIn("STALE_RESOURCES",errors)
+    def test_same_month_older_screen_does_not_reopen_state(self):
+        state=replay([e(1,"MATCHES_COMPLETED",7),
+                      e(2,"SCREEN",7,branch="ACCEPTED",
+                        resources={"study":4,"sports":28,"play":25,"nature":18,"cheer":100})])
+        self.assertEqual(state["observations_ignored_as_stale"],["E2"])
+        self.assertFalse(state["resources"]["fresh"])
+    def test_explicit_confirmed_current_screen_reopens_state(self):
+        state=replay([e(1,"MATCHES_COMPLETED",7),
+                      e(2,"SCREEN",7,branch="ACCEPTED",confirmed_after_period_completion=True,
+                        resources={"study":4,"sports":28,"play":25,"nature":18,"cheer":100})])
+        self.assertTrue(state["resources"]["fresh"])
     def test_late_historical_completion_preserves_new_snapshot(self):
         s=replay([screen(1,8),e(2,"MATCHES_COMPLETED",7)])
         self.assertTrue(s["resources"]["fresh"])
