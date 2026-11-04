@@ -87,7 +87,7 @@ class LiveStateRegression(unittest.TestCase):
                         resources={"study":4,"sports":28,"play":25,"nature":18,"cheer":100})])
         self.assertTrue(state["resources"]["fresh"])
     def test_rollback_removes_discarded_skill(self):
-        s=replay([screen(1),e(2,"TRAINING",player="入江",drill="素振り",skill="ミート力アップ",branch="ACCEPTED"),
+        s=replay([screen(1),e(2,"TRAINING",participants=["入江","今井","芦田"],drill="素振り",drill_level=1,cheer="OFF",skill_awards=[{"player":"入江","skill":"ミート力アップ"}],branch="ACCEPTED"),
                   e(3,"ROLLBACK",restore_to_event_id="E1")])
         self.assertEqual(s["skills"],[])
         self.assertEqual(s["discarded_branch_event_ids"],["E2"])
@@ -158,6 +158,34 @@ class LiveStateRegression(unittest.TestCase):
         self.assertEqual(snapshot["resources"],{"study":4,"sports":28,"play":25,"nature":18,"cheer":100})
         self.assertEqual(snapshot["money_yen"],15980)
         self.assertEqual(snapshot["after_event_id"],"LIVE-Y1-JUN-HANASAKA-ACCEPTED")
+    def test_training_counts_only_committed_participants(self):
+        s=replay([e(1,"TRAINING",participants=["石渡","たき","岡治"],drill="シャドー",drill_level=1,
+                  cheer="ON",branch="ACCEPTED",skill_awards=[{"player":"石渡","skill":"コントロールアップ"}]),
+                  e(2,"TRAINING",participants=["石渡","たき","岡治"],drill="シャドー",drill_level=1,
+                  cheer="ON",branch="REJECTED",skill_awards=[])])
+        self.assertEqual(s["training_counts_observed"]["石渡"]["シャドー"],1)
+        self.assertEqual(s["training_counts_observed"]["岡治"]["シャドー"],1)
+        self.assertEqual(len(s["skills"]),1)
+        self.assertEqual(len(s["training_history"]),1)
+    def test_rollback_resets_training_counts(self):
+        s=replay([screen(1),e(2,"TRAINING",participants=["石渡","たき","岡治"],drill="シャドー",drill_level=1,
+                  cheer="ON",branch="ACCEPTED",skill_awards=[]),e(3,"ROLLBACK",restore_to_event_id="E1")])
+        self.assertEqual(s["training_counts_observed"],{})
+    def test_training_skill_must_be_awarded_to_participant(self):
+        with self.assertRaises(ObservationError):
+            replay([e(1,"TRAINING",participants=["石渡","たき","岡治"],drill="シャドー",drill_level=1,
+                      cheer="ON",branch="ACCEPTED",skill_awards=[{"player":"入江","skill":"ジャストミート"}])])
+    def test_match_wide_correction_updates_all_attempts(self):
+        events=[e(1,"MATCH_SCHEDULE",entries=[{"match_id":"M","opponent":"仮"}]),
+                e(2,"MATCH_ATTEMPT",match_id="M",opponent="仮",attempt=1,our_runs=0,their_runs=1,branch="REJECTED"),
+                e(3,"MATCH_ATTEMPT",match_id="M",opponent="仮",attempt=2,our_runs=3,their_runs=0,branch="ACCEPTED"),
+                e(4,"CORRECTION",target_match_id="M",patch={"opponent":"生南"})]
+        s=replay(events)
+        self.assertEqual(s["matches"]["M"]["opponent"],"生南")
+        self.assertEqual(events[0]["entries"][0]["opponent"],"仮")
+    def test_match_wide_correction_unknown_id_fails(self):
+        with self.assertRaises(ObservationError):
+            replay([screen(1),e(2,"CORRECTION",target_match_id="NOT_FOUND",patch={"opponent":"生南"})])
     def test_late_historical_completion_preserves_new_snapshot(self):
         s=replay([screen(1,8),e(2,"MATCHES_COMPLETED",7)])
         self.assertTrue(s["resources"]["fresh"])
