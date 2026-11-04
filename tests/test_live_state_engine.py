@@ -218,9 +218,9 @@ class LiveStateRegression(unittest.TestCase):
         self.assertEqual(s["matches"]["M"]["first_attempt"]["our_runs"],0)
         self.assertEqual(s["matches"]["M"]["accepted_attempt"]["our_runs"],3)
         self.assertEqual(s["matches"]["M"]["classification"],"RESET_ASSISTED_WIN")
-    def test_rollback_refuses_missing_checkpoint(self):
+    def test_rollback_refuses_invalid_explicit_checkpoint(self):
         with self.assertRaises(ObservationError):
-            replay([e(1,"ROLLBACK")])
+            replay([e(1,"ROLLBACK",to_checkpoint_id="NOT_A_REAL_SAVE")])
     def test_same_month_post_match_old_screen_rejected(self):
         s=replay([screen(1),e(2,"MATCH_ATTEMPT",match_id="M",opponent="花さか",
                     attempt=1,our_runs=2,their_runs=0,branch="ACCEPTED"),
