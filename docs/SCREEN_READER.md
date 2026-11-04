@@ -61,3 +61,20 @@ Japanese OCR for actual player names/stat numbers, player identity recognition, 
 ### Checks and known limits
 - CI uses synthesized font silhouettes and 85 state/image regression tests. Actual screenshot comparisons were run separately from mounted source files; no user PNG is committed to GitHub. The templates were learned from the same observed font family, so this is not a blind accuracy benchmark on new sources.
 - Font/layout resolution changes, color shifts, unknown blue 9 and substitute batting rows are not proved supported. Any unknown glyph or incompatible total is `NEEDS_REVIEW`, not PASS. Correct sum does not independently establish correct names or whether a branch was reloaded.
+
+## Native roster-list page classification (v1.2, 2026-11-05)
+
+`read_image()` now recognizes the **page header only** for native iOS 1.42 player-list screenshots as `ROSTER_LIST`. It returns `roster_page.page_index` (1–6) and `status=PAGE_ONLY`; Japanese names, abilities, roster ordering/scroll offset and player identity remain UNVERIFIED. Never map a visible row to a player using page number alone. No roster content is automatically ingested into the current live state.
+
+Two fixed header ROIs are checked: the source-derived “選手一覧” mask and the page-number mask. The supported pixel masks were derived from original, user-provided `2622×1206` screenshots. Thresholds require a close title match, a close page-digit match and a distinct second-best distance. Unsupported scale, absent title, changed font/color and ambiguous page indicator return no roster detection. This is not generic OCR.
+
+Actual-image local comparison (original PNG bytes stay in Library, **not GitHub**):
+- Positive: `IMG_8894/8895` → 2/6, `IMG_8896/8897` → 1/6, `IMG_8898/8899` → 3/6, `IMG_8901` → 4/6, `IMG_8902` → 5/6, `IMG_8904` → 6/6: 9/9 page-only.
+- Negative: `IMG_8926`, `IMG_8927`, `IMG_8928` batter/pitcher result screens: 3/3 rejected as roster.
+- Sources include SHA256 `IMG_8894=216984a4e3ce56e65cb152eacaae168d3a3188dc455bca5a9c27bccc2b239a48`, `IMG_8902=e86445f53656491cc21dbc34b14850a6d5792ef04ef10795290e6a13cc371a9c`. New layouts remain unverified.
+
+## Unrecognized tens-glyph correction (v1.2)
+
+`_read_batter_number()` now distinguishes a genuinely empty tens position from a **present but unrecognized** blue pixel-font glyph. The latter returns `None`, causing `NEEDS_REVIEW` for that batting page; a team-total failure also prevents nine-row acceptance. The tens ROI excludes the ones ROI's first column. Verified historical samples show 0 source-blue tens pixels in each single-digit field on `IMG_8926` and 1150 in the `25` at-bats total's tens cell on `IMG_8927`. Unsupported blue 9 remains unsupported. No optimistic substitution or automatic player binding has been added.
+
+GitHub Actions Run Guard for candidate code `e978187fa802ae96025dd21c798dc9e8f81eb1ff`: [run 41931474550](https://github.com/inari-1234/baseball-navigator/actions/runs/41931474550), guard/contract/replay PASS and 90 unittest cases PASS. Synthetic unit fixtures do not establish unseen-source recognition accuracy.
