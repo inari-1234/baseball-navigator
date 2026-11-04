@@ -190,7 +190,8 @@ class RosterBattingNumberRegression(unittest.TestCase):
     def _image(self, values=None, *, page=2):
         from screen_reader import (
             _ROSTER_BATTING_FONT, _ROSTER_BATTING_ROW_Y,
-            _ROSTER_BATTING_COLUMNS, _ROSTER_NUMERIC_INK,
+            _ROSTER_BATTING_COLUMNS, _ROSTER_PITCHING_COLUMNS,
+            _ROSTER_NUMERIC_INK,
         )
         img=RosterPageRegression()._sample(page)
         values=values or [
@@ -199,7 +200,8 @@ class RosterBattingNumberRegression(unittest.TestCase):
         ]
         draw=ImageDraw.Draw(img)
         for top,triple in zip(_ROSTER_BATTING_ROW_Y,values):
-            for (field,(right,limit)),value in zip(_ROSTER_BATTING_COLUMNS.items(),triple):
+            columns=_ROSTER_PITCHING_COLUMNS if page==3 else _ROSTER_BATTING_COLUMNS
+            for (field,(right,limit)),value in zip(columns.items(),triple):
                 for place,digit in enumerate(str(value)[::-1]):
                     bits=_ROSTER_BATTING_FONT[digit][0]
                     left=right-24-25*place
@@ -238,6 +240,47 @@ class RosterBattingNumberRegression(unittest.TestCase):
         self.assertEqual(result["source"]["sha256"],digest)
         self.assertNotIn("player_names",result)
         self.assertFalse(result["roster_batting_values"]["player_identities_verified"])
+
+    def test_roster_pitching_velocity_control_breaking_seven_rows(self):
+        from screen_reader import read_roster_pitching_values
+        rows=[(80,7,0),(80,2,10),(81,17,12),(87,18,16),
+              (82,2,0),(82,13,4),(80,1,0)]
+        result=read_roster_pitching_values(self._image(rows,page=3))
+        self.assertEqual(result["status"],"PASS",result)
+        values=[tuple(row[k] for k in ("velocity_kmh","control","breaking"))
+                for row in result["rows"]]
+        self.assertEqual(values,rows)
+        self.assertFalse(result["names_verified"])
+        self.assertFalse(result["player_identities_verified"])
+        self.assertFalse(result["live_state_current"])
+
+    def test_roster_pitching_read_image_dispatch_and_source(self):
+        from screen_reader import read_image
+        rows=[(80,7,0),(80,2,10),(81,17,12),(87,18,16),
+              (82,2,0),(82,13,4),(80,1,0)]
+        with tempfile.TemporaryDirectory() as tmp:
+            path=Path(tmp)/"pitch_roster.png"
+            self._image(rows,page=3).save(path)
+            digest=hashlib.sha256(path.read_bytes()).hexdigest()
+            result=read_image(path)
+        self.assertEqual(result["screen_type"],"ROSTER_LIST")
+        self.assertEqual(result["roster_pitching_values"]["status"],"PASS")
+        self.assertNotIn("roster_batting_values",result)
+        self.assertEqual(result["source"]["sha256"],digest)
+
+    def test_roster_pitching_unknown_tens_digit_fails_closed(self):
+        from screen_reader import read_roster_pitching_values, _ROSTER_BATTING_ROW_Y
+        rows=[(80,7,0),(80,2,10),(81,17,12),(87,18,16),
+              (82,2,0),(82,13,4),(80,1,0)]
+        im=self._image(rows,page=3)
+        # Replace velocity '8' with an unseen silhouette.
+        top=_ROSTER_BATTING_ROW_Y[0]
+        ImageDraw.Draw(im).rectangle((1397,top,1421,top+34),fill=(23,34,53))
+        result=read_roster_pitching_values(im)
+        self.assertEqual(result["status"],"NEEDS_REVIEW")
+        self.assertIsNone(result["rows"][0]["velocity_kmh"])
+        self.assertEqual(result["rows"][0]["control"],7)
+        self.assertIn("UNKNOWN_PITCHING_GLYPH_ROW:1",result["errors"])
 
     def test_unrecognized_digit_in_a_tens_slot_fails_closed(self):
         from screen_reader import read_roster_batting_values, _ROSTER_BATTING_ROW_Y
