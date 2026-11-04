@@ -84,5 +84,9 @@
   "training_counts_by_player_drill": {},
   "item_effects": [],
   "reverted_event_ids": [],
-  "rollback_count": 0
+  "rollback_count": 0,
+  "inventory": {
+    "fresh": false,
+    "items": null
+  }
 }
