@@ -167,6 +167,12 @@ def read_image(path: str | Path) -> dict[str, Any]:
         result = read_formation(im)
         if result["screen_type"] == "UNSUPPORTED":
             result["screen_type"] = _other_screen_type(im.convert("RGB"))
+        if result["screen_type"] == "BATTER_RESULTS":
+            from score_digits import read_batter_numbers
+            result["numeric_results"] = read_batter_numbers(im)
+        elif result["screen_type"] == "PITCHER_RESULTS":
+            from score_digits import read_pitcher_numbers
+            result["numeric_results"] = read_pitcher_numbers(im)
         result["image_size"] = [im.width, im.height]
     result["source"] = {
         "sha256": hashlib.sha256(raw).hexdigest(), "filename": path.name,
@@ -218,7 +224,7 @@ def propose_hp_event(reading: dict[str, Any], verified_names: dict[str, str],
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Classify screenshot and measure formation graphical HP fill.")
+        description="Classify screenshots, read supported numeric results and measure formation HP graphics.")
     parser.add_argument("image")
     args = parser.parse_args()
     print(json.dumps(read_image(args.image), ensure_ascii=False, indent=2))
