@@ -3,12 +3,13 @@
 from __future__ import annotations
 import argparse
 import json
+import math
 import re
 from pathlib import Path
 from typing import Any
 
 KINDS={"SCREEN","MATCH_SCHEDULE","MATCH_ATTEMPT","MATCHES_COMPLETED","TRAINING",
-       "ITEM_USE","CORRECTION","SAVE_CHECKPOINT","ROLLBACK"}
+       "ITEM_USE","CORRECTION","SAVE_CHECKPOINT","ROLLBACK","HP_OBSERVATION"}
 SOURCES={"RAW_SCREEN","USER_REPORT","USER_CORRECTION"}
 BRANCHES={"ACCEPTED","REJECTED"}
 COUNTERS=("study","sports","play","nature","cheer")
@@ -31,6 +32,45 @@ def clock_minutes(s):
     m=re.fullmatch(r"(AM|PM)\s*(1[0-2]|[1-9]):([0-5][0-9])",s.strip(),re.I)
     if not m:return None
     return (int(m.group(2))%12)*60+int(m.group(3))+(720 if m.group(1).upper()=="PM" else 0)
+
+
+def measure_hp_observation(entry, source_kind):
+    """Keep visual bar fill distinct from actual numeric HP; no screenshot OCR is implied."""
+    if not isinstance(entry,dict) or not isinstance(entry.get("player"),str) or not entry["player"].strip():
+        raise ObservationError("HP needs a named player")
+    kind=entry.get("reading_kind")
+    if kind=="VERTICAL_BAR":
+        if source_kind!="RAW_SCREEN" or entry.get("identity_evidence") not in {"SELECTED_PLAYER_PANEL","VISIBLE_ROSTER_ROW","VERIFIED_FORMATION_SLOT"}:
+            raise ObservationError("bar needs a screenshot source and independently grounded player identity")
+        g=entry.get("geometry_px")
+        if not isinstance(g,dict):raise ObservationError("bar requires pixel geometry")
+        keys=("center_x","track_top","track_bottom","fill_top","edge_uncertainty")
+        if any(type(g.get(k)) is not int for k in keys):raise ObservationError("bar geometry must be integer pixels")
+        top,bottom,fill,unc=(g[k] for k in ("track_top","track_bottom","fill_top","edge_uncertainty"))
+        height=bottom-top
+        if (g["center_x"]<0 or top<0 or height<16 or not top<=fill<=bottom
+            or unc<0 or unc>3 or height<=2*unc):
+            raise ObservationError("invalid bar geometry")
+        filled=bottom-fill
+        estimate=round(100*filled/height,1)
+        low=max(0,math.floor(100*max(0,filled-unc)/(height+2*unc)))
+        high=min(100,math.ceil(100*min(height,filled+unc)/(height-2*unc)))
+        return {"reading_kind":kind,"confidence":"VISUAL_UNCALIBRATED",
+                "graphical_fill_estimate_pct":estimate,"graphical_fill_range_pct":[low,high],
+                "hp_numeric_percent":None,"full_state":"NOT_NEAR_FULL" if high<90 else "UNKNOWN",
+                "identity_evidence":entry["identity_evidence"],"geometry_px":{k:g[k] for k in keys}}
+    if kind in {"USER_APPROX_PERCENT","USER_EXACT_PERCENT"}:
+        if source_kind not in {"USER_REPORT","USER_CORRECTION"}:
+            raise ObservationError("numeric HP must be directly user reported, not inferred from bar")
+        val=entry.get("reported_percent")
+        if type(val) is not int or not 0<=val<=100:
+            raise ObservationError("reported HP percent must be integer 0..100")
+        is_exact=kind=="USER_EXACT_PERCENT"
+        return {"reading_kind":kind,"confidence":"USER_EXACT" if is_exact else "USER_APPROX",
+                "graphical_fill_estimate_pct":None,"graphical_fill_range_pct":None,
+                "hp_numeric_percent":val,"full_state":("FULL" if is_exact and val==100 else
+                  "NOT_FULL" if val<100 else "UNKNOWN"),"identity_evidence":"USER_NAMED_PLAYER"}
+    raise ObservationError("unrecognized HP reading; use VERTICAL_BAR or direct user percent")
 
 def read_events(path):
     out=[]
@@ -125,7 +165,7 @@ def replay(events):
         if e["kind"]=="MATCH_ATTEMPT" and e.get("attempt")==1 and e.get("match_id") not in prior_first:
             prior_first[e["match_id"]]={"attempt":1,"our_runs":e.get("our_runs"),
                 "their_runs":e.get("their_runs"),"evidence_id":e["event_id"]}
-    state={"schema_version":"1.1","last_event_seq":len(events),"period_floor":None,
+    state={"schema_version":"1.2","last_event_seq":len(events),"period_floor":None,
            "last_seen_screen_period":None,
            "resources":{"fresh":False,"values":None,"last_observed":None},
            "matches":{},"completed_match_periods":[],"skills":[],
@@ -134,14 +174,16 @@ def replay(events):
            "observations_ignored_as_stale":[],"reverted_event_ids":discarded,
            "discarded_branch_event_ids":discarded,"rollback_count":rollback_count,
            "timeline_status":"UNKNOWN_AFTER_ROLLBACK" if unknown_after_rollback else "TRUSTED",
+           "hp_by_player":{},
            "current_exact_time":"UNKNOWN"}
     floor=None;closed=set();matches={};seen_attempts=set()
-    last_mutation_id=None;last_screen_clock=None;last_screen_period=None
+    last_mutation_id=None;last_screen_clock=None;last_screen_period=None;last_context_event_id=None
     def invalidate():
         state["resources"]["fresh"]=False
         state["resources"]["values"]=None
         state["inventory"]["fresh"]=False
         state["inventory"]["items"]=None
+        for value in state["hp_by_player"].values():value["fresh"]=False
     for e in active:
         kind=e["kind"];p=period(e);pk=label(p);eid=e["event_id"]
         historical=bool(floor and p<floor)
@@ -175,7 +217,33 @@ def replay(events):
                 state["timeline_status"]="RECAPTURED_AFTER_UNANCHORED_ROLLBACK"
             state["current_exact_time"]=e.get("clock") or "UNKNOWN"
             floor=max(floor,p) if floor else p
-            last_screen_clock=current_clock;last_screen_period=pk;last_mutation_id=None
+            last_screen_clock=current_clock;last_screen_period=pk;last_mutation_id=None;last_context_event_id=eid
+        elif kind=="HP_OBSERVATION":
+            entries=e.get("entries")
+            if not isinstance(entries,list) or not entries:
+                raise ObservationError(f"{eid}: HP requires one or more entries")
+            # Always validate data, including historical/rejected screenshots.
+            parsed={}
+            for entry in entries:
+                result=measure_hp_observation(entry,e["source"]["kind"])
+                player=entry["player"].strip()
+                if player in parsed:raise ObservationError(f"{eid}: duplicated HP player")
+                parsed[player]=result
+            after=e.get("after_event_id") or e.get("observed_after_event_id")
+            clock=clock_minutes(e.get("clock"))
+            stale=(historical or e.get("branch")!="ACCEPTED" or
+                   (last_context_event_id is not None and after!=last_context_event_id) or
+                   (pk in closed and last_mutation_id is None) or
+                   (last_screen_period==pk and last_screen_clock is not None and
+                    clock is not None and clock<last_screen_clock and not e.get("confirmed_clock_reset")))
+            if stale:
+                state["observations_ignored_as_stale"].append(eid)
+                continue
+            for player,result in parsed.items():
+                state["hp_by_player"][player]={**result,"fresh":True,"event_id":eid,"period":pk,
+                    "source_locator":e["source"]["locator"]}
+            last_context_event_id=eid
+            floor=max(floor,p) if floor else p
         elif kind=="MATCH_SCHEDULE":
             if not isinstance(e.get("entries"),list):raise ObservationError(f"{eid}: entries required")
             for item in e["entries"]:
@@ -210,7 +278,7 @@ def replay(events):
                 m["classification"]=(("RESET_ASSISTED_WIN" if reset_assisted else "STABLE_WIN")
                     if a>b else ("DRAW" if a==b else "LOSS"))
                 if not historical:
-                    invalidate();state["current_exact_time"]="UNKNOWN";last_mutation_id=eid
+                    invalidate();state["current_exact_time"]="UNKNOWN";last_mutation_id=eid;last_context_event_id=eid;last_context_event_id=eid
                     floor=max(floor,p) if floor else p
         elif kind=="MATCHES_COMPLETED":
             if e["source"]["kind"] not in {"USER_REPORT","USER_CORRECTION"}:
@@ -260,7 +328,7 @@ def replay(events):
                 invalidate();state["current_exact_time"]="UNKNOWN";last_mutation_id=eid
                 floor=max(floor,p) if floor else p
         elif kind=="ROLLBACK":
-            invalidate();state["current_exact_time"]="UNKNOWN";last_mutation_id=eid
+            invalidate();state["current_exact_time"]="UNKNOWN";last_mutation_id=eid;last_context_event_id=eid
             last_screen_clock=None;last_screen_period=None
         elif kind=="SAVE_CHECKPOINT":
             pass
@@ -314,6 +382,40 @@ def validate_recommendation(rec,state,contract):
                     type(item.get("quantity")) is not int or item["quantity"]<1 or
                     state["inventory"]["items"].get(item["item"],0)<item["quantity"]):
                     errors.append("INSUFFICIENT_ITEM_INVENTORY")
+    # A bar's fill ratio is never an exact HP value without a live calibration.
+    hp_claims=rec.get("hp_claims",{})
+    if not isinstance(hp_claims,dict):
+        errors.append("INVALID_HP_CLAIMS")
+        hp_claims={}
+    for player,claim in hp_claims.items():
+        obs=state.get("hp_by_player",{}).get(player)
+        if not obs or not obs["fresh"]:
+            errors.append(f"HP_NOT_VERIFIED:{player}")
+            continue
+        if claim=="FULL" and obs["full_state"]!="FULL":
+            errors.append(f"HP_FULL_NOT_PROVEN:{player}")
+        elif claim=="NEAR_FULL":
+            if obs["reading_kind"]=="VERTICAL_BAR":
+                code="HP_NEAR_FULL_CONTRADICTED" if obs["full_state"]=="NOT_NEAR_FULL" else "HP_NEAR_FULL_NOT_PROVEN"
+                errors.append(f"{code}:{player}")
+            elif obs["hp_numeric_percent"]<90:
+                errors.append(f"HP_NEAR_FULL_CONTRADICTED:{player}")
+        elif claim not in {"FULL","NEAR_FULL","NOT_FULL"}:
+            errors.append(f"UNSUPPORTED_HP_CLAIM:{player}")
+    limits=rec.get("hp_min_by_player",{})
+    if not isinstance(limits,dict):
+        errors.append("INVALID_HP_REQUIREMENTS")
+        limits={}
+    for player,minimum in limits.items():
+        obs=state.get("hp_by_player",{}).get(player)
+        if type(minimum) is not int or not 0<=minimum<=100:
+            errors.append(f"INVALID_HP_THRESHOLD:{player}")
+        elif not obs or not obs["fresh"]:
+            errors.append(f"HP_NOT_VERIFIED:{player}")
+        elif obs["reading_kind"]!="USER_EXACT_PERCENT":
+            errors.append(f"HP_THRESHOLD_UNVERIFIED:{player}")
+        elif obs["hp_numeric_percent"]<minimum:
+            errors.append(f"HP_BELOW_THRESHOLD:{player}")
     mid=rec.get("target_match_id")
     if mid:
         m=state["matches"].get(mid)
