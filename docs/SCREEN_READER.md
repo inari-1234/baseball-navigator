@@ -42,3 +42,22 @@ The same image was probed with nearest-neighbor rescaling to `1311×603` and `18
 
 ## Remaining
 Japanese OCR for actual player names/stat numbers, player identity recognition, HUD resource number extraction, and numeric HP bar calibration remain separate future changes. The current post-July resource and HP state is UNKNOWN.
+
+## Native batting/pitcher numeric result reader (v1.1)
+
+`python3 screen_reader.py IMG_8926.png` now attaches `batter_stats` to the existing category result, and `IMG_8928.png` attaches `pitcher_stats`. All derived stats remain screenshot evidence, not automatically accepted match events.
+
+### Batting result sheets
+- Fixed native pixels `2622×1206`; top result page rows 1–5, lower result page rows 6–9 with a final `team_total` row. Each row's `at_bats`, `hits`, `rbi` is extracted from source-observed fixed-font blue numerals and returned with `lineup_slot`. Player names are deliberately omitted.
+- Source-observed blue glyph coverage: 0,1,2,3,4,5,6,7,8; **9 has no trusted native example yet**. Unknown glyphs return `None` and set `NEEDS_REVIEW` rather than invent a value. Other scales are `UNSUPPORTED_SCALE`.
+- `validate_batter_pages(top,bottom,verified_match_id="...")` **only when the two screenshots are independently confirmed to be the same match**. The 9-row at-bat/hit/RBI sums must match the displayed total exactly; otherwise `TOTAL_MISMATCH` and accepted rows remain empty. The caller-supplied match ID is not proof by itself.
+- Real mounted evidence: `IMG_8926.png` hash `29cd90d8876131377c9c4f05fb779a4f5f3c4d99a9e09dca05cfe82fd969571d` and `IMG_8927.png` hash `365d5d9bbbfd99224549941a7bcdcebefd420407670782ca7a14c53a3630c694`: 9 summed rows = shown `25 at-bats / 8 hits / 5 RBI`.
+
+### Pitcher result
+- Source-observed blue top row: appearances/innings display, hits allowed, runs allowed. White panel: cumulative ERA kept as a decimal string (e.g., `1.20`), wins, losses, strikeouts, walks. White pixel font covers digits 0–9 and the decimal point.
+- Real mounted evidence: `IMG_8928.png` hash `79d789059eb563b2137168f51c1c11c474d0c4a15c9ea4f415ff6838eeeff302`: 6 innings displayed, H3 R1, ERA1.20, W4 L0 K5 BB2; `IMG_8924.png` hash `f06d6cefa38a0329fcaff2f9b9f409fbe894cc64d145619a987d2df82d84f2e9`: 6 innings, H1 R0, ERA0.75, W3 L0 K4 BB1. ERA is not interpreted as the single game's ERA without stronger evidence.
+- The engine cannot read Japanese names, opponent, reset branch, current calendar or score solely from these numbers. That information requires independently sourced visible text/user report and chronological replay.
+
+### Checks and known limits
+- CI uses synthesized font silhouettes and 85 state/image regression tests. Actual screenshot comparisons were run separately from mounted source files; no user PNG is committed to GitHub. The templates were learned from the same observed font family, so this is not a blind accuracy benchmark on new sources.
+- Font/layout resolution changes, color shifts, unknown blue 9 and substitute batting rows are not proved supported. Any unknown glyph or incompatible total is `NEEDS_REVIEW`, not PASS. Correct sum does not independently establish correct names or whether a branch was reloaded.

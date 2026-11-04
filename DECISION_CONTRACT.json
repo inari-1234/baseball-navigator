@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0",
-  "contract_version": "1.4.0",
+  "contract_version": "1.5.0",
   "status": "ACTIVE",
   "built_from": {
     "legacy_sources": [
@@ -496,7 +496,14 @@
       "status": "ACTIVE",
       "type": "PROCESS",
       "layer": "LIVE_EVIDENCE",
-      "rule": "For accessible v1.42 screenshot bytes, run a supported pixel/template screen reader before extracting gauges. The parser may recognize formation positions and graphical green fill, but MUST NOT claim Japanese name or numerical score OCR, assign a player without independently verified position mapping, convert the bar to exact game HP, or treat an older screenshot as current. Unsupported layouts fail closed; document source hash and recognition scope."
+      "rule": "For accessible v1.42 screenshot bytes, run a supported pixel/template screen reader before extracting gauges. The parser may recognize formation positions and graphical green fill, but MUST NOT claim Japanese name recognition, arbitrary numerical OCR, or unobserved glyph support; the only supported score extraction is fixed-font native batter/pitcher numeric panels under DC-SCORE-001, assign a player without independently verified position mapping, convert the bar to exact game HP, or treat an older screenshot as current. Unsupported layouts fail closed; document source hash and recognition scope."
+    },
+    {
+      "rule_id": "DC-SCORE-001",
+      "status": "ACTIVE",
+      "type": "PROCESS",
+      "layer": "LIVE_EVIDENCE",
+      "rule": "Numeric score extraction requires a source-linked native 2622x1206 v1.42 result screen and recognized glyphs; unknown digits, unsupported layouts, inconsistent totals or unverified match pairing fail closed. Batter pages may be combined only with a verified common match ID and 9-row at-bat/hit/RBI sum equal to displayed total. Pitcher fields are a separately sourced panel (ERA cumulative, not assumed game-only). No player name, reset branch or current-game state may be inferred from pixel digits alone."
     }
   ],
   "material_event_names": [
@@ -528,6 +535,7 @@
     "hp_stale_on": "MATCH/TRAINING/ITEM_USE, MATCHES_COMPLETED, ROLLBACK",
     "hp_gate": "visual bars never prove full, near-full, or numeric thresholds",
     "image_pixel_reader": "screen_reader.py (formation gauges only, positions unbound to player names)",
-    "image_reader_scope": "Formation graphical fill+category classification; unsupported screen or text/digit fields remain UNKNOWN"
+    "image_reader_scope": "Formation positions and graphical HP; native batting/pitching fixed-font numeric results; names, unfamiliar fonts or scales UNKNOWN",
+    "numeric_score_reader": "Native 2622x1206 blue batting digits 0-8; white pitcher panel digits 0-9 + decimal; team total validation requires externally verified same match"
   }
 }

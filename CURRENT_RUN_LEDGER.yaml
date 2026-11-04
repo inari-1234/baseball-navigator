@@ -1,8 +1,8 @@
 {
   "schema_version": "1.0",
-  "ledger_version": 10,
+  "ledger_version": 11,
   "run_id": "SAPPORO_SPRINT_RESTART_20261103",
-  "expected_parent_sha": "bde53aa281d08285ce3bb2eff25b3ee388730507",
+  "expected_parent_sha": "09be290d2e778ee0c3bb61fcd6f57dcb93dda93f",
   "run_status": {
     "previous_run": "ABANDONED_FOR_REDESIGN",
     "new_run": "ACTIVE_AFTER_JULY_MATCHES_REPORTED_COMPLETE",
@@ -38,12 +38,13 @@
     "document": "SAPPORO_SPRINT_STRATEGY.md",
     "boot_document": "AGENTS.md",
     "decision_contract": "DECISION_CONTRACT.json",
-    "contract_version": "1.4.0",
+    "contract_version": "1.5.0",
     "mode": "Y1_OCTOBER_SAPPORO_SPRINT",
     "live_events": "LIVE_EVENTS.jsonl",
     "current_live_state": "CURRENT_LIVE_STATE.json",
     "hp_measurement_owner": "live_state_engine.py",
-    "screen_reader": "screen_reader.py"
+    "screen_reader": "screen_reader.py",
+    "stats_image_reading": "screen_reader.py numeric fixed font 2622x1206"
   },
   "evidence": [
     {
@@ -136,6 +137,18 @@
       "kind": "RAW_EVIDENCE",
       "locator": "Current conversation screenshot IMG_8932.png, sha256=d3966cd2762b991774e98e5b69feb48f069f7123447ef41fab7a2cf1aedca299",
       "statement": "On supplied full iOS formation screenshot, programmatic pixel detector found 9/9 position-coded gauges. Original/resized checks PASS; only the graphical fill ratio is extracted; no automatic character name, number OCR or numeric HP calibration."
+    },
+    {
+      "evidence_id": "EV-BATTER-PIXEL-NUMBERS-8926-8927",
+      "kind": "RAW_EVIDENCE",
+      "locator": "IMG_8926.png sha256=29cd90d8876131377c9c4f05fb779a4f5f3c4d99a9e09dca05cfe82fd969571d; IMG_8927.png sha256=365d5d9bbbfd99224549941a7bcdcebefd420407670782ca7a14c53a3630c694",
+      "statement": "Nine lineup rows auto-read with source-derived pixel glyphs; sum displayed 25 at-bats, 8 hits, 5 RBI matches the total strip. Match branch/name identity must be grounded separately."
+    },
+    {
+      "evidence_id": "EV-PITCHER-PIXEL-NUMBERS-8928",
+      "kind": "RAW_EVIDENCE",
+      "locator": "IMG_8928.png sha256=79d789059eb563b2137168f51c1c11c474d0c4a15c9ea4f415ff6838eeeff302",
+      "statement": "Pitcher panel numeric shapes decode appearances6, hits allowed3, runs1, ERA1.20, W4 L0 K5 BB2, without player-name OCR."
     }
   ],
   "facts": [
@@ -521,6 +534,15 @@
       "material_to_goal": false,
       "default": "Do not infer player identity or numeric game stats from a detected graphical gauge. Text and digits require separate source-grounded reading.",
       "resolve_by": "Independent label/number extraction with actual screenshot gold fixtures, accuracy and fail-closed gates."
+    },
+    {
+      "unknown_id": "UNK-BLUE-PIXEL-DIGIT-9",
+      "field": "pixel_font.blue_batter_digit_nine",
+      "status": "OPEN",
+      "material_to_next_action": false,
+      "material_to_goal": false,
+      "default": "Return NEEDS_REVIEW rather than misread an unseen blue 9. Do not silently substitute a similar glyph.",
+      "resolve_by": "New native v1.42 source where a known blue 9 appears, validate glyph against independent direct reading."
     }
   ]
 }
