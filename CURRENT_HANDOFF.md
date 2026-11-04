@@ -1,6 +1,6 @@
 # CURRENT_HANDOFF
 
-Last updated: 2026-11-04
+Last updated: 2026-11-05
 State: ACTIVE_POST_JULY_RECONCILIATION — BLOCKED_ON_CURRENT_COUNTERS
 
 ## Canonical runtime
@@ -77,3 +77,11 @@ Repo change is the ingestion/reconciliation owner; `Excel-Tests` is not mutated.
 - Blue font observed digit coverage is 0–8, **9 unsupported** and unknown characters fail closed. White pitcher panel font 0–9 plus dot observed. Fixed native layouts only; no generic OCR, no automatic player name, no game-score reconstruction, no proof of beyond-sample accuracy. Font shapes are derived signatures; original screenshots are NOT in GitHub.
 - Current post-July time/resources and HP are still UNKNOWN; historical match screenshot extraction does not promote them to current. No new live EVENT was appended by a detector.
 - Acceptance requires GitHub Actions Guard + Contract + existing replay + 85-case test suite, read back after main FF. No user screenshots were committed as fixtures.
+
+## Screenshot reader v1.2 continuation boundary (2026-11-05)
+- Owner: `screen_reader.py`; existing result-screen numeric parser remains limited to native `2622×1206` iOS 1.42. `_read_batter_number` now distinguishes a genuinely blank tens cell from present unrecognized blue ink, so unsupported glyphs (including blue 9) fail closed rather than losing a tens digit. Two focused regression tests added.
+- Implemented **page-only** `ROSTER_LIST` detection from source-derived title plus 1/6–6/6 page-number pixel masks, without Japanese name/ability/stat OCR, player identity, or scroll-offset inference. Three additional regressions test six known pages, missing-header/scale negatives, and provenance output. No new live event or game action.
+- Verified original Library images locally: 9 roster screenshots correctly classified by page (`IMG_8894/8895`:2, `8896/8897`:1, `8898/8899`:3, `8901`:4, `8902`:5, `8904`:6); three historical result screens (`IMG_8926`, `8927`, `8928`) rejected as roster. Real-image check is separate from CI, and source PNG bytes are not committed.
+- Actual-image hashes: `IMG_8894` SHA256 `216984a4e3ce56e65cb152eacaae168d3a3188dc455bca5a9c27bccc2b239a48`; `IMG_8902` SHA256 `e86445f53656491cc21dbc34b14850a6d5792ef04ef10795290e6a13cc371a9c`. Their canonical storage is the user's Library.
+- Verified candidate code SHA `e978187fa802ae96025dd21c798dc9e8f81eb1ff` with GitHub Actions Run Guard [41931474550](https://github.com/inari-1234/baseball-navigator/actions/runs/41931474550): Guard PASS, Decision Contract PASS, all 90 unittest cases PASS, live event replay PASS. Final handoff/doc commits require their own final main PASS/readback.
+- Next owner-boundary: extract grounded numerical player abilities and source-linked names using the saved 1/6–6/6 screenshot family with independent gold labels and explicit scroll/roster identity, **not** by filling missing values from earlier pages. Match outcome/score extraction also requires independently verified actual scoreboard sources. No change to Y1-July-complete and stale current-resource gate.
