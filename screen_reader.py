@@ -304,11 +304,16 @@ def _read_blue_cell(image: Image.Image, box: tuple[int,int,int,int]) -> int | No
 
 
 def _read_batter_number(image: Image.Image, left: int, y: int) -> int | None:
-    # Fixed advance of 40 native pixels; never infer unseen tens as zero.
+    # A blank tens cell is different from a present but unreadable glyph
+    # (including blue 9, for which no source-verified template exists).
     ones=_read_blue_cell(image,(left,y,left+41,y+46))
     if ones is None: return None
-    tens=_read_blue_cell(image,(left-40,y,left+1,y+46))
-    return ones if tens is None else tens*10+ones
+    tens_box=(left-40,y,left,y+46)  # do not borrow the ones' edge pixel
+    tens_mask=_font_mask(image,tens_box,_BLUE_RGB)
+    if not any(any(row) for row in tens_mask):
+        return ones
+    tens=_read_blue_cell(image,tens_box)
+    return None if tens is None else tens*10+ones
 
 
 def read_batter_stats(image: Image.Image) -> dict[str, Any]:
