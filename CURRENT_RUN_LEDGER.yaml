@@ -1,8 +1,8 @@
 {
   "schema_version": "1.0",
-  "ledger_version": 6,
+  "ledger_version": 7,
   "run_id": "SAPPORO_SPRINT_RESTART_20261103",
-  "expected_parent_sha": "059924e7106eb0424d1f23c95ddda3fed1ac6a73",
+  "expected_parent_sha": "bff6782d5bd034f32648067db54f38e52ef5c1bf",
   "run_status": {
     "previous_run": "ABANDONED_FOR_REDESIGN",
     "new_run": "ACTIVE_AFTER_JULY_MATCHES_REPORTED_COMPLETE",
@@ -38,7 +38,7 @@
     "document": "SAPPORO_SPRINT_STRATEGY.md",
     "boot_document": "AGENTS.md",
     "decision_contract": "DECISION_CONTRACT.json",
-    "contract_version": "1.1.0",
+    "contract_version": "1.2.0",
     "mode": "Y1_OCTOBER_SAPPORO_SPRINT",
     "live_events": "LIVE_EVENTS.jsonl",
     "current_live_state": "CURRENT_LIVE_STATE.json"
@@ -368,7 +368,14 @@
         "DC-RESET-002"
       ]
     },
-    "response_mode": "FAST_WITH_RULE_REFS"
+    "response_mode": "FAST_WITH_RULE_REFS",
+    "live_state_ingestion": {
+      "owner": "live_state_engine.py",
+      "evidence_log": "LIVE_EVENTS.jsonl",
+      "snapshot": "CURRENT_LIVE_STATE.json",
+      "version": "1.2.0",
+      "limits": "Screenshot transcription is manually reviewed; training totals count only recorded committed events."
+    }
   },
   "milestone_gates": [
     {

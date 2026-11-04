@@ -18,9 +18,13 @@ If any required BOOT authority cannot be read, do not reconstruct it from conver
 ## Live observation state gate
 Screenshots and user reports must be structured as source-linked observations before making recommendations. Use `LIVE_EVENTS.jsonl` as the append-only live event history and `CURRENT_LIVE_STATE.json` as the validated derived runtime state. This is not an automatic OCR tool: the assistant must read screenshots, mark uncertain fields UNKNOWN, and retain provenance.
 
+A screenshot entered after a later state-changing event must explicitly cite the preceding mutation's event_id (`after_event_id`); otherwise it cannot restore resource freshness. A known SAVE rollback excludes all later discarded branch effects from the active timeline, including skills, matches, and player training counts. Unknown rollback anchors block action until a genuine post-rollback screen recaptures state.
+
 An event saying a match is *scheduled* is not proof of a played result. A user report that the July matches have finished closes those schedule entries even when individual scores are unavailable. A discarded first-attempt loss/draw and an accepted reset-assisted win are separate observations; never promote the latter to STABLE.
 
 Before actionable advice, check `CURRENT_LIVE_STATE.last_event_seq`, event ordering, completed periods, and resource freshness. Never reuse June resources after July match completion. On a match result, time change, reload, material resource spending, or correction, ingest the delta before recommending anything. If counters are stale, do not propose resource-paid training; request only the fresh counters actually needed.
+
+Participant training counts are observations **only for recorded committed sessions**, not lifetime estimates. REJECTED retries and discarded rollback branches never increase the count. Never claim 4th-session skill-point thresholds from a partial record.
 
 Every actionable recommendation must be checked against `live_state_engine.validate_recommendation` semantics: ACTIVE rules, current state revision, not-yet-completed target, and available fresh resources. If the check fails, no action should be issued. The check is operationally required in chat; repository CI validates the event replay and regression tests, not the pixels of a screenshot or all ordinary chat replies.
 

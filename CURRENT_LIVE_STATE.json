@@ -1,5 +1,5 @@
 {
-  "schema_version": "1.0",
+  "schema_version": "1.1",
   "last_event_seq": 7,
   "period_floor": "Y1-07",
   "last_seen_screen_period": "Y1-06",
@@ -75,5 +75,10 @@
   ],
   "skills": [],
   "observations_ignored_as_stale": [],
-  "current_exact_time": "UNKNOWN"
+  "current_exact_time": "UNKNOWN",
+  "item_uses": [],
+  "training_counts_observed": {},
+  "training_history": [],
+  "discarded_branch_event_ids": [],
+  "timeline_status": "TRUSTED"
 }

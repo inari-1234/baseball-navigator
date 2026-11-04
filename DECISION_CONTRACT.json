@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0",
-  "contract_version": "1.1.0",
+  "contract_version": "1.2.0",
   "status": "ACTIVE",
   "built_from": {
     "legacy_sources": [
@@ -468,21 +468,21 @@
       "status": "ACTIVE",
       "type": "PROCESS",
       "layer": "LIVE_EVIDENCE",
-      "rule": "Before applying screenshot/user reports, extract only visible or explicitly stated observations with source locator, period, and accepted/rejected branch. Missing fields remain UNKNOWN; corrections reference the original event. Never infer game state from earlier screenshots."
+      "rule": "Before applying screenshot/user reports, extract only visible or explicitly stated observations with source locator, period, and accepted/rejected branch. Missing fields remain UNKNOWN; corrections reference the original event. Never infer game state from earlier screenshots. After a game/resource mutation, a later SCREEN must identify the preceding mutation via after_event_id. A screenshot without visible values must not be filled from older screenshots."
     },
     {
       "rule_id": "DC-STATE-001",
       "status": "ACTIVE",
       "type": "PROCESS",
       "layer": "HARD_CONSTRAINT",
-      "rule": "Derive current state from ordered live events. A schedule is not a completed match. Explicit user completion closes that period's scheduled matches even when scores are UNKNOWN. Preserve first-attempt branches separately from reset-assisted accepted branches. Invalidate stale resource counters after a later match or rollback."
+      "rule": "Derive current state from ordered live events. A schedule is not a completed match. Explicit user completion closes that period's scheduled matches even when scores are UNKNOWN. Preserve first-attempt branches separately from reset-assisted accepted branches. Invalidate stale resource counters after a later match or rollback. Known SAVE rollback removes discarded branch contributions from the active timeline; unknown save anchor remains blocked pending recapture. Retain rejected attempts as audit-only evidence. Only committed per-player special-training events contribute to observed training counts."
     },
     {
       "rule_id": "DC-ACTION-001",
       "status": "ACTIVE",
       "type": "HARD_CONSTRAINT",
       "layer": "HARD_CONSTRAINT",
-      "rule": "Before issuing an actionable recommendation, use the latest live event revision, ACTIVE rule IDs, and validated match/resource constraints. Reject actions targeting already completed matches and paid training when resource counters are stale or insufficient."
+      "rule": "Before issuing an actionable recommendation, use the latest live event revision, ACTIVE rule IDs, and validated match/resource constraints. Reject actions targeting already completed matches and paid training when resource counters are stale or insufficient. TRAIN with Cheer ON requires explicitly checked Sports and Cheer costs; older-month target matches are never upcoming. ITEM actions must fail closed until inventory availability is verified."
     }
   ],
   "material_event_names": [
@@ -503,6 +503,12 @@
     "unknown_resource_action": "BLOCK",
     "period_level_completion": "CLOSE_REGISTERED_MATCHES_WITH_SCORE_UNKNOWN",
     "screenshot_reading": "MANUAL_SOURCE_LINKED_NOT_AUTOMATIC_OCR",
-    "recommendation_requires_latest_event_seq": true
+    "recommendation_requires_latest_event_seq": true,
+    "schema_version": "1.1",
+    "rollback_semantics": "known restore_to_event_id discards subsequent active branch effects; unknown anchor blocks actions until evidenced recapture",
+    "fresh_screen_after_mutation": "after_event_id must match last resource-invalidating event",
+    "training_counts_scope": "recorded committed participants only; historical unrecorded training UNKNOWN",
+    "supported_item_actions": "BLOCKED until a source-verified item inventory is modeled",
+    "replay_does_not_prove_visual_transcription": true
   }
 }

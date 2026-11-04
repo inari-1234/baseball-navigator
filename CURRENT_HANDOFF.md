@@ -18,6 +18,15 @@ Read `AGENTS.md`, `RUN_GUARD_POLICY.yaml`, `DECISION_CONTRACT.json`, `CURRENT_LI
 ## Why prior gameplay advice failed
 AI analyzed screenshots and match reports but never committed their temporal deltas to an executable current-state model. It subsequently advised preparing for July matches already finished and reused June points for unverified later actions.
 
+## Audit v1.2 corrective boundary
+- Cause-owner code: `live_state_engine.py`; tests: `tests/test_live_state_engine.py`.
+- Correctly restored SAVEs prune superseded branch skill, item, match and training-count effects. Unknown rollback anchor blocks unsafe actions until a new screen is confirmed after that rollback.
+- Screens in the same month do not refresh resource counters after a gameplay change unless `after_event_id` identifies that change.
+- Committed per-player training counts are tracked **only from recorded TRAINING events**, not inferred from 40 SAVE/LOAD experiments. The hidden skill-point hypothesis stays OPEN.
+- Old-month match registration is not an actionable upcoming match; Cheer ON costs must be checked.
+- No current post-July screen has been supplied; the current exact time and resources remain UNKNOWN. No fresh playing advice is authorized yet.
+- Image-to-data recognition remains manual; CI verifies data replay and fixed visual transcription fixtures, not OCR accuracy.
+
 ## First safe continuation
 Do not recommend a training with cost or a July match. Ask only for a **current** resource/calendar snapshot when gameplay resumes, then append its sourced SCREEN event, re-run the event projection, update handoff and use the latest revision for the next action. No repeated request for historical July scores is required to establish July completion.
 
