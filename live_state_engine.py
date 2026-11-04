@@ -2,6 +2,7 @@
 """Deterministic replay of source-linked observations, not image OCR."""
 from __future__ import annotations
 import argparse
+import copy
 import json
 from pathlib import Path
 
@@ -33,7 +34,7 @@ def read_events(path):
 def apply_corrections(events):
     base={}
     for e in events:
-        if e["kind"]!="CORRECTION":base[e["event_id"]]=dict(e);continue
+        if e["kind"]!="CORRECTION":base[e["event_id"]]=copy.deepcopy(e);continue
         target=e.get("target_event_id");match_id=e.get("target_match_id");patch=e.get("patch")
         if not isinstance(patch,dict) or not patch or (bool(target)==bool(match_id)):
             raise ObservationError("correction requires exactly one earlier event or match target and a patch")
