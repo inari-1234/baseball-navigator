@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0",
-  "contract_version": "1.4.0",
+  "contract_version": "1.5.0",
   "status": "ACTIVE",
   "built_from": {
     "legacy_sources": [
@@ -496,7 +496,7 @@
       "status": "ACTIVE",
       "type": "PROCESS",
       "layer": "LIVE_EVIDENCE",
-      "rule": "For accessible v1.42 screenshot bytes, run a supported pixel/template screen reader before extracting gauges. The parser may recognize formation positions and graphical green fill, but MUST NOT claim Japanese name or numerical score OCR, assign a player without independently verified position mapping, convert the bar to exact game HP, or treat an older screenshot as current. Unsupported layouts fail closed; document source hash and recognition scope."
+      "rule": "For accessible v1.42 screenshot bytes, run a supported pixel/template screen reader before extracting gauges. The parser may recognize formation positions and graphical green fill, but MUST NOT claim Japanese name or numerical score OCR, assign a player without independently verified position mapping, convert the bar to exact game HP, or treat an older screenshot as current. Unsupported layouts fail closed; document source hash and recognition scope. In batter/pitcher result views, supported numeric digits may be recognized by exact-template pixel comparison, but unreadable digits are UNKNOWN, not zero. Name, opponent, actual match score, accepted branch and current period are separate evidenced fields; team totals require arithmetic consistency with all displayed player rows before relying on the paired pages."
     }
   ],
   "material_event_names": [
@@ -528,6 +528,8 @@
     "hp_stale_on": "MATCH/TRAINING/ITEM_USE, MATCHES_COMPLETED, ROLLBACK",
     "hp_gate": "visual bars never prove full, near-full, or numeric thresholds",
     "image_pixel_reader": "screen_reader.py (formation gauges only, positions unbound to player names)",
-    "image_reader_scope": "Formation graphical fill+category classification; unsupported screen or text/digit fields remain UNKNOWN"
+    "image_reader_scope": "Formation graphical fill+category classification; unsupported screen or text/digit fields remain UNKNOWN",
+    "numeric_result_reader": "score_digits.py via screen_reader.py: native v1.42 batter/pitcher numeric glyphs only",
+    "numeric_result_policy": "UNKNOWN glyph remains null; scores/names/branch/opponent must be verified separately; no automatic LIVE_EVENTS mutation"
   }
 }

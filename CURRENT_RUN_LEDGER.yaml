@@ -1,8 +1,8 @@
 {
   "schema_version": "1.0",
-  "ledger_version": 10,
+  "ledger_version": 11,
   "run_id": "SAPPORO_SPRINT_RESTART_20261103",
-  "expected_parent_sha": "bde53aa281d08285ce3bb2eff25b3ee388730507",
+  "expected_parent_sha": "7441054463ce8f9be6923a73e07a24be33d8f8b5",
   "run_status": {
     "previous_run": "ABANDONED_FOR_REDESIGN",
     "new_run": "ACTIVE_AFTER_JULY_MATCHES_REPORTED_COMPLETE",
@@ -38,12 +38,13 @@
     "document": "SAPPORO_SPRINT_STRATEGY.md",
     "boot_document": "AGENTS.md",
     "decision_contract": "DECISION_CONTRACT.json",
-    "contract_version": "1.4.0",
+    "contract_version": "1.5.0",
     "mode": "Y1_OCTOBER_SAPPORO_SPRINT",
     "live_events": "LIVE_EVENTS.jsonl",
     "current_live_state": "CURRENT_LIVE_STATE.json",
     "hp_measurement_owner": "live_state_engine.py",
-    "screen_reader": "screen_reader.py"
+    "screen_reader": "screen_reader.py",
+    "numeric_result_reader": "score_digits.py"
   },
   "evidence": [
     {
@@ -136,6 +137,12 @@
       "kind": "RAW_EVIDENCE",
       "locator": "Current conversation screenshot IMG_8932.png, sha256=d3966cd2762b991774e98e5b69feb48f069f7123447ef41fab7a2cf1aedca299",
       "statement": "On supplied full iOS formation screenshot, programmatic pixel detector found 9/9 position-coded gauges. Original/resized checks PASS; only the graphical fill ratio is extracted; no automatic character name, number OCR or numeric HP calibration."
+    },
+    {
+      "evidence_id": "EV-PIXEL-RESULT-NUMBERS-20261105",
+      "kind": "RAW_EVIDENCE",
+      "locator": "Already supplied iOS Ver1.42 historical screenshots IMG_8922/8923/8924 and IMG_8926/8927/8928; exact source SHA256 in docs/RESULT_NUMBER_READER.md",
+      "statement": "Local exact pixel-font extraction returned complete values for 19 batter and 11 pitcher result images; two independently visible batter page totals reconciled (23/5/1 and 25/8/5). No names/scores/branch determined by the numeric parser."
     }
   ],
   "facts": [
@@ -376,6 +383,16 @@
         "EV-AUTO-FORMATION-IMG8932-20261104"
       ],
       "usable_for_decision": false
+    },
+    {
+      "fact_id": "FACT-RESULT-NUMERIC-EXTRACTION-SCOPED",
+      "fact_type": "OBSERVED",
+      "path": "pipeline.image_reader.batter_pitcher_numeric_supported",
+      "value": "NATIVE_SCREEN_NUMERIC_GLYPH_TEMPLATES; 19_BATTER_AND_11_PITCHER_HISTORICAL_PROBES",
+      "source_refs": [
+        "EV-PIXEL-RESULT-NUMBERS-20261105"
+      ],
+      "usable_for_decision": false
     }
   ],
   "strategy_policy": {
@@ -521,6 +538,15 @@
       "material_to_goal": false,
       "default": "Do not infer player identity or numeric game stats from a detected graphical gauge. Text and digits require separate source-grounded reading.",
       "resolve_by": "Independent label/number extraction with actual screenshot gold fixtures, accuracy and fail-closed gates."
+    },
+    {
+      "unknown_id": "UNK-RESULT-NAME-AND-MATCH-ID",
+      "field": "pipeline.screenshot_result.player_names_and_match_identity",
+      "status": "OPEN",
+      "material_to_next_action": false,
+      "material_to_goal": false,
+      "default": "Keep row-order numeric results detached from names and match records. Never infer match win from team RBI or pitcher stats. Do not mutate live event log without identity and accepted branch.",
+      "resolve_by": "Verified player lineup/match label and accepted branch paired to corresponding source image; later independently validated glyph/text matching."
     }
   ]
 }

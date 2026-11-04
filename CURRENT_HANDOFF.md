@@ -68,3 +68,11 @@ Repo change is the ingestion/reconciliation owner; `Excel-Tests` is not mutated.
 - 91 existing PNG screenshots were classified locally (no image bytes uploaded into the repo). Categories included 1 formation, 19 batter results, 11 pitcher results, 1 tournament, 39 world/overlay, 20 unsupported; **all category labels have not been independently human-reviewed**.
 - 14 synthetic reader tests + 62 preexisting tests run in CI. `propose_hp_event()` requires explicit verified position→name mapping and timeline anchor and is only a draft; the parser never writes `LIVE_EVENTS` by itself.
 - Remaining: automatic Japanese name recognition and numeric OCR; calibration of graphical bars to actual game HP; current post-July images. Do not claim automated general screenshot transcription.
+
+## Batting/pitching result-number reader v1 (2026-11-05)
+- Cause owner: `score_digits.py`, integrated with existing `screen_reader.py:read_image`. No external OCR service/driver; supported native 2622×1206 exact two blue palettes (29,73,153 and 40,72,147) plus white stat font. Unknown/unseen glyph is NULL, never a substituted number.
+- Actual local historical-image probe: all 19 batter result pages and all 11 pitcher result pages returned COMPLETE for their supported numeric fields. One batter screenshot (IMG_8876) uses alternate dark blue palette; two others introduced 4/7 glyphs. Validation set contains previously uploaded images and may be correlated; it is not an independent generalization estimate.
+- Manual gold examples: IMG_8922+IMG_8923 match (23 at-bats, 5 hits, 1 RBI); IMG_8926+IMG_8927 match (25 at-bats, 8 hits, 5 RBI). IMG_8924 pitching: displayed 6, 1 hit, 0 runs, ERA 0.75, W3 L0 K4 BB1. IMG_8928: displayed 6, 3 hits, 1 run, ERA 1.20, W4 L0 K5 BB2.
+- CI uses synthetic pixel-font fixtures and invariant tests; actual user images are NOT checked into the repo. Source screenshot digests and restrictions in `docs/RESULT_NUMBER_READER.md`.
+- Remaining limitations: player-name/Japanese text recognition, score or winner detection, redacted/unseen blue 9 glyph, resized result screens, differing game versions/layouts and automatic identity/accepted-branch linkage.
+- This is a **historical extraction capability**; JULY matches remain reported COMPLETED, scores UNKNOWN, post-July resources/HP UNKNOWN. Do not populate current state from older images.

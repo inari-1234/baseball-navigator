@@ -18,6 +18,7 @@ on:
       - "live_state_engine.py"
       - "screen_reader.py"
       - "score_digits.py"
+      - "docs/RESULT_NUMBER_READER.md"
       - "tests/**"
       - "docs/LIVE_OBSERVATION_CONTRACT.md"
       - "docs/SCREEN_READER.md"
