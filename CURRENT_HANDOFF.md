@@ -40,3 +40,12 @@ Do not recommend a training with cost or a July match. Ask only for a **current*
 
 ## Boundary
 Repo change is the ingestion/reconciliation owner; `Excel-Tests` is not mutated. Re-read remote main on restart.
+
+## Live observation replay v2 audit boundary (2026-11-04)
+- Reviewed the image-source → event → replay → action-guard chain against real July-completed / June-stale counter failures.
+- Engine now preserves discarded branch IDs but removes reverted training, skills, item deltas and current match results. A first-attempt match result remains audit history when the later accepted branch is reset-assisted.
+- Rollback source is explicit SAVE_CHECKPOINT or screenshot explicitly marked as savepoint. If unknown, timeline is UNKNOWN_AFTER_ROLLBACK; no actionable decision until an anchored recapture.
+- Same-month old screens, past-period match recommendations, missing Cheer cost, unverified item inventory and omitted item selection are rejected by the action guard.
+- All training counts are only confirmed in-log non-reverted executions; historical totals and hidden skill points remain UNKNOWN.
+- Pixel extraction accuracy is not proven by CI. Manual image comparison/source verification is still required; do not claim it has been automated.
+- Final v2 check: Run Guard, Decision Contract, event replay and 47-case regression on candidate branch; advance to main only after these PASS and re-read main.

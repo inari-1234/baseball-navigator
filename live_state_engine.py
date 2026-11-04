@@ -302,11 +302,17 @@ def validate_recommendation(rec,state,contract):
     if action_type in {"ITEM","ACTIVITY"} and not isinstance(rec.get("spend"),dict):
         errors.append("COST_DECLARATION_REQUIRED")
     if action_type=="ITEM":
+        items=rec.get("items")
+        if not isinstance(items,list) or not items:
+            errors.append("ITEM_SELECTION_REQUIRED")
+            items=[]
         if not state.get("inventory",{}).get("fresh"):
             errors.append("ITEM_INVENTORY_NOT_VERIFIED")
         else:
-            for item in rec.get("items",[]):
-                if not isinstance(item,dict) or state["inventory"]["items"].get(item.get("item"),0)<item.get("quantity",0):
+            for item in items:
+                if (not isinstance(item,dict) or not isinstance(item.get("item"),str) or
+                    type(item.get("quantity")) is not int or item["quantity"]<1 or
+                    state["inventory"]["items"].get(item["item"],0)<item["quantity"]):
                     errors.append("INSUFFICIENT_ITEM_INVENTORY")
     mid=rec.get("target_match_id")
     if mid:

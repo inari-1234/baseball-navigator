@@ -57,3 +57,4 @@ GitHub CI cannot validate the pixels, observe unsent future gameplay, or check e
 - A SCREEN after a state-changing event must cite \`observed_after_event_id\` pointing to that specific event. If not, it is marked stale. An earlier in-month clock is stale unless the source explicitly documents a clock reset. For a user-confirmed completed month, same-month SCREEN also requires \`confirmed_after_period_completion=true\`.
 - A MATCH recommendation must specify both match_id and period, TRAIN requires all three players, actual Sports cost, and Cheer ON cost when applicable. ITEM/ACTIVITY actions must explicitly declare costs, even if zero.
 - Scope limitation: screenshot extraction is still a manual read, not independent pixel verification; evidence of source identity cannot prove a number was transcribed correctly.
+- ITEM action must declare a nonempty item/quantity selection even when inventory was observed; blank selection cannot bypass availability checks.

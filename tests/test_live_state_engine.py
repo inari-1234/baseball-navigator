@@ -266,6 +266,14 @@ class LiveStateRegression(unittest.TestCase):
                   e(2,"TRAINING",drill="素振り",branch="ACCEPTED",
                      participants=["入江","今井","芦田"],skill_awards=[])])
         self.assertEqual(s["training_counts_by_player_drill"]["入江|素振り"],1)
+    def test_item_with_fresh_inventory_still_requires_selection(self):
+        screen_obs=e(1,"SCREEN",branch="ACCEPTED",resources={"study":0,"sports":8,"play":4,"nature":2,"cheer":50},
+                     inventory={"バナナ":3})
+        s=replay([screen_obs])
+        errs=validate_recommendation({"action_type":"ITEM","spend":{},"based_on_event_seq":1,
+             "rule_ids":["DC-ITEM-001"]},s,
+             {"rules":[{"rule_id":"DC-ITEM-001","status":"ACTIVE"}]})
+        self.assertIn("ITEM_SELECTION_REQUIRED",errs)
     def test_late_historical_completion_preserves_new_snapshot(self):
         s=replay([screen(1,8),e(2,"MATCHES_COMPLETED",7)])
         self.assertTrue(s["resources"]["fresh"])
