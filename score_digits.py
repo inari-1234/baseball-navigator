@@ -161,16 +161,25 @@ def read_batter_numbers(image):
                      "rbi":rbi["value"],"field_status":{"at_bats":ab["status"],
                          "hits":hits["status"],"rbi":rbi["status"]}})
     total=rows[-1]
-    is_total=(total["at_bats"] is not None and total["at_bats"]>=10)
-    page="BOTTOM_6_TO_9_AND_TOTAL" if is_total else "TOP_1_TO_5"
-    if is_total:
+    # Page identity is structural. An unsupported digit in the two-digit total
+    # must not make the second page look like batting-order positions 1–5.
+    last_y=252+4*181
+    glyphs=_components(im,(1329,last_y,1419,last_y+57),"BLUE")
+    total_shape=(len(glyphs)==1 and glyphs[0][:2]==(46,81))
+    single_shape=(len(glyphs)==1 and glyphs[0][0]==46 and glyphs[0][1] in (26,41))
+    page=("BOTTOM_6_TO_9_AND_TOTAL" if total_shape else
+          "TOP_1_TO_5" if single_shape else "UNKNOWN")
+    if total_shape:
         for i,row in enumerate(rows[:4]):
             row["batting_order"]=i+6
         total["row_position"]="TOTAL"
         total["batting_order"]=None
-    else:
+    elif single_shape:
         for i,row in enumerate(rows):
             row["batting_order"]=i+1
+    else:
+        for row in rows:
+            row["batting_order"]=None
     contradictions=[]
     for row in rows:
         if row["hits"] is not None and row["at_bats"] is not None and row["hits"]>row["at_bats"]:
@@ -178,7 +187,7 @@ def read_batter_numbers(image):
     if contradictions:
         return {"status":"INCONSISTENT_VALUES","page":page,"rows":rows,"errors":contradictions}
     count_unknown=sum(x is None for r in rows for x in (r["at_bats"],r["hits"],r["rbi"]))
-    return {"status":"COMPLETE" if count_unknown==0 else "PARTIAL_UNVERIFIED",
+    return {"status":"COMPLETE" if count_unknown==0 and page!="UNKNOWN" else "PARTIAL_UNVERIFIED",
             "page":page,"rows":rows,"unknown_field_count":count_unknown,
             "name_recognition":"NOT_AVAILABLE","match_id":"UNKNOWN",
             "accepted_branch":"UNKNOWN"}
