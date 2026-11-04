@@ -49,6 +49,23 @@ def apply_corrections(events):
             base[e["event_id"]]=dict(e)
             continue
         target=e.get("target_event_id");patch=e.get("patch")
+        mid=e.get("target_match_id")
+        if mid:
+            if not isinstance(patch,dict) or set(patch)!={"opponent"} or not isinstance(patch["opponent"],str) or not patch["opponent"]:
+                raise ObservationError("match-wide correction permits only nonempty opponent")
+            touched=False
+            for item in base.values():
+                if item["kind"]=="MATCH_ATTEMPT" and item.get("match_id")==mid:
+                    item["opponent"]=patch["opponent"];touched=True
+                elif item["kind"]=="MATCH_SCHEDULE":
+                    entries=[]
+                    for entry in item.get("entries",[]):
+                        entry=dict(entry)
+                        if entry.get("match_id")==mid:entry["opponent"]=patch["opponent"];touched=True
+                        entries.append(entry)
+                    item["entries"]=entries
+            if not touched:raise ObservationError("match-wide correction target unknown")
+            continue
         if target not in base or not isinstance(patch,dict) or not patch:
             raise ObservationError("correction needs earlier target and nonempty patch")
         if not set(patch).issubset({"opponent","our_runs","their_runs","player","skill"}):
@@ -63,23 +80,30 @@ def apply_corrections(events):
 
 def resolve_active_lineage(events):
     """Keep discarded branches for audit, but never apply their skills/items to current state."""
-    active=[];discarded=[];discarded_match_ids=set();rollback_count=0
+    active=[];discarded=[];discarded_match_ids=set();rollback_count=0;unknown_after_rollback=False
     for e in events:
         if e["kind"]!="ROLLBACK":
             active.append(e)
             continue
-        cp=e.get("to_checkpoint_id")
+        cp=e.get("to_checkpoint_id") or e.get("restore_to_event_id")
+        if cp is None:
+            discarded.extend(x["event_id"] for x in active if x["kind"]!="ROLLBACK")
+            discarded_match_ids.update(x.get("match_id") for x in active if x["kind"]=="MATCH_ATTEMPT")
+            active=[e];unknown_after_rollback=True;rollback_count+=1
+            continue
         if not isinstance(cp,str) or not cp:
-            raise ObservationError(f"{e['event_id']}: rollback requires to_checkpoint_id")
-        index=next((i for i,v in enumerate(active) if v["event_id"]==cp and v["kind"]=="SAVE_CHECKPOINT"),None)
+            raise ObservationError(f"{e['event_id']}: invalid rollback anchor")
+        index=next((i for i,v in enumerate(active)
+            if v["event_id"]==cp and (v["kind"]=="SAVE_CHECKPOINT" or
+               (v["kind"]=="SCREEN" and v.get("is_savepoint") is True))),None)
         if index is None:
-            raise ObservationError(f"{e['event_id']}: rollback checkpoint is not active")
+            raise ObservationError(f"{e['event_id']}: rollback anchor is not an explicit active savepoint")
         removed=active[index+1:]
         discarded.extend(x["event_id"] for x in removed if x["kind"]!="ROLLBACK")
         discarded_match_ids.update(x.get("match_id") for x in removed if x["kind"]=="MATCH_ATTEMPT")
         active=active[:index+1]+[e]
         rollback_count+=1
-    return active,discarded,discarded_match_ids,rollback_count
+    return active,discarded,discarded_match_ids,rollback_count,unknown_after_rollback
 
 def replay(events):
     ids=set();seqs=[]
@@ -95,7 +119,7 @@ def replay(events):
     if seqs!=list(range(1,len(events)+1)):
         raise ObservationError("event seq must be contiguous starting at 1")
     corrected=apply_corrections(events)
-    active,discarded,reverted_match_ids,rollback_count=resolve_active_lineage(corrected)
+    active,discarded,reverted_match_ids,rollback_count,unknown_after_rollback=resolve_active_lineage(corrected)
     prior_first={}
     for e in corrected:
         if e["kind"]=="MATCH_ATTEMPT" and e.get("attempt")==1 and e.get("match_id") not in prior_first:
@@ -105,14 +129,19 @@ def replay(events):
            "last_seen_screen_period":None,
            "resources":{"fresh":False,"values":None,"last_observed":None},
            "matches":{},"completed_match_periods":[],"skills":[],
-           "training_counts_by_player_drill":{},"item_effects":[],
+           "training_counts_by_player_drill":{},"training_counts_observed":{},"training_history":[],
+           "item_effects":[],"item_uses":[],"inventory":{"fresh":False,"items":None},
            "observations_ignored_as_stale":[],"reverted_event_ids":discarded,
-           "rollback_count":rollback_count,"current_exact_time":"UNKNOWN"}
+           "discarded_branch_event_ids":discarded,"rollback_count":rollback_count,
+           "timeline_status":"UNKNOWN_AFTER_ROLLBACK" if unknown_after_rollback else "TRUSTED",
+           "current_exact_time":"UNKNOWN"}
     floor=None;closed=set();matches={};seen_attempts=set()
     last_mutation_id=None;last_screen_clock=None;last_screen_period=None
     def invalidate():
         state["resources"]["fresh"]=False
         state["resources"]["values"]=None
+        state["inventory"]["fresh"]=False
+        state["inventory"]["items"]=None
     for e in active:
         kind=e["kind"];p=period(e);pk=label(p);eid=e["event_id"]
         historical=bool(floor and p<floor)
@@ -124,11 +153,11 @@ def replay(events):
                 raise ObservationError(f"{eid}: invalid resource counter")
             if "money_yen" in e and (type(e["money_yen"]) is not int or e["money_yen"]<0):
                 raise ObservationError(f"{eid}: invalid money")
-            after=e.get("observed_after_event_id")
+            after=e.get("observed_after_event_id") or e.get("after_event_id")
             mutation_unresolved=last_mutation_id is not None
             if (historical or e.get("branch")!="ACCEPTED" or
                 (mutation_unresolved and after!=last_mutation_id) or
-                (pk in closed and e.get("confirmed_after_period_completion") is not True)):
+                (pk in closed and after!=last_mutation_id)):
                 state["observations_ignored_as_stale"].append(eid)
                 continue
             current_clock=clock_minutes(e.get("clock"))
@@ -137,6 +166,13 @@ def replay(events):
                 continue
             state["last_seen_screen_period"]=pk
             state["resources"]={"fresh":True,"values":{k:vals[k] for k in COUNTERS},"last_observed":eid}
+            inventory=e.get("inventory")
+            if inventory is not None:
+                if not isinstance(inventory,dict) or any(not isinstance(k,str) or type(v) is not int or v<0 for k,v in inventory.items()):
+                    raise ObservationError(f"{eid}: invalid inventory")
+                state["inventory"]={"fresh":True,"items":dict(inventory)}
+            if state["timeline_status"]=="UNKNOWN_AFTER_ROLLBACK":
+                state["timeline_status"]="RECAPTURED_AFTER_UNANCHORED_ROLLBACK"
             state["current_exact_time"]=e.get("clock") or "UNKNOWN"
             floor=max(floor,p) if floor else p
             last_screen_clock=current_clock;last_screen_period=pk;last_mutation_id=None
@@ -199,20 +235,27 @@ def replay(events):
             for player in players:
                 k=f"{player}|{drill}"
                 state["training_counts_by_player_drill"][k]=state["training_counts_by_player_drill"].get(k,0)+1
+                per=state["training_counts_observed"].setdefault(player,{})
+                per[drill]=per.get(drill,0)+1
+            state["training_history"].append({"event_id":eid,"drill":drill,"participants":list(players),
+                "drill_level":e.get("drill_level"),"cheer":e.get("cheer")})
             if not historical:
                 invalidate();state["current_exact_time"]="UNKNOWN";last_mutation_id=eid
                 floor=max(floor,p) if floor else p
         elif kind=="ITEM_USE":
             if e.get("branch")!="ACCEPTED":continue
-            bundle=e.get("item_bundle")
+            bundle=e.get("item_bundle") or e.get("items")
             if not isinstance(bundle,list) or not bundle or any(
-                not isinstance(x,dict) or not isinstance(x.get("item"),str) or not x["item"] or
+                not isinstance(x,dict) or not isinstance(x.get("item",x.get("name")),str) or not x.get("item",x.get("name")) or
                 type(x.get("quantity")) is not int or x["quantity"]<1 for x in bundle):
                 raise ObservationError(f"{eid}: item use needs item_bundle with positive quantity")
-            delta=e.get("effect_deltas",{})
+            bundle=[{"item":x.get("item",x.get("name")),"quantity":x["quantity"]} for x in bundle]
+            delta=e.get("effect_deltas",e.get("observed_delta",{}))
             if not isinstance(delta,dict) or any(not isinstance(k,str) or type(v) is not int for k,v in delta.items()):
                 raise ObservationError(f"{eid}: invalid effect_deltas")
-            state["item_effects"].append({"event_id":eid,"item_bundle":bundle,"effect_deltas":delta})
+            item_entry={"event_id":eid,"item_bundle":bundle,"effect_deltas":delta}
+            state["item_effects"].append(item_entry)
+            state["item_uses"].append(item_entry)
             if not historical:
                 invalidate();state["current_exact_time"]="UNKNOWN";last_mutation_id=eid
                 floor=max(floor,p) if floor else p
@@ -240,6 +283,8 @@ def validate_recommendation(rec,state,contract):
     action_type=rec.get("action_type")
     if action_type not in {"MATCH","TRAIN","ITEM","ACTIVITY","OTHER"}:
         errors.append("ACTION_TYPE_REQUIRED")
+    if state.get("timeline_status")=="UNKNOWN_AFTER_ROLLBACK":
+        errors.append("UNRESOLVED_ROLLBACK")
     if action_type=="MATCH":
         if not rec.get("target_match_id"):errors.append("MATCH_ID_REQUIRED")
         if not rec.get("target_period"):errors.append("MATCH_PERIOD_REQUIRED")
@@ -256,14 +301,24 @@ def validate_recommendation(rec,state,contract):
         if not state["resources"]["fresh"]:errors.append("STALE_RESOURCES")
     if action_type in {"ITEM","ACTIVITY"} and not isinstance(rec.get("spend"),dict):
         errors.append("COST_DECLARATION_REQUIRED")
+    if action_type=="ITEM":
+        if not state.get("inventory",{}).get("fresh"):
+            errors.append("ITEM_INVENTORY_NOT_VERIFIED")
+        else:
+            for item in rec.get("items",[]):
+                if not isinstance(item,dict) or state["inventory"]["items"].get(item.get("item"),0)<item.get("quantity",0):
+                    errors.append("INSUFFICIENT_ITEM_INVENTORY")
     mid=rec.get("target_match_id")
     if mid:
         m=state["matches"].get(mid)
         if m is None:errors.append("UNKNOWN_MATCH")
         elif m["status"]!="SCHEDULED" or m["period"] in state["completed_match_periods"]:
             errors.append("ALREADY_COMPLETED_MATCH")
-        elif action_type=="MATCH" and m["period"]!=rec.get("target_period"):
-            errors.append("MATCH_PERIOD_MISMATCH")
+        else:
+            if action_type=="MATCH" and m["period"]!=rec.get("target_period"):
+                errors.append("MATCH_PERIOD_CONFLICT")
+            if state.get("period_floor") and m["period"]<state["period_floor"]:
+                errors.append("PAST_PERIOD_MATCH")
     spend=rec.get("spend",{})
     if not isinstance(spend,dict):errors.append("INVALID_SPEND")
     elif spend:
