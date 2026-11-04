@@ -276,30 +276,46 @@ def _read_roster_batting_number(image: Image.Image, right: int,
     return int("".join(reversed(numbers)))
 
 
-def read_roster_batting_values(image: Image.Image) -> dict[str, Any]:
-    """Position-indexed batting numbers only, with no claimed player mapping.
+_ROSTER_PITCHING_COLUMNS = {
+    "velocity_kmh": (1446, 3),
+    "control": (1668, 3),
+    "breaking": (1843, 2),
+}
 
-    This does not read player names, attributes of other pages, E/F grades,
-    season/date, or actual live state. Rows may be scrolled between captures.
-    """
+
+def _read_roster_numeric_values(image: Image.Image, *, page_index: int,
+                                columns: dict[str, tuple[int, int]],
+                                label: str) -> dict[str, Any]:
+    """Read only verified numeric columns on one fixed roster page."""
     if image.size != (BASE_W, BASE_H):
         return {"status": "UNSUPPORTED_SCALE", "rows": []}
     page = read_roster_page(image)
-    if page is None or page.get("page_index") != 2:
+    if page is None or page.get("page_index") != page_index:
         return {"status": "UNSUPPORTED_PAGE", "rows": []}
     im = image.convert("RGB")
-    rows = []
-    errors = []
+    rows, errors = [], []
     for row_index, top in enumerate(_ROSTER_BATTING_ROW_Y, 1):
         fields = {field: _read_roster_batting_number(im, right, top, digits)
-                  for field, (right, digits) in _ROSTER_BATTING_COLUMNS.items()}
+                  for field, (right, digits) in columns.items()}
         if any(value is None for value in fields.values()):
-            errors.append(f"UNKNOWN_BATTING_GLYPH_ROW:{row_index}")
+            errors.append(f"UNKNOWN_{label}_GLYPH_ROW:{row_index}")
         rows.append({"visible_row": row_index, **fields})
     return {"status": "PASS" if not errors else "NEEDS_REVIEW",
-            "page_index": 2, "rows": rows, "errors": errors,
+            "page_index": page_index, "rows": rows, "errors": errors,
             "names_verified": False, "player_identities_verified": False,
             "ability_grades_verified": False, "live_state_current": False}
+
+
+def read_roster_batting_values(image: Image.Image) -> dict[str, Any]:
+    """Page 2: batting/slugging/running numbers, without player identities."""
+    return _read_roster_numeric_values(
+        image, page_index=2, columns=_ROSTER_BATTING_COLUMNS, label="BATTING")
+
+
+def read_roster_pitching_values(image: Image.Image) -> dict[str, Any]:
+    """Page 3: velocity/control/breaking numbers, without player identities."""
+    return _read_roster_numeric_values(
+        image, page_index=3, columns=_ROSTER_PITCHING_COLUMNS, label="PITCHING")
 
 
 def read_image(path: str | Path) -> dict[str, Any]:
@@ -314,6 +330,8 @@ def read_image(path: str | Path) -> dict[str, Any]:
                         "roster_page":roster}
                 if roster["page_index"]==2:
                     result["roster_batting_values"]=read_roster_batting_values(im)
+                elif roster["page_index"]==3:
+                    result["roster_pitching_values"]=read_roster_pitching_values(im)
             else:
                 result["screen_type"] = _other_screen_type(im.convert("RGB"))
         if result["screen_type"]=="BATTER_RESULTS":
