@@ -34,12 +34,26 @@ def apply_corrections(events):
     base={}
     for e in events:
         if e["kind"]!="CORRECTION":base[e["event_id"]]=dict(e);continue
-        target=e.get("target_event_id");patch=e.get("patch")
-        if target not in base or not isinstance(patch,dict) or not patch:
-            raise ObservationError("correction needs earlier target and nonempty patch")
-        if not set(patch).issubset({"opponent","our_runs","their_runs","player","skill"}):
-            raise ObservationError("correction cannot rewrite time, branch, source or event identity")
-        base[target].update(patch)
+        target=e.get("target_event_id");match_id=e.get("target_match_id");patch=e.get("patch")
+        if not isinstance(patch,dict) or not patch or (bool(target)==bool(match_id)):
+            raise ObservationError("correction requires exactly one earlier event or match target and a patch")
+        if match_id:
+            if set(patch)!={"opponent"} or not isinstance(patch["opponent"],str) or not patch["opponent"]:
+                raise ObservationError("match-level correction supports only a verified opponent name")
+            found=False
+            for old in base.values():
+                if old["kind"]=="MATCH_ATTEMPT" and old.get("match_id")==match_id:
+                    old["opponent"]=patch["opponent"];found=True
+                if old["kind"]=="MATCH_SCHEDULE":
+                    for row in old.get("entries",[]):
+                        if row.get("match_id")==match_id:
+                            row["opponent"]=patch["opponent"];found=True
+            if not found:raise ObservationError("match-level correction target not found")
+        else:
+            if target not in base:raise ObservationError("correction target event not found")
+            if not set(patch).issubset({"opponent","our_runs","their_runs","player","skill"}):
+                raise ObservationError("correction cannot rewrite time, branch, source or event identity")
+            base[target].update(patch)
     return [base[e["event_id"]] for e in events if e["kind"]!="CORRECTION"]
 
 def select_active_timeline(events):
@@ -83,6 +97,7 @@ def replay(events):
     state={"schema_version":"1.1","last_event_seq":len(events),"period_floor":None,"last_seen_screen_period":None,
            "resources":{"fresh":False,"values":None,"last_observed":None},
            "matches":{},"completed_match_periods":[],"skills":[],"item_uses":[],
+           "training_counts_observed":{},"training_history":[],
            "discarded_branch_event_ids":discarded,"timeline_status":"UNKNOWN_AFTER_ROLLBACK" if unanchored else "TRUSTED",
            "observations_ignored_as_stale":[],"current_exact_time":"UNKNOWN"}
     floor=None;closed=set();matches={};seen_attempts=set();resource_anchor=None
@@ -149,10 +164,24 @@ def replay(events):
             if not historical:invalidate(eid);state["current_exact_time"]="UNKNOWN"
             floor=max(floor,p) if floor else p
         elif kind=="TRAINING":
-            if e.get("branch")!="ACCEPTED":continue
-            if not e.get("player") or not e.get("drill"):raise ObservationError(f"{eid}: training needs player/drill")
-            if e.get("skill"):state["skills"].append({"player":e["player"],"skill":e["skill"],"evidence_id":eid})
-            if not historical:invalidate(eid)
+            participants=e.get("participants")
+            drill=e.get("drill");level=e.get("drill_level");cheer=e.get("cheer");awards=e.get("skill_awards",[])
+            if (e.get("branch") not in BRANCHES or not isinstance(participants,list) or len(participants)!=3
+                or any(not isinstance(x,str) or not x for x in participants) or len(set(participants))!=3
+                or not isinstance(drill,str) or not drill or type(level) is not int or level<1
+                or cheer not in {"ON","OFF"} or not isinstance(awards,list)):
+                raise ObservationError(f"{eid}: training requires exact three participants, drill, level, cheer and branch")
+            if any(not isinstance(x,dict) or x.get("player") not in participants or not isinstance(x.get("skill"),str) or not x["skill"] for x in awards):
+                raise ObservationError(f"{eid}: invalid skill recipient or skill")
+            if e["branch"]=="ACCEPTED":
+                state["training_history"].append({"evidence_id":eid,"participants":list(participants),
+                        "drill":drill,"drill_level":level,"cheer":cheer})
+                for player in participants:
+                    counter=state["training_counts_observed"].setdefault(player,{})
+                    counter[drill]=counter.get(drill,0)+1
+                for award in awards:
+                    state["skills"].append({"player":award["player"],"skill":award["skill"],"evidence_id":eid})
+                if not historical:invalidate(eid)
         elif kind=="ITEM_USE":
             if e.get("branch") not in BRANCHES:raise ObservationError(f"{eid}: item use needs ACCEPTED or REJECTED branch")
             if e["branch"]=="ACCEPTED":
