@@ -81,12 +81,12 @@ GitHub Actions Run Guard for candidate code `e978187fa802ae96025dd21c798dc9e8f81
 
 ## Roster numeric ability reader (v1.3, 2026-11-05)
 
-Source owner: \`screen_reader.py\`. It now extracts **numeric ability fields only** on native iOS Ver1.42 \`2622×1206\` pages \`ROSTER_LIST\` 2/6 and 3/6. The existing page-header classifier is required: no recognized page, changed scale, or unsupported layout yields no numeric records.
+Source owner: `screen_reader.py`. It now extracts **numeric ability fields only** on native iOS Ver1.42 `2622×1206` pages `ROSTER_LIST` 2/6 and 3/6. The existing page-header classifier is required: no recognized page, changed scale, or unsupported layout yields no numeric records.
 
-- Page 2: \`roster_batting_values.rows[1..7]\` each contains \`visible_row\`, \`batting\`, \`slugging\`, \`running\`.
-- Page 3: \`roster_pitching_values.rows[1..7]\` each contains \`visible_row\`, \`velocity_kmh\`, \`control\`, \`breaking\`.
-- Both types return \`status=PASS\` only if every numeric glyph in all seven visible rows is source-verified. On any unknown glyph (including unobserved \`9\`), missing value, or unexpected extra leading digit: the affected field is \`null\`, \`status=NEEDS_REVIEW\`, and its row is listed in \`errors\`. Do not silently truncate a two-/three-digit value.
-- Exact source-derived navy-pixel font signatures 0–8 are used; no general OCR, font scaling, rank E/F OCR, player-name mapping, scroll-position alignment, roster merging, in-game timestamp inference or live-state mutation is claimed. \`names_verified\`, \`player_identities_verified\`, \`ability_grades_verified\`, and \`live_state_current\` are all \`false\`. The JSON includes the source image SHA256.
+- Page 2: `roster_batting_values.rows[1..7]` each contains `visible_row`, `batting`, `slugging`, `running`.
+- Page 3: `roster_pitching_values.rows[1..7]` each contains `visible_row`, `velocity_kmh`, `control`, `breaking`.
+- Both types return `status=PASS` only if every numeric glyph in all seven visible rows is source-verified. On any unknown glyph (including unobserved `9`), missing value, or unexpected extra leading digit: the affected field is `null`, `status=NEEDS_REVIEW`, and its row is listed in `errors`. Do not silently truncate a two-/three-digit value.
+- Exact source-derived navy-pixel font signatures 0–8 are used; no general OCR, font scaling, rank E/F OCR, player-name mapping, scroll-position alignment, roster merging, in-game timestamp inference or live-state mutation is claimed. `names_verified`, `player_identities_verified`, `ability_grades_verified`, and `live_state_current` are all `false`. The JSON includes the source image SHA256.
 - The number reader is shared by the two page-specific APIs; the only differences are independently grounded column positions and field names.
 
 Actual-source review (screens in the user's Library, not placed in the repository; each native 2622×1206):
