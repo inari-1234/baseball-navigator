@@ -213,6 +213,39 @@ class ScorePixelReaderRegression(unittest.TestCase):
         self.assertEqual(merged["status"],"PASS")
         self.assertFalse(merged["names_verified"])
 
+    def test_unknown_present_tens_does_not_become_single_digit(self):
+        from screen_reader import read_batter_stats
+        from PIL import ImageDraw
+        im=self._batter_page(True)
+        # Native blue-colored ink exists in the tens slot but is not a
+        # recognized 0-8 glyph. Previously this silently read "3".
+        ImageDraw.Draw(im).rectangle((1342,263,1362,292),
+                                     fill=(29,73,153))
+        result=read_batter_stats(im)
+        self.assertEqual(result["status"],"NEEDS_REVIEW")
+        self.assertIsNone(result["rows"][0]["at_bats"])
+        self.assertIn("UNRECOGNIZED_GLYPH_ROW:1",result["errors"])
+        # An actually empty tens slot must still accept a single digit.
+        normal=read_batter_stats(self._batter_page(True))
+        self.assertEqual(normal["rows"][0]["at_bats"],3)
+        self.assertEqual(normal["status"],"PASS")
+
+    def test_unrecognized_team_total_tens_rejects_page_pair(self):
+        from screen_reader import read_batter_stats,validate_batter_pages
+        from PIL import ImageDraw
+        top=read_batter_stats(self._batter_page(True))
+        img=self._batter_page(False)
+        # Team-total value 25 contains a tens glyph. Replace it with an
+        # unknown silhouette rather than treating the number as 5.
+        ImageDraw.Draw(img).rectangle((1342,986,1362,1015),
+                                     fill=(29,73,153))
+        bottom=read_batter_stats(img)
+        self.assertEqual(bottom["status"],"NEEDS_REVIEW")
+        self.assertIsNone(bottom["team_total"]["at_bats"])
+        combined=validate_batter_pages(top,bottom,verified_match_id="M")
+        self.assertEqual(combined["status"],"INVALID_PAGE_PAIR")
+        self.assertEqual(combined["rows"],[])
+
     def test_batter_pair_rejects_implicit_match_pairing(self):
         from screen_reader import read_batter_stats,validate_batter_pages
         first=read_batter_stats(self._batter_page(True))
