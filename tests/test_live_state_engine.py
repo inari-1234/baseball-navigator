@@ -274,6 +274,122 @@ class LiveStateRegression(unittest.TestCase):
              "rule_ids":["DC-ITEM-001"]},s,
              {"rules":[{"rule_id":"DC-ITEM-001","status":"ACTIVE"}]})
         self.assertIn("ITEM_SELECTION_REQUIRED",errs)
+    def test_visual_hp_geometry_fixture_ishiwata(self):
+        # Manually reviewed IMG_8932.png: green fill is not a numeric game-HP reading.
+        obs=e(1,"HP_OBSERVATION",source={"kind":"RAW_SCREEN","locator":"IMG_8932.png"},
+              branch="ACCEPTED",entries=[{"player":"石渡いなり","reading_kind":"VERTICAL_BAR",
+              "identity_evidence":"SELECTED_PLAYER_PANEL",
+              "geometry_px":{"center_x":1300,"track_top":543,"track_bottom":594,
+                             "fill_top":557,"edge_uncertainty":1}}])
+        state=replay([obs])
+        hp=state["hp_by_player"]["石渡いなり"]
+        self.assertEqual(hp["graphical_fill_estimate_pct"],72.5)
+        self.assertEqual(hp["graphical_fill_range_pct"],[67,78])
+        self.assertIsNone(hp["hp_numeric_percent"])
+        self.assertEqual(hp["full_state"],"NOT_NEAR_FULL")
+        self.assertTrue(hp["fresh"])
+    def test_visual_hp_never_supports_exact_or_near_full_claim(self):
+        state=replay([e(1,"HP_OBSERVATION",source={"kind":"RAW_SCREEN","locator":"IMG_8932.png"},
+              branch="ACCEPTED",entries=[{"player":"石渡","reading_kind":"VERTICAL_BAR",
+              "identity_evidence":"SELECTED_PLAYER_PANEL","geometry_px":
+              {"center_x":1300,"track_top":543,"track_bottom":594,"fill_top":557,"edge_uncertainty":1}}])])
+        rules={"rules":[{"rule_id":"DC-HP-001","status":"ACTIVE"}]}
+        full=validate_recommendation({"action_type":"OTHER","based_on_event_seq":1,
+            "rule_ids":["DC-HP-001"],"hp_claims":{"石渡":"FULL"}},state,rules)
+        self.assertIn("HP_FULL_NOT_PROVEN:石渡",full)
+        near=validate_recommendation({"action_type":"OTHER","based_on_event_seq":1,
+            "rule_ids":["DC-HP-001"],"hp_claims":{"石渡":"NEAR_FULL"}},state,rules)
+        self.assertIn("HP_NEAR_FULL_CONTRADICTED:石渡",near)
+        req=validate_recommendation({"action_type":"OTHER","based_on_event_seq":1,
+            "rule_ids":["DC-HP-001"],"hp_min_by_player":{"石渡":80}},state,rules)
+        self.assertIn("HP_THRESHOLD_UNVERIFIED:石渡",req)
+    def test_visual_hp_rejects_player_without_identity_evidence(self):
+        with self.assertRaises(ObservationError):
+            replay([e(1,"HP_OBSERVATION",branch="ACCEPTED",
+               source={"kind":"RAW_SCREEN","locator":"IMG_8932.png"},
+               entries=[{"player":"石渡","reading_kind":"VERTICAL_BAR",
+                  "geometry_px":{"center_x":1300,"track_top":543,"track_bottom":594,
+                                 "fill_top":557,"edge_uncertainty":1}}])])
+    def test_visual_hp_invalid_geometry_fails_closed(self):
+        with self.assertRaises(ObservationError):
+            replay([e(1,"HP_OBSERVATION",branch="ACCEPTED",
+               source={"kind":"RAW_SCREEN","locator":"IMG_8932.png"},
+               entries=[{"player":"石渡","reading_kind":"VERTICAL_BAR",
+               "identity_evidence":"SELECTED_PLAYER_PANEL",
+               "geometry_px":{"center_x":1300,"track_top":600,"track_bottom":594,
+                               "fill_top":557,"edge_uncertainty":1}}])])
+    def test_approx_user_eighty_is_not_full_or_exact(self):
+        state=replay([e(1,"HP_OBSERVATION",branch="ACCEPTED",
+             entries=[{"player":"石渡","reading_kind":"USER_APPROX_PERCENT","reported_percent":80}])])
+        hp=state["hp_by_player"]["石渡"]
+        self.assertEqual(hp["confidence"],"USER_APPROX")
+        self.assertEqual(hp["full_state"],"NOT_FULL")
+        errors=validate_recommendation({"action_type":"OTHER","based_on_event_seq":1,
+             "rule_ids":["DC-HP-001"],"hp_claims":{"石渡":"NEAR_FULL"},
+             "hp_min_by_player":{"石渡":80}},state,
+             {"rules":[{"rule_id":"DC-HP-001","status":"ACTIVE"}]})
+        self.assertIn("HP_NEAR_FULL_CONTRADICTED:石渡",errors)
+        self.assertIn("HP_THRESHOLD_UNVERIFIED:石渡",errors)
+    def test_exact_user_hp_threshold_can_be_applied(self):
+        state=replay([e(1,"HP_OBSERVATION",branch="ACCEPTED",
+             entries=[{"player":"石渡","reading_kind":"USER_EXACT_PERCENT","reported_percent":85}])])
+        rules={"rules":[{"rule_id":"DC-HP-001","status":"ACTIVE"}]}
+        ok=validate_recommendation({"action_type":"OTHER","based_on_event_seq":1,
+             "rule_ids":["DC-HP-001"],"hp_min_by_player":{"石渡":80}},state,rules)
+        self.assertEqual(ok,[])
+        blocked=validate_recommendation({"action_type":"OTHER","based_on_event_seq":1,
+             "rule_ids":["DC-HP-001"],"hp_min_by_player":{"石渡":90}},state,rules)
+        self.assertIn("HP_BELOW_THRESHOLD:石渡",blocked)
+    def test_hp_snapshot_expires_after_match(self):
+        state=replay([e(1,"HP_OBSERVATION",branch="ACCEPTED",
+               entries=[{"player":"石渡","reading_kind":"USER_APPROX_PERCENT","reported_percent":80}]),
+              e(2,"MATCH_ATTEMPT",match_id="M",opponent="花さか",attempt=1,our_runs=4,their_runs=1,branch="ACCEPTED")])
+        self.assertFalse(state["hp_by_player"]["石渡"]["fresh"])
+        errors=validate_recommendation({"action_type":"OTHER","based_on_event_seq":2,
+            "rule_ids":["DC-HP-001"],"hp_claims":{"石渡":"NOT_FULL"}},state,
+            {"rules":[{"rule_id":"DC-HP-001","status":"ACTIVE"}]})
+        self.assertIn("HP_NOT_VERIFIED:石渡",errors)
+    def test_hp_from_older_screen_is_ignored_after_mutation(self):
+        visual={"player":"石渡","reading_kind":"VERTICAL_BAR","identity_evidence":"SELECTED_PLAYER_PANEL",
+              "geometry_px":{"center_x":1300,"track_top":543,"track_bottom":594,"fill_top":557,"edge_uncertainty":1}}
+        state=replay([screen(1),
+              e(2,"MATCH_ATTEMPT",match_id="M",opponent="花さか",attempt=1,our_runs=4,their_runs=1,branch="ACCEPTED"),
+              e(3,"HP_OBSERVATION",branch="ACCEPTED",source={"kind":"RAW_SCREEN","locator":"IMG_8932.png"},
+                after_event_id="E1",entries=[visual])])
+        self.assertEqual(state["hp_by_player"],{})
+        self.assertIn("E3",state["observations_ignored_as_stale"])
+    def test_hp_after_current_screen_can_be_fresh(self):
+        state=replay([screen(1),e(2,"HP_OBSERVATION",branch="ACCEPTED",after_event_id="E1",
+              entries=[{"player":"石渡","reading_kind":"USER_APPROX_PERCENT","reported_percent":80}])])
+        self.assertTrue(state["hp_by_player"]["石渡"]["fresh"])
+    def test_hp_rollback_discards_unaccepted_fill(self):
+        state=replay([e(1,"SAVE_CHECKPOINT"),
+             e(2,"HP_OBSERVATION",branch="ACCEPTED",entries=[
+               {"player":"石渡","reading_kind":"USER_EXACT_PERCENT","reported_percent":100}]),
+             e(3,"ROLLBACK",to_checkpoint_id="E1")])
+        self.assertEqual(state["hp_by_player"],{})
+        self.assertIn("E2",state["reverted_event_ids"])
+    def test_hp_from_old_month_is_not_current(self):
+        state=replay([e(1,"MATCHES_COMPLETED",7),
+             e(2,"HP_OBSERVATION",6,branch="ACCEPTED",entries=[
+               {"player":"石渡","reading_kind":"USER_APPROX_PERCENT","reported_percent":80}])])
+        self.assertEqual(state["hp_by_player"],{})
+        self.assertIn("E2",state["observations_ignored_as_stale"])
+    def test_hp_gauge_multiple_players_separately_bound(self):
+        state=replay([e(1,"HP_OBSERVATION",branch="ACCEPTED",source={"kind":"RAW_SCREEN","locator":"IMG_8932.png"},entries=[
+            {"player":"石渡","reading_kind":"VERTICAL_BAR","identity_evidence":"SELECTED_PLAYER_PANEL",
+             "geometry_px":{"center_x":1300,"track_top":543,"track_bottom":594,"fill_top":557,"edge_uncertainty":1}},
+            {"player":"入江","reading_kind":"VERTICAL_BAR","identity_evidence":"VERIFIED_FORMATION_SLOT",
+             "geometry_px":{"center_x":850,"track_top":543,"track_bottom":594,"fill_top":549,"edge_uncertainty":1}}
+        ])])
+        self.assertEqual(len(state["hp_by_player"]),2)
+        self.assertNotEqual(state["hp_by_player"]["石渡"]["graphical_fill_estimate_pct"],
+                            state["hp_by_player"]["入江"]["graphical_fill_estimate_pct"])
+    def test_bar_does_not_allow_numeric_hp_from_screenshot_source(self):
+        with self.assertRaises(ObservationError):
+            replay([e(1,"HP_OBSERVATION",branch="ACCEPTED",
+               source={"kind":"RAW_SCREEN","locator":"IMG_8932.png"},
+               entries=[{"player":"石渡","reading_kind":"USER_EXACT_PERCENT","reported_percent":80}])])
     def test_late_historical_completion_preserves_new_snapshot(self):
         s=replay([screen(1,8),e(2,"MATCHES_COMPLETED",7)])
         self.assertTrue(s["resources"]["fresh"])
