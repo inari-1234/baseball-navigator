@@ -2,6 +2,7 @@
 import hashlib
 import tempfile
 import unittest
+import unittest.mock
 from pathlib import Path
 
 from PIL import Image, ImageDraw
@@ -132,6 +133,121 @@ class ScreenReaderRegression(unittest.TestCase):
             self.assertEqual(out["screen_type"], "BATTER_RESULTS")
             self.assertEqual(out["positions"], {})
 
+
+
+
+class ScorePixelReaderRegression(unittest.TestCase):
+    """Deterministic digit silhouettes; real-game screenshot probes are external."""
+    def test_blue_glyph_coverage_and_unknown(self):
+        from screen_reader import _BLUE_DIGITS,_nearest_digit
+        self.assertEqual(set(_BLUE_DIGITS),"012345678")
+        for digit,variants in _BLUE_DIGITS.items():
+            for variant in variants:
+                self.assertEqual(_nearest_digit(variant,_BLUE_DIGITS),digit)
+        self.assertIsNone(_nearest_digit((1<<192)-1,_BLUE_DIGITS))
+
+    def test_white_digits_0_to_9_and_decimal(self):
+        from screen_reader import _WHITE_DIGITS,_nearest_digit
+        self.assertEqual(set(_WHITE_DIGITS),"0123456789.")
+        for digit,variants in _WHITE_DIGITS.items():
+            for variant in variants:
+                self.assertEqual(_nearest_digit(variant,_WHITE_DIGITS),digit)
+
+    def test_pixel_fingerprint_round_trip(self):
+        from screen_reader import _BLUE_DIGITS,_pixel_font_fingerprint
+        for digit,items in _BLUE_DIGITS.items():
+            bits=items[0]
+            mask=[[bool(bits & (1<<(y*12+x))) for x in range(12)] for y in range(16)]
+            self.assertEqual(_pixel_font_fingerprint(mask,12,16),bits,digit)
+
+    def _put(self,im,digit,x,y,alphabet,ink):
+        from PIL import ImageDraw
+        dim=(12,16) if ink==(29,73,153) else (10,14)
+        bits=alphabet[str(digit)][0]
+        draw=ImageDraw.Draw(im)
+        for yy in range(dim[1]):
+            for xx in range(dim[0]):
+                if (bits>>(yy*dim[0]+xx))&1:
+                    draw.point((x+xx,y+yy),fill=ink)
+
+    def _batter_page(self, top):
+        from screen_reader import _BLUE_DIGITS
+        im=Image.new("RGB",(2622,1206),(255,255,255))
+        im.putpixel((640,1004),(255,255,255) if top else (166,186,239))
+        first=[(3,0,0),(3,1,0),(2,1,2),(3,1,0),(3,1,0)]
+        last=[(3,1,0),(3,1,1),(3,1,0),(2,1,2),(25,8,5)]
+        for y,values in zip((256,437,617,798,979),first if top else last):
+            for x,value in zip((1376,1569,1768),values):
+                if value>9:
+                    self._put(im,str(value)[0],x-40,y+5,_BLUE_DIGITS,(29,73,153))
+                self._put(im,str(value)[-1],x+14,y+5,_BLUE_DIGITS,(29,73,153))
+        return im
+
+    def test_batter_page_parse_and_merge(self):
+        from screen_reader import read_batter_stats,validate_batter_pages
+        first=read_batter_stats(self._batter_page(True))
+        second=read_batter_stats(self._batter_page(False))
+        self.assertEqual(first["status"],"PASS")
+        self.assertEqual(second["status"],"PASS")
+        self.assertEqual(len(first["rows"]),5)
+        self.assertEqual(len(second["rows"]),4)
+        self.assertEqual(second["team_total"],{"at_bats":25,"hits":8,"rbi":5})
+        merged=validate_batter_pages(first,second,verified_match_id="Y1-JUN-HANASAKA")
+        self.assertEqual(merged["status"],"PASS")
+        self.assertFalse(merged["names_verified"])
+
+    def test_batter_pair_rejects_implicit_match_pairing(self):
+        from screen_reader import read_batter_stats,validate_batter_pages
+        first=read_batter_stats(self._batter_page(True))
+        second=read_batter_stats(self._batter_page(False))
+        self.assertEqual(validate_batter_pages(first,second)["status"],"NEEDS_MATCH_ID")
+
+    def test_batter_total_mismatch_fails_closed(self):
+        from screen_reader import read_batter_stats,validate_batter_pages
+        first=read_batter_stats(self._batter_page(True))
+        second=read_batter_stats(self._batter_page(False))
+        second["team_total"]["hits"]=7
+        self.assertEqual(validate_batter_pages(first,second,verified_match_id="M")["status"],
+                         "TOTAL_MISMATCH")
+
+    def test_unknown_color_and_scale_do_not_create_stats(self):
+        from screen_reader import read_batter_stats,read_pitcher_stats
+        img=Image.new("RGB",(2622,1206),"white")
+        self.assertEqual(read_batter_stats(img)["status"],"NEEDS_REVIEW")
+        self.assertEqual(read_pitcher_stats(img)["status"],"NEEDS_REVIEW")
+        self.assertEqual(read_batter_stats(Image.new("RGB",(1311,603)))["status"],
+                         "UNSUPPORTED_SCALE")
+
+    def test_pitcher_panel_numeric_fields(self):
+        from screen_reader import _BLUE_DIGITS,_WHITE_DIGITS,read_pitcher_stats
+        im=Image.new("RGB",(2622,1206),(69,71,72))
+        for n,x in ((6,1185),(3,1597),(1,1833)):
+            self._put(im,n,x,321,_BLUE_DIGITS,(29,73,153))
+        for key,s,y,x in [
+            ("era","1.20",406,904),("win","4",406,1487),
+            ("loss","0",406,1874),("k","5",487,1487),
+            ("bb","2",487,1874),
+        ]:
+            for ch in s:
+                self._put(im,ch,x,y,_WHITE_DIGITS,(255,255,255))
+                x+=16
+        result=read_pitcher_stats(im)
+        self.assertEqual(result["status"],"PASS")
+        self.assertEqual(result["fields"]["innings_displayed"],6)
+        self.assertEqual(result["fields"]["hits_allowed"],3)
+        self.assertEqual(result["fields"]["runs_allowed"],1)
+        self.assertEqual(result["fields"]["earned_run_average"],"1.20")
+        self.assertEqual(result["fields"]["wins"],4)
+        self.assertEqual(result["fields"]["losses"],0)
+        self.assertEqual(result["fields"]["strikeouts"],5)
+        self.assertEqual(result["fields"]["walks"],2)
+        self.assertFalse(result["player_name_verified"])
+
+    def test_pitcher_unsupported_era_format_rejected(self):
+        from screen_reader import read_pitcher_stats
+        with unittest.mock.patch("screen_reader._read_white_characters",return_value="12"):
+            r=read_pitcher_stats(Image.new("RGB",(2622,1206),(69,71,72)))
+        self.assertIn("INVALID_ERA_FORMAT",r["errors"])
 
 if __name__ == "__main__":
     unittest.main()
