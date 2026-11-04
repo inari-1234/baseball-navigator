@@ -47,3 +47,13 @@ A screenshot after a later resource mutation is treated as stale unless `after_e
 
 ## Limitations
 GitHub CI cannot validate the pixels, observe unsent future gameplay, or check every chat-only recommendation. A report of period completion is accepted as user evidence, not invented scores. The engine deliberately preserves these limits.
+
+
+## Corrected lineage, same-month freshness and skill experiments
+- A committed SAVE is a \`SAVE_CHECKPOINT\` event with its event_id. A \`ROLLBACK\` MUST name \`to_checkpoint_id\`. Without a verified checkpoint, the engine fails closed; it does not guess which skills/results survived.
+- Replaying events drops all post-checkpoint events from the active state, retains their IDs in \`reverted_event_ids\`, and preserves the earliest match branch as **audit**. A later win cannot be marked STABLE after a discarded prior attempt.
+- Accepted TRAINING records exactly three participants and optional \`skill_awards\`. \`training_counts_by_player_drill\` counts only accepted, non-reverted training visible in the current event log. It does NOT claim total lifetime participation or prove a hidden skill-point mechanic.
+- Accepted ITEM_USE uses item bundles and optional \`effect_deltas\` as observed aggregate deltas; a discarded alternate branch does not affect current stats. Do not split aggregate effects into per-item claims.
+- A SCREEN after a state-changing event must cite \`observed_after_event_id\` pointing to that specific event. If not, it is marked stale. An earlier in-month clock is stale unless the source explicitly documents a clock reset. For a user-confirmed completed month, same-month SCREEN also requires \`confirmed_after_period_completion=true\`.
+- A MATCH recommendation must specify both match_id and period, TRAIN requires all three players, actual Sports cost, and Cheer ON cost when applicable. ITEM/ACTIVITY actions must explicitly declare costs, even if zero.
+- Scope limitation: screenshot extraction is still a manual read, not independent pixel verification; evidence of source identity cannot prove a number was transcribed correctly.

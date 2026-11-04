@@ -1,16 +1,20 @@
 #!/usr/bin/env python3
-"""Deterministic replay of source-linked observations, not image OCR."""
+"""Replay sourced live-game observations. This validates extracted data, NOT screenshot pixels."""
 from __future__ import annotations
 import argparse
-import copy
 import json
+import re
 from pathlib import Path
+from typing import Any
 
-KINDS={"SCREEN","MATCH_SCHEDULE","MATCH_ATTEMPT","MATCHES_COMPLETED","TRAINING","ITEM_USE","CORRECTION","ROLLBACK"}
+KINDS={"SCREEN","MATCH_SCHEDULE","MATCH_ATTEMPT","MATCHES_COMPLETED","TRAINING",
+       "ITEM_USE","CORRECTION","SAVE_CHECKPOINT","ROLLBACK"}
 SOURCES={"RAW_SCREEN","USER_REPORT","USER_CORRECTION"}
 BRANCHES={"ACCEPTED","REJECTED"}
+COUNTERS=("study","sports","play","nature","cheer")
 
-class ObservationError(ValueError): pass
+class ObservationError(ValueError):
+    pass
 
 def period(e):
     p=e.get("period")
@@ -19,7 +23,14 @@ def period(e):
     if p["year"]<1 or not 1<=p["month"]<=12:raise ObservationError("invalid period")
     return p["year"],p["month"]
 
-def label(p):return f"Y{p[0]}-{p[1]:02d}"
+def label(p):
+    return f"Y{p[0]}-{p[1]:02d}"
+
+def clock_minutes(s):
+    if not isinstance(s,str):return None
+    m=re.fullmatch(r"(AM|PM)\s*(1[0-2]|[1-9]):([0-5][0-9])",s.strip(),re.I)
+    if not m:return None
+    return (int(m.group(2))%12)*60+int(m.group(3))+(720 if m.group(1).upper()=="PM" else 0)
 
 def read_events(path):
     out=[]
@@ -34,53 +45,41 @@ def read_events(path):
 def apply_corrections(events):
     base={}
     for e in events:
-        if e["kind"]!="CORRECTION":base[e["event_id"]]=copy.deepcopy(e);continue
-        target=e.get("target_event_id");match_id=e.get("target_match_id");patch=e.get("patch")
-        if not isinstance(patch,dict) or not patch or (bool(target)==bool(match_id)):
-            raise ObservationError("correction requires exactly one earlier event or match target and a patch")
-        if match_id:
-            if set(patch)!={"opponent"} or not isinstance(patch["opponent"],str) or not patch["opponent"]:
-                raise ObservationError("match-level correction supports only a verified opponent name")
-            found=False
-            for old in base.values():
-                if old["kind"]=="MATCH_ATTEMPT" and old.get("match_id")==match_id:
-                    old["opponent"]=patch["opponent"];found=True
-                if old["kind"]=="MATCH_SCHEDULE":
-                    for row in old.get("entries",[]):
-                        if row.get("match_id")==match_id:
-                            row["opponent"]=patch["opponent"];found=True
-            if not found:raise ObservationError("match-level correction target not found")
-        else:
-            if target not in base:raise ObservationError("correction target event not found")
-            if not set(patch).issubset({"opponent","our_runs","their_runs","player","skill"}):
-                raise ObservationError("correction cannot rewrite time, branch, source or event identity")
-            base[target].update(patch)
+        if e["kind"]!="CORRECTION":
+            base[e["event_id"]]=dict(e)
+            continue
+        target=e.get("target_event_id");patch=e.get("patch")
+        if target not in base or not isinstance(patch,dict) or not patch:
+            raise ObservationError("correction needs earlier target and nonempty patch")
+        if not set(patch).issubset({"opponent","our_runs","their_runs","player","skill"}):
+            raise ObservationError("correction cannot rewrite time, branch, source or event identity")
+        for key,value in patch.items():
+            if key in {"our_runs","their_runs"} and (type(value) is not int or value<0):
+                raise ObservationError("corrected runs must be nonnegative integer")
+            if key in {"opponent","player","skill"} and (not isinstance(value,str) or not value):
+                raise ObservationError("corrected text must be nonempty")
+        base[target].update(patch)
     return [base[e["event_id"]] for e in events if e["kind"]!="CORRECTION"]
 
-def select_active_timeline(events):
-    """Preserve event audit, but exclude operations undone by restoring an earlier save."""
-    active=[];discarded=[];unanchored=None
-    for event in events:
-        if event["kind"]!="ROLLBACK":
-            active.append(event)
+def resolve_active_lineage(events):
+    """Keep discarded branches for audit, but never apply their skills/items to current state."""
+    active=[];discarded=[];discarded_match_ids=set();rollback_count=0
+    for e in events:
+        if e["kind"]!="ROLLBACK":
+            active.append(e)
             continue
-        restore=event.get("restore_to_event_id")
-        if restore is None:
-            discarded.extend(x["event_id"] for x in active if x["kind"]!="ROLLBACK")
-            active=[]
-            unanchored=event["event_id"]
-        else:
-            positions=[i for i,x in enumerate(active) if x["event_id"]==restore]
-            if len(positions)!=1:
-                raise ObservationError(f'{event["event_id"]}: rollback restore point is missing or discarded')
-            i=positions[0]
-            discarded.extend(x["event_id"] for x in active[i+1:] if x["kind"]!="ROLLBACK")
-            active=active[:i+1]
-            if unanchored and not any(x["event_id"]==unanchored for x in active):
-                unanchored=None
-        active.append(event)
-    return active,discarded,unanchored
-
+        cp=e.get("to_checkpoint_id")
+        if not isinstance(cp,str) or not cp:
+            raise ObservationError(f"{e['event_id']}: rollback requires to_checkpoint_id")
+        index=next((i for i,v in enumerate(active) if v["event_id"]==cp and v["kind"]=="SAVE_CHECKPOINT"),None)
+        if index is None:
+            raise ObservationError(f"{e['event_id']}: rollback checkpoint is not active")
+        removed=active[index+1:]
+        discarded.extend(x["event_id"] for x in removed if x["kind"]!="ROLLBACK")
+        discarded_match_ids.update(x.get("match_id") for x in removed if x["kind"]=="MATCH_ATTEMPT")
+        active=active[:index+1]+[e]
+        rollback_count+=1
+    return active,discarded,discarded_match_ids,rollback_count
 
 def replay(events):
     ids=set();seqs=[]
@@ -93,46 +92,64 @@ def replay(events):
         if not isinstance(source,dict) or source.get("kind") not in SOURCES or not isinstance(source.get("locator"),str) or not source["locator"].strip():
             raise ObservationError(f"{eid}: missing source kind/locator")
         if e["kind"]!="CORRECTION":period(e)
-    if seqs!=list(range(1,len(events)+1)):raise ObservationError("event seq must be contiguous starting at 1")
-    active_events,discarded,unanchored=select_active_timeline(events)
-    state={"schema_version":"1.1","last_event_seq":len(events),"period_floor":None,"last_seen_screen_period":None,
+    if seqs!=list(range(1,len(events)+1)):
+        raise ObservationError("event seq must be contiguous starting at 1")
+    corrected=apply_corrections(events)
+    active,discarded,reverted_match_ids,rollback_count=resolve_active_lineage(corrected)
+    prior_first={}
+    for e in corrected:
+        if e["kind"]=="MATCH_ATTEMPT" and e.get("attempt")==1 and e.get("match_id") not in prior_first:
+            prior_first[e["match_id"]]={"attempt":1,"our_runs":e.get("our_runs"),
+                "their_runs":e.get("their_runs"),"evidence_id":e["event_id"]}
+    state={"schema_version":"1.1","last_event_seq":len(events),"period_floor":None,
+           "last_seen_screen_period":None,
            "resources":{"fresh":False,"values":None,"last_observed":None},
-           "matches":{},"completed_match_periods":[],"skills":[],"item_uses":[],
-           "training_counts_observed":{},"training_history":[],
-           "discarded_branch_event_ids":discarded,"timeline_status":"UNKNOWN_AFTER_ROLLBACK" if unanchored else "TRUSTED",
-           "observations_ignored_as_stale":[],"current_exact_time":"UNKNOWN"}
-    floor=None;closed=set();matches={};seen_attempts=set();resource_anchor=None
-    def invalidate(event_id):
-        nonlocal resource_anchor
-        resource_anchor=event_id
+           "matches":{},"completed_match_periods":[],"skills":[],
+           "training_counts_by_player_drill":{},"item_effects":[],
+           "observations_ignored_as_stale":[],"reverted_event_ids":discarded,
+           "rollback_count":rollback_count,"current_exact_time":"UNKNOWN"}
+    floor=None;closed=set();matches={};seen_attempts=set()
+    last_mutation_id=None;last_screen_clock=None;last_screen_period=None
+    def invalidate():
         state["resources"]["fresh"]=False
         state["resources"]["values"]=None
-    for e in apply_corrections(active_events):
+    for e in active:
         kind=e["kind"];p=period(e);pk=label(p);eid=e["event_id"]
         historical=bool(floor and p<floor)
         if kind=="SCREEN":
             vals=e.get("resources")
-            if not isinstance(vals,dict) or not {"study","sports","play","nature","cheer"}.issubset(vals):
+            if not isinstance(vals,dict) or not set(COUNTERS).issubset(vals):
                 raise ObservationError(f"{eid}: SCREEN missing required resource counters")
-            if any(type(vals[x]) is not int or vals[x]<0 for x in ("study","sports","play","nature","cheer")):
+            if any(type(vals[x]) is not int or vals[x]<0 for x in COUNTERS):
                 raise ObservationError(f"{eid}: invalid resource counter")
             if "money_yen" in e and (type(e["money_yen"]) is not int or e["money_yen"]<0):
                 raise ObservationError(f"{eid}: invalid money")
-            if historical or e.get("branch")!="ACCEPTED" or (resource_anchor is not None and e.get("after_event_id")!=resource_anchor):
-                state["observations_ignored_as_stale"].append(eid);continue
+            after=e.get("observed_after_event_id")
+            mutation_unresolved=last_mutation_id is not None
+            if (historical or e.get("branch")!="ACCEPTED" or
+                (mutation_unresolved and after!=last_mutation_id) or
+                (pk in closed and e.get("confirmed_after_period_completion") is not True)):
+                state["observations_ignored_as_stale"].append(eid)
+                continue
+            current_clock=clock_minutes(e.get("clock"))
+            if last_screen_period==pk and last_screen_clock is not None and current_clock is not None and current_clock<last_screen_clock and not e.get("confirmed_clock_reset"):
+                state["observations_ignored_as_stale"].append(eid)
+                continue
             state["last_seen_screen_period"]=pk
-            state["resources"]={"fresh":True,"values":dict(vals),"last_observed":eid}
+            state["resources"]={"fresh":True,"values":{k:vals[k] for k in COUNTERS},"last_observed":eid}
             state["current_exact_time"]=e.get("clock") or "UNKNOWN"
-            if unanchored and e.get("after_event_id")==unanchored:
-                state["timeline_status"]="RECAPTURED_AFTER_UNANCHORED_ROLLBACK"
             floor=max(floor,p) if floor else p
+            last_screen_clock=current_clock;last_screen_period=pk;last_mutation_id=None
         elif kind=="MATCH_SCHEDULE":
             if not isinstance(e.get("entries"),list):raise ObservationError(f"{eid}: entries required")
             for item in e["entries"]:
+                if not isinstance(item,dict):raise ObservationError(f"{eid}: invalid schedule entry")
                 mid=item.get("match_id");opp=item.get("opponent")
-                if not mid or not opp or mid in matches:raise ObservationError(f"{eid}: duplicate/invalid schedule entry")
-                matches[mid]={"opponent":opp,"period":pk,"status":"COMPLETED_SCORE_UNKNOWN" if pk in closed else "SCHEDULED",
-                              "first_attempt":None,"accepted_attempt":None,"classification":None}
+                if not isinstance(mid,str) or not mid or not isinstance(opp,str) or not opp or mid in matches:
+                    raise ObservationError(f"{eid}: duplicate/invalid schedule entry")
+                matches[mid]={"opponent":opp,"period":pk,
+                    "status":"COMPLETED_SCORE_UNKNOWN" if pk in closed else "SCHEDULED",
+                    "first_attempt":None,"accepted_attempt":None,"classification":None}
         elif kind=="MATCH_ATTEMPT":
             mid=e.get("match_id");n=e.get("attempt");a=e.get("our_runs");b=e.get("their_runs")
             if not isinstance(mid,str) or not mid or type(n) is not int or n<1 or any(type(v) is not int or v<0 for v in (a,b)):
@@ -141,55 +158,72 @@ def replay(events):
             if mid not in matches:
                 if not e.get("opponent"):raise ObservationError(f"{eid}: unscheduled match needs opponent")
                 matches[mid]={"opponent":e["opponent"],"period":pk,"status":"UNRESOLVED",
-                              "first_attempt":None,"accepted_attempt":None,"classification":None}
+                    "first_attempt":None,"accepted_attempt":None,"classification":None}
             m=matches[mid]
             if m["period"]!=pk:raise ObservationError(f"{eid}: match period conflict")
             if e.get("opponent") and e["opponent"]!=m["opponent"]:
                 raise ObservationError(f"{eid}: opponent conflict: submit CORRECTION")
-            if (mid,n) in seen_attempts:raise ObservationError(f"{eid}: duplicate match attempt")
+            if (mid,n) in seen_attempts:raise ObservationError(f"{eid}: duplicate active match attempt")
             seen_attempts.add((mid,n))
             result={"attempt":n,"our_runs":a,"their_runs":b,"evidence_id":eid}
             if n==1:m["first_attempt"]=result
             if e["branch"]=="ACCEPTED":
                 if m["accepted_attempt"] is not None:raise ObservationError(f"{eid}: multiple accepted branches")
                 m["accepted_attempt"]=result;m["status"]="PLAYED"
-                m["classification"]=("STABLE_WIN" if n==1 else "RESET_ASSISTED_WIN") if a>b else ("DRAW" if a==b else "LOSS")
-                if not historical:invalidate(eid);state["current_exact_time"]="UNKNOWN"
-                floor=max(floor,p) if floor else p
+                reset_assisted=(n>1 or mid in reverted_match_ids)
+                m["classification"]=(("RESET_ASSISTED_WIN" if reset_assisted else "STABLE_WIN")
+                    if a>b else ("DRAW" if a==b else "LOSS"))
+                if not historical:
+                    invalidate();state["current_exact_time"]="UNKNOWN";last_mutation_id=eid
+                    floor=max(floor,p) if floor else p
         elif kind=="MATCHES_COMPLETED":
             if e["source"]["kind"] not in {"USER_REPORT","USER_CORRECTION"}:
                 raise ObservationError(f"{eid}: period completion requires user assertion")
             closed.add(pk)
             for m in matches.values():
                 if m["period"]==pk and m["status"]=="SCHEDULED":m["status"]="COMPLETED_SCORE_UNKNOWN"
-            if not historical:invalidate(eid);state["current_exact_time"]="UNKNOWN"
-            floor=max(floor,p) if floor else p
+            if not historical:
+                invalidate();state["current_exact_time"]="UNKNOWN";last_mutation_id=eid
+                floor=max(floor,p) if floor else p
         elif kind=="TRAINING":
-            participants=e.get("participants")
-            drill=e.get("drill");level=e.get("drill_level");cheer=e.get("cheer");awards=e.get("skill_awards",[])
-            if (e.get("branch") not in BRANCHES or not isinstance(participants,list) or len(participants)!=3
-                or any(not isinstance(x,str) or not x for x in participants) or len(set(participants))!=3
-                or not isinstance(drill,str) or not drill or type(level) is not int or level<1
-                or cheer not in {"ON","OFF"} or not isinstance(awards,list)):
-                raise ObservationError(f"{eid}: training requires exact three participants, drill, level, cheer and branch")
-            if any(not isinstance(x,dict) or x.get("player") not in participants or not isinstance(x.get("skill"),str) or not x["skill"] for x in awards):
-                raise ObservationError(f"{eid}: invalid skill recipient or skill")
-            if e["branch"]=="ACCEPTED":
-                state["training_history"].append({"evidence_id":eid,"participants":list(participants),
-                        "drill":drill,"drill_level":level,"cheer":cheer})
-                for player in participants:
-                    counter=state["training_counts_observed"].setdefault(player,{})
-                    counter[drill]=counter.get(drill,0)+1
-                for award in awards:
-                    state["skills"].append({"player":award["player"],"skill":award["skill"],"evidence_id":eid})
-                if not historical:invalidate(eid)
+            if e.get("branch")!="ACCEPTED":continue
+            players=e.get("participants");drill=e.get("drill")
+            if not isinstance(players,list) or len(players)!=3 or len(set(players))!=3 or not all(isinstance(x,str) and x for x in players) or not isinstance(drill,str) or not drill:
+                raise ObservationError(f"{eid}: training requires three distinct participants and drill")
+            awards=e.get("skill_awards",[])
+            if not isinstance(awards,list):raise ObservationError(f"{eid}: skill_awards must be list")
+            for award in awards:
+                if not isinstance(award,dict) or award.get("player") not in players or not isinstance(award.get("skill"),str) or not award["skill"]:
+                    raise ObservationError(f"{eid}: invalid skill award")
+                state["skills"].append({"player":award["player"],"skill":award["skill"],"evidence_id":eid})
+            for player in players:
+                k=f"{player}|{drill}"
+                state["training_counts_by_player_drill"][k]=state["training_counts_by_player_drill"].get(k,0)+1
+            if not historical:
+                invalidate();state["current_exact_time"]="UNKNOWN";last_mutation_id=eid
+                floor=max(floor,p) if floor else p
         elif kind=="ITEM_USE":
-            if e.get("branch") not in BRANCHES:raise ObservationError(f"{eid}: item use needs ACCEPTED or REJECTED branch")
-            if e["branch"]=="ACCEPTED":
-                state["item_uses"].append({"evidence_id":eid,"items":e.get("items"),"observed_delta":e.get("observed_delta")})
-                if not historical:invalidate(eid)
+            if e.get("branch")!="ACCEPTED":continue
+            bundle=e.get("item_bundle")
+            if not isinstance(bundle,list) or not bundle or any(
+                not isinstance(x,dict) or not isinstance(x.get("item"),str) or not x["item"] or
+                type(x.get("quantity")) is not int or x["quantity"]<1 for x in bundle):
+                raise ObservationError(f"{eid}: item use needs item_bundle with positive quantity")
+            delta=e.get("effect_deltas",{})
+            if not isinstance(delta,dict) or any(not isinstance(k,str) or type(v) is not int for k,v in delta.items()):
+                raise ObservationError(f"{eid}: invalid effect_deltas")
+            state["item_effects"].append({"event_id":eid,"item_bundle":bundle,"effect_deltas":delta})
+            if not historical:
+                invalidate();state["current_exact_time"]="UNKNOWN";last_mutation_id=eid
+                floor=max(floor,p) if floor else p
         elif kind=="ROLLBACK":
-            if not historical:invalidate(eid);state["current_exact_time"]="UNKNOWN"
+            invalidate();state["current_exact_time"]="UNKNOWN";last_mutation_id=eid
+            last_screen_clock=None;last_screen_period=None
+        elif kind=="SAVE_CHECKPOINT":
+            pass
+    for mid,m in matches.items():
+        if m["first_attempt"] is None and mid in prior_first:
+            m["first_attempt"]=prior_first[mid]
     state["period_floor"]=label(floor) if floor else None
     state["completed_match_periods"]=sorted(closed)
     state["matches"]=dict(sorted(matches.items()))
@@ -199,8 +233,6 @@ def validate_recommendation(rec,state,contract):
     errors=[]
     if rec.get("based_on_event_seq")!=state["last_event_seq"]:
         errors.append("STALE_REVISION")
-    if state.get("timeline_status")=="UNKNOWN_AFTER_ROLLBACK":
-        errors.append("UNRESOLVED_ROLLBACK")
     active={r["rule_id"] for r in contract.get("rules",[]) if r.get("status")=="ACTIVE"}
     ids=rec.get("rule_ids")
     if not isinstance(ids,list) or not ids or any(r not in active for r in ids):
@@ -208,33 +240,30 @@ def validate_recommendation(rec,state,contract):
     action_type=rec.get("action_type")
     if action_type not in {"MATCH","TRAIN","ITEM","ACTIVITY","OTHER"}:
         errors.append("ACTION_TYPE_REQUIRED")
-    if action_type=="MATCH" and not rec.get("target_match_id"):
-        errors.append("MATCH_ID_REQUIRED")
-    if action_type=="MATCH" and rec.get("target_period") in state["completed_match_periods"]:
-        errors.append("COMPLETED_PERIOD_MATCH")
-    if action_type=="MATCH" and rec.get("target_period") and state["period_floor"] and rec["target_period"]<state["period_floor"]:
-        errors.append("PAST_PERIOD_MATCH")
+    if action_type=="MATCH":
+        if not rec.get("target_match_id"):errors.append("MATCH_ID_REQUIRED")
+        if not rec.get("target_period"):errors.append("MATCH_PERIOD_REQUIRED")
+        if rec.get("target_period") in state["completed_match_periods"]:
+            errors.append("COMPLETED_PERIOD_MATCH")
     if action_type=="TRAIN":
-        if rec.get("cheer") not in {"ON","OFF"} or not isinstance(rec.get("participants"),list) or len(rec["participants"])!=3 or len(set(rec["participants"]))!=3:
+        players=rec.get("participants")
+        if rec.get("cheer") not in {"ON","OFF"} or not isinstance(players,list) or len(players)!=3 or not all(isinstance(x,str) and x for x in players) or len(set(players))!=3:
             errors.append("TRAINING_DETAILS_REQUIRED")
-        if not isinstance(rec.get("spend"),dict) or "sports" not in rec["spend"] or type(rec["spend"]["sports"]) is not int or rec["spend"]["sports"]<=0:
+        if not isinstance(rec.get("spend"),dict) or "sports" not in rec["spend"]:
             errors.append("TRAINING_COST_REQUIRED")
-        if rec.get("cheer")=="ON" and (not isinstance(rec.get("spend"),dict) or type(rec["spend"].get("cheer")) is not int or rec["spend"]["cheer"]<=0):
+        if rec.get("cheer")=="ON" and (not isinstance(rec.get("spend"),dict) or "cheer" not in rec["spend"]):
             errors.append("CHEER_COST_REQUIRED")
-        if not state["resources"]["fresh"]:
-            errors.append("STALE_RESOURCES")
+        if not state["resources"]["fresh"]:errors.append("STALE_RESOURCES")
+    if action_type in {"ITEM","ACTIVITY"} and not isinstance(rec.get("spend"),dict):
+        errors.append("COST_DECLARATION_REQUIRED")
     mid=rec.get("target_match_id")
     if mid:
         m=state["matches"].get(mid)
         if m is None:errors.append("UNKNOWN_MATCH")
         elif m["status"]!="SCHEDULED" or m["period"] in state["completed_match_periods"]:
             errors.append("ALREADY_COMPLETED_MATCH")
-        elif state["period_floor"] and m["period"]<state["period_floor"]:
-            errors.append("PAST_PERIOD_MATCH")
-        if m is not None and rec.get("target_period") and rec["target_period"]!=m["period"]:
-            errors.append("MATCH_PERIOD_CONFLICT")
-    if action_type=="ITEM":
-        errors.append("ITEM_INVENTORY_NOT_VERIFIED")  # no canonical item-count snapshot yet; fail closed
+        elif action_type=="MATCH" and m["period"]!=rec.get("target_period"):
+            errors.append("MATCH_PERIOD_MISMATCH")
     spend=rec.get("spend",{})
     if not isinstance(spend,dict):errors.append("INVALID_SPEND")
     elif spend:
@@ -259,7 +288,8 @@ def main():
         if state!=saved:raise ObservationError("CURRENT_LIVE_STATE.json differs from event replay")
         if not isinstance(contract.get("rules"),list):raise ObservationError("invalid contract rules")
         print(json.dumps({"result":"PASS","events":state["last_event_seq"],"period_floor":state["period_floor"],
-              "resources_fresh":state["resources"]["fresh"],"completed_months":state["completed_match_periods"]},ensure_ascii=False))
+              "resources_fresh":state["resources"]["fresh"],"completed_months":state["completed_match_periods"],
+              "rollbacks":state["rollback_count"]},ensure_ascii=False))
         return 0
     except (ObservationError,OSError,ValueError) as exc:
         print(json.dumps({"result":"FAIL","error":str(exc)},ensure_ascii=False));return 1

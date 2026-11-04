@@ -43,7 +43,7 @@ class LiveStateRegression(unittest.TestCase):
         with self.assertRaises(ObservationError):
             replay([e(1,"SCREEN",branch="ACCEPTED",resources={"sports":28})])
     def test_rollback_expires_snapshot(self):
-        s=replay([screen(1),e(2,"ROLLBACK")])
+        s=replay([e(1,"SAVE_CHECKPOINT"),screen(2),e(3,"ROLLBACK",to_checkpoint_id="E1")])
         self.assertFalse(s["resources"]["fresh"])
     def test_two_accepted_branches_rejected(self):
         with self.assertRaises(ObservationError):
@@ -186,6 +186,86 @@ class LiveStateRegression(unittest.TestCase):
     def test_match_wide_correction_unknown_id_fails(self):
         with self.assertRaises(ObservationError):
             replay([screen(1),e(2,"CORRECTION",target_match_id="NOT_FOUND",patch={"opponent":"生南"})])
+    def test_rollback_drops_skill_and_training_count(self):
+        s=replay([e(1,"SAVE_CHECKPOINT"),
+                  e(2,"TRAINING",drill="シャドー",participants=["石渡","たき","岡治"],
+                    skill_awards=[{"player":"石渡","skill":"コントロールアップ"}],branch="ACCEPTED"),
+                  e(3,"ROLLBACK",to_checkpoint_id="E1"),
+                  e(4,"TRAINING",drill="シャドー",participants=["石渡","たき","岡治"],
+                    skill_awards=[],branch="ACCEPTED")])
+        self.assertEqual(s["skills"],[])
+        self.assertEqual(s["training_counts_by_player_drill"]["石渡|シャドー"],1)
+        self.assertIn("E2",s["reverted_event_ids"])
+        self.assertEqual(s["rollback_count"],1)
+    def test_rollback_drops_item_effect(self):
+        s=replay([e(1,"SAVE_CHECKPOINT"),
+                  e(2,"ITEM_USE",branch="ACCEPTED",
+                    item_bundle=[{"item":"バナナ","quantity":3}],
+                    effect_deltas={"wisdom":5,"control":3}),
+                  e(3,"ROLLBACK",to_checkpoint_id="E1"),
+                  e(4,"ITEM_USE",branch="ACCEPTED",
+                    item_bundle=[{"item":"バナナ","quantity":3}],
+                    effect_deltas={"wisdom":11,"control":0})])
+        self.assertEqual(len(s["item_effects"]),1)
+        self.assertEqual(s["item_effects"][0]["effect_deltas"],{"wisdom":11,"control":0})
+    def test_rollback_removes_match_but_preserves_first_attempt_audit(self):
+        s=replay([e(1,"SAVE_CHECKPOINT"),
+                  e(2,"MATCH_ATTEMPT",match_id="M",opponent="花さか",attempt=1,
+                    our_runs=0,their_runs=1,branch="ACCEPTED"),
+                  e(3,"ROLLBACK",to_checkpoint_id="E1"),
+                  e(4,"MATCH_ATTEMPT",match_id="M",opponent="花さか",attempt=2,
+                    our_runs=3,their_runs=0,branch="ACCEPTED")])
+        self.assertEqual(s["matches"]["M"]["first_attempt"]["our_runs"],0)
+        self.assertEqual(s["matches"]["M"]["accepted_attempt"]["our_runs"],3)
+        self.assertEqual(s["matches"]["M"]["classification"],"RESET_ASSISTED_WIN")
+    def test_rollback_refuses_missing_checkpoint(self):
+        with self.assertRaises(ObservationError):
+            replay([e(1,"ROLLBACK")])
+    def test_same_month_post_match_old_screen_rejected(self):
+        s=replay([screen(1),e(2,"MATCH_ATTEMPT",match_id="M",opponent="花さか",
+                    attempt=1,our_runs=2,their_runs=0,branch="ACCEPTED"),
+                  screen(3)])
+        self.assertIn("E3",s["observations_ignored_as_stale"])
+        self.assertFalse(s["resources"]["fresh"])
+    def test_same_month_post_match_screen_must_name_transition(self):
+        s=replay([screen(1),e(2,"MATCH_ATTEMPT",match_id="M",opponent="花さか",
+                    attempt=1,our_runs=2,their_runs=0,branch="ACCEPTED"),
+                  e(3,"SCREEN",branch="ACCEPTED",observed_after_event_id="E2",
+                    resources={"study":1,"sports":2,"play":3,"nature":4,"cheer":5})])
+        self.assertTrue(s["resources"]["fresh"])
+        self.assertEqual(s["resources"]["values"]["sports"],2)
+    def test_same_month_older_clock_rejected(self):
+        s=replay([e(1,"SCREEN",clock="PM 5:40",branch="ACCEPTED",
+                     resources={"study":1,"sports":2,"play":3,"nature":4,"cheer":5}),
+                  e(2,"SCREEN",clock="PM 3:00",branch="ACCEPTED",
+                    resources={"study":1,"sports":28,"play":3,"nature":4,"cheer":5})])
+        self.assertEqual(s["resources"]["values"]["sports"],2)
+        self.assertIn("E2",s["observations_ignored_as_stale"])
+    def test_match_requires_target_period(self):
+        s=replay([e(1,"MATCH_SCHEDULE",7,entries=[{"match_id":"J1","opponent":"まんるい"}])])
+        err=validate_recommendation({"action_type":"MATCH","target_match_id":"J1",
+              "based_on_event_seq":1,"rule_ids":["DC-PROC-001"]},s,
+              {"rules":[{"rule_id":"DC-PROC-001","status":"ACTIVE"}]})
+        self.assertIn("MATCH_PERIOD_REQUIRED",err)
+    def test_cheer_on_requires_cost(self):
+        s=replay([screen(1)])
+        err=validate_recommendation({"action_type":"TRAIN","spend":{"sports":6},
+              "participants":["入江","今井","芦田"],"cheer":"ON","based_on_event_seq":1,
+              "rule_ids":["DC-PROC-001"]},s,
+              {"rules":[{"rule_id":"DC-PROC-001","status":"ACTIVE"}]})
+        self.assertIn("CHEER_COST_REQUIRED",err)
+    def test_missing_item_cost_is_not_free(self):
+        s=replay([screen(1)])
+        err=validate_recommendation({"action_type":"ITEM","based_on_event_seq":1,
+              "rule_ids":["DC-PROC-001"]},s,
+              {"rules":[{"rule_id":"DC-PROC-001","status":"ACTIVE"}]})
+        self.assertIn("COST_DECLARATION_REQUIRED",err)
+    def test_training_counts_only_accepted(self):
+        s=replay([e(1,"TRAINING",drill="素振り",branch="REJECTED",
+                     participants=["入江","今井","芦田"],skill_awards=[]),
+                  e(2,"TRAINING",drill="素振り",branch="ACCEPTED",
+                     participants=["入江","今井","芦田"],skill_awards=[])])
+        self.assertEqual(s["training_counts_by_player_drill"]["入江|素振り"],1)
     def test_late_historical_completion_preserves_new_snapshot(self):
         s=replay([screen(1,8),e(2,"MATCHES_COMPLETED",7)])
         self.assertTrue(s["resources"]["fresh"])

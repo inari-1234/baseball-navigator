@@ -80,5 +80,9 @@
   "training_counts_observed": {},
   "training_history": [],
   "discarded_branch_event_ids": [],
-  "timeline_status": "TRUSTED"
+  "timeline_status": "TRUSTED",
+  "training_counts_by_player_drill": {},
+  "item_effects": [],
+  "reverted_event_ids": [],
+  "rollback_count": 0
 }
