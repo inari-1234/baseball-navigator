@@ -185,6 +185,107 @@ class RosterPageRegression(unittest.TestCase):
         self.assertEqual(read["source"]["sha256"],digest)
 
 
+class RosterBattingNumberRegression(unittest.TestCase):
+    """Synthetic glyph test fixtures; actual user screenshot gold remains external."""
+    def _image(self, values=None, *, page=2):
+        from screen_reader import (
+            _ROSTER_BATTING_FONT, _ROSTER_BATTING_ROW_Y,
+            _ROSTER_BATTING_COLUMNS, _ROSTER_NUMERIC_INK,
+        )
+        img=RosterPageRegression()._sample(page)
+        values=values or [
+            (33,15,44),(10,11,4),(80,46,30),(5,4,4),
+            (15,102,25),(15,12,30),(7,7,5),
+        ]
+        draw=ImageDraw.Draw(img)
+        for top,triple in zip(_ROSTER_BATTING_ROW_Y,values):
+            for (field,(right,limit)),value in zip(_ROSTER_BATTING_COLUMNS.items(),triple):
+                for place,digit in enumerate(str(value)[::-1]):
+                    bits=_ROSTER_BATTING_FONT[digit][0]
+                    left=right-24-25*place
+                    for y in range(7):
+                        for x in range(5):
+                            if bits>>(y*5+x)&1:
+                                draw.rectangle((left+5*x,top+5*y,
+                                                left+5*x+4,top+5*y+4),
+                                               fill=_ROSTER_NUMERIC_INK)
+        return img
+
+    def test_roster_batting_three_numeric_fields_seven_visible_rows(self):
+        from screen_reader import read_roster_batting_values
+        rows=[(33,15,44),(10,11,4),(80,46,30),(5,4,4),
+              (15,102,25),(15,12,30),(7,7,5)]
+        result=read_roster_batting_values(self._image(rows))
+        self.assertEqual(result["status"],"PASS",result)
+        self.assertEqual(len(result["rows"]),7)
+        values=[tuple(row[k] for k in ("batting","slugging","running"))
+                for row in result["rows"]]
+        self.assertEqual(values,rows)
+        self.assertFalse(result["names_verified"])
+        self.assertFalse(result["player_identities_verified"])
+        self.assertFalse(result["ability_grades_verified"])
+        self.assertFalse(result["live_state_current"])
+
+    def test_roster_batting_integration_keeps_source_and_draft_only(self):
+        from screen_reader import read_image
+        with tempfile.TemporaryDirectory() as tmp:
+            path=Path(tmp)/"test_roster.png"
+            self._image().save(path)
+            digest=hashlib.sha256(path.read_bytes()).hexdigest()
+            result=read_image(path)
+        self.assertEqual(result["screen_type"],"ROSTER_LIST")
+        self.assertEqual(result["roster_batting_values"]["status"],"PASS")
+        self.assertEqual(result["source"]["sha256"],digest)
+        self.assertNotIn("player_names",result)
+        self.assertFalse(result["roster_batting_values"]["player_identities_verified"])
+
+    def test_unrecognized_digit_in_a_tens_slot_fails_closed(self):
+        from screen_reader import read_roster_batting_values, _ROSTER_BATTING_ROW_Y
+        img=self._image()
+        # Replace the '3' in 33 with a previously unseen, all-ink glyph.
+        top=_ROSTER_BATTING_ROW_Y[0]
+        ImageDraw.Draw(img).rectangle((1442,top,1466,top+34),
+                                      fill=(23,34,53))
+        result=read_roster_batting_values(img)
+        self.assertEqual(result["status"],"NEEDS_REVIEW")
+        self.assertIsNone(result["rows"][0]["batting"])
+        self.assertIn("UNKNOWN_BATTING_GLYPH_ROW:1",result["errors"])
+        self.assertEqual(result["rows"][0]["slugging"],15)
+
+    def test_extra_leading_digit_cannot_be_truncated(self):
+        from screen_reader import (
+            read_roster_batting_values, _ROSTER_BATTING_FONT, _ROSTER_BATTING_ROW_Y,
+        )
+        img=self._image()
+        # Add a third digit before the 33 in the first bounded field.
+        top=_ROSTER_BATTING_ROW_Y[0]
+        left=1492-24-25*2
+        mask=_ROSTER_BATTING_FONT["1"][0]
+        draw=ImageDraw.Draw(img)
+        for y in range(7):
+            for x in range(5):
+                if mask>>(y*5+x)&1:
+                    draw.rectangle((left+x*5,top+y*5,
+                                    left+x*5+4,top+y*5+4),fill=(23,34,53))
+        result=read_roster_batting_values(img)
+        self.assertEqual(result["status"],"NEEDS_REVIEW")
+        self.assertIsNone(result["rows"][0]["batting"])
+
+    def test_other_roster_page_and_scale_do_not_create_batting_stats(self):
+        from screen_reader import read_roster_batting_values, read_image
+        other=self._image(page=1)
+        self.assertEqual(read_roster_batting_values(other)["status"],
+                         "UNSUPPORTED_PAGE")
+        with tempfile.TemporaryDirectory() as tmp:
+            path=Path(tmp)/"wrong_page.png"
+            other.save(path)
+            result=read_image(path)
+        self.assertNotIn("roster_batting_values",result)
+        self.assertEqual(read_roster_batting_values(
+            self._image().resize((1311,603),Image.Resampling.NEAREST)
+        )["status"],"UNSUPPORTED_SCALE")
+
+
 class ScorePixelReaderRegression(unittest.TestCase):
     """Deterministic digit silhouettes; real-game screenshot probes are external."""
     def test_blue_glyph_coverage_and_unknown(self):
