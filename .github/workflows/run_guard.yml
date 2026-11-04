@@ -2,7 +2,7 @@ name: Run Guard
 
 on:
   push:
-    branches: [main, "fix/**"]
+    branches: [main, "fix/**", "feature/formation-screenshot-reader-v1"]
     paths:
       - "CURRENT_RUN_LEDGER.yaml"
       - "RUN_GUARD_POLICY.yaml"
