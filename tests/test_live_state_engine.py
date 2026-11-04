@@ -83,9 +83,81 @@ class LiveStateRegression(unittest.TestCase):
         self.assertFalse(state["resources"]["fresh"])
     def test_explicit_confirmed_current_screen_reopens_state(self):
         state=replay([e(1,"MATCHES_COMPLETED",7),
-                      e(2,"SCREEN",7,branch="ACCEPTED",confirmed_after_period_completion=True,
+                      e(2,"SCREEN",7,branch="ACCEPTED",after_event_id="E1",
                         resources={"study":4,"sports":28,"play":25,"nature":18,"cheer":100})])
         self.assertTrue(state["resources"]["fresh"])
+    def test_rollback_removes_discarded_skill(self):
+        s=replay([screen(1),e(2,"TRAINING",player="入江",drill="素振り",skill="ミート力アップ",branch="ACCEPTED"),
+                  e(3,"ROLLBACK",restore_to_event_id="E1")])
+        self.assertEqual(s["skills"],[])
+        self.assertEqual(s["discarded_branch_event_ids"],["E2"])
+        self.assertFalse(s["resources"]["fresh"])
+        self.assertEqual(s["timeline_status"],"TRUSTED")
+    def test_rollback_removes_discarded_match(self):
+        s=replay([screen(1),e(2,"MATCH_ATTEMPT",match_id="M",opponent="生南",attempt=1,our_runs=3,their_runs=0,branch="ACCEPTED"),
+                  e(3,"ROLLBACK",restore_to_event_id="E1")])
+        self.assertEqual(s["matches"],{})
+        self.assertIn("E2",s["discarded_branch_event_ids"])
+    def test_rollback_removes_discarded_item_effect(self):
+        s=replay([screen(1),e(2,"ITEM_USE",branch="ACCEPTED",items=[{"name":"バナナ","quantity":3}],observed_delta={"wisdom":11}),
+                  e(3,"ROLLBACK",restore_to_event_id="E1")])
+        self.assertEqual(s["item_uses"],[])
+    def test_unanchored_rollback_blocks_unsafe_advice(self):
+        s=replay([screen(1),e(2,"ROLLBACK")])
+        self.assertEqual(s["timeline_status"],"UNKNOWN_AFTER_ROLLBACK")
+        errors=validate_recommendation({"based_on_event_seq":2,"action_type":"TRAIN","rule_ids":["DC-TRAIN-001"],
+                 "participants":["入江","今井","長島"],"cheer":"ON","spend":{"sports":7,"cheer":20}},
+                 s,{"rules":[{"rule_id":"DC-TRAIN-001","status":"ACTIVE"}]})
+        self.assertIn("UNRESOLVED_ROLLBACK",errors)
+    def test_explicit_recap_after_unanchored_rollback(self):
+        s=replay([screen(1),e(2,"ROLLBACK"),e(3,"SCREEN",after_event_id="E2",branch="ACCEPTED",
+            resources={"study":4,"sports":28,"play":25,"nature":18,"cheer":100})])
+        self.assertEqual(s["timeline_status"],"RECAPTURED_AFTER_UNANCHORED_ROLLBACK")
+        self.assertTrue(s["resources"]["fresh"])
+    def test_bad_rollback_anchor_is_rejected(self):
+        with self.assertRaises(ObservationError):
+            replay([screen(1),e(2,"ROLLBACK",restore_to_event_id="NEVER_EXISTED")])
+    def test_old_same_month_screen_after_match_is_stale(self):
+        s=replay([screen(1),e(2,"MATCH_ATTEMPT",match_id="M",opponent="花さか",
+           attempt=1,our_runs=4,their_runs=1,branch="ACCEPTED"),screen(3)])
+        self.assertIn("E3",s["observations_ignored_as_stale"])
+        self.assertFalse(s["resources"]["fresh"])
+    def test_evidenced_same_month_screen_after_match_is_fresh(self):
+        s=replay([screen(1),e(2,"MATCH_ATTEMPT",match_id="M",opponent="花さか",
+           attempt=1,our_runs=4,their_runs=1,branch="ACCEPTED"),
+           e(3,"SCREEN",after_event_id="E2",branch="ACCEPTED",
+              resources={"study":4,"sports":28,"play":25,"nature":18,"cheer":100})])
+        self.assertTrue(s["resources"]["fresh"])
+    def test_old_month_scheduled_match_is_not_actionable(self):
+        s=replay([e(1,"MATCH_SCHEDULE",entries=[{"match_id":"OLD","opponent":"生南"}]),screen(2,7)])
+        errs=validate_recommendation({"based_on_event_seq":2,"action_type":"MATCH",
+          "target_match_id":"OLD","rule_ids":["DC-MATCH-001"]},s,
+          {"rules":[{"rule_id":"DC-MATCH-001","status":"ACTIVE"}]})
+        self.assertIn("PAST_PERIOD_MATCH",errs)
+    def test_cheer_on_requires_actual_cheer_cost(self):
+        s=replay([screen(1)])
+        errs=validate_recommendation({"based_on_event_seq":1,"action_type":"TRAIN","rule_ids":["DC-TRAIN-001"],
+          "participants":["入江","今井","長島"],"cheer":"ON","spend":{"sports":7}},s,
+          {"rules":[{"rule_id":"DC-TRAIN-001","status":"ACTIVE"}]})
+        self.assertIn("CHEER_COST_REQUIRED",errs)
+    def test_item_recommendations_fail_closed_without_inventory(self):
+        s=replay([screen(1)])
+        errs=validate_recommendation({"based_on_event_seq":1,"action_type":"ITEM","rule_ids":["DC-ITEM-001"]},
+          s,{"rules":[{"rule_id":"DC-ITEM-001","status":"ACTIVE"}]})
+        self.assertIn("ITEM_INVENTORY_NOT_VERIFIED",errs)
+    def test_match_period_mismatch_is_rejected(self):
+        s=replay([e(1,"MATCH_SCHEDULE",7,entries=[{"match_id":"J1","opponent":"まんるい"}])])
+        errs=validate_recommendation({"based_on_event_seq":1,"action_type":"MATCH","rule_ids":["DC-MATCH-001"],
+          "target_match_id":"J1","target_period":"Y1-08"},s,
+          {"rules":[{"rule_id":"DC-MATCH-001","status":"ACTIVE"}]})
+        self.assertIn("MATCH_PERIOD_CONFLICT",errs)
+    def test_existing_screenshot_fact_fixture(self):
+        from live_state_engine import read_events
+        events=read_events("LIVE_EVENTS.jsonl")
+        snapshot=next(x for x in events if x["event_id"]=="LIVE-Y1-JUN-POST-HANASAKA-SCREEN")
+        self.assertEqual(snapshot["resources"],{"study":4,"sports":28,"play":25,"nature":18,"cheer":100})
+        self.assertEqual(snapshot["money_yen"],15980)
+        self.assertEqual(snapshot["after_event_id"],"LIVE-Y1-JUN-HANASAKA-ACCEPTED")
     def test_late_historical_completion_preserves_new_snapshot(self):
         s=replay([screen(1,8),e(2,"MATCHES_COMPLETED",7)])
         self.assertTrue(s["resources"]["fresh"])
