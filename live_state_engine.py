@@ -108,6 +108,14 @@ def apply_corrections(events):
             continue
         if target not in base or not isinstance(patch,dict) or not patch:
             raise ObservationError("correction needs earlier target and nonempty patch")
+        if "entries" in patch:
+            if (base[target]["kind"]!="HP_OBSERVATION" or set(patch)!={"entries"} or
+                e["source"]["kind"]!="USER_CORRECTION" or not isinstance(patch["entries"],list) or
+                not patch["entries"]):
+                raise ObservationError("HP correction must be user-sourced entries for HP_OBSERVATION")
+            base[target]["entries"]=patch["entries"]
+            base[target]["hp_corrected_by_event_id"]=e["event_id"]
+            continue
         if not set(patch).issubset({"opponent","our_runs","their_runs","player","skill"}):
             raise ObservationError("correction cannot rewrite time, branch, source or event identity")
         for key,value in patch.items():
@@ -241,7 +249,7 @@ def replay(events):
                 continue
             for player,result in parsed.items():
                 state["hp_by_player"][player]={**result,"fresh":True,"event_id":eid,"period":pk,
-                    "source_locator":e["source"]["locator"]}
+                    "source_locator":e["source"]["locator"],"hp_corrected_by_event_id":e.get("hp_corrected_by_event_id")}
             last_context_event_id=eid
             floor=max(floor,p) if floor else p
         elif kind=="MATCH_SCHEDULE":

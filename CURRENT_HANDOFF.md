@@ -55,3 +55,8 @@ Repo change is the ingestion/reconciliation owner; `Excel-Tests` is not mutated.
 - `HP_OBSERVATION` stores player-identity evidence, source, period, branch and bar geometry or direct user numeric report. Uncalibrated bars cannot satisfy exact numerical HP gates or FULL/NEAR_FULL claims. HP is invalidated on match/training/item/rollback.
 - No current post-July HP image exists: actual present HP is UNKNOWN, historical June IMG_8932 must not be promoted as current.
 - CI verifies source-structured numerical geometry, chronology and action guards, NOT pixel segmentation, character recognition or true gauge-to-HP calibration.
+
+## HP correction and acceptance completion
+- A later source-linked USER_CORRECTION can replace only an earlier `HP_OBSERVATION.entries` extraction, not unrelated match/score events. The original raw event persists in the append-only event log; derived state includes `hp_corrected_by_event_id`.
+- Image-reading limitation remains: measured pixel segments are manually extracted. No automation is claimed to identify the player or derive exact game HP from a bar. Historical IMG_8932 is not current post-July HP.
+- Final acceptance evidence: Guard + Decision Contract + replay + expanded HP regressions on candidate and final main.

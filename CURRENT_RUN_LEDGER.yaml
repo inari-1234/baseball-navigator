@@ -1,8 +1,8 @@
 {
   "schema_version": "1.0",
-  "ledger_version": 8,
+  "ledger_version": 9,
   "run_id": "SAPPORO_SPRINT_RESTART_20261103",
-  "expected_parent_sha": "1f228554f054568b8a2b484a534e17e527ae6159",
+  "expected_parent_sha": "c86871fa2257d3d0e3fa113513f21e36dcbd8768",
   "run_status": {
     "previous_run": "ABANDONED_FOR_REDESIGN",
     "new_run": "ACTIVE_AFTER_JULY_MATCHES_REPORTED_COMPLETE",
@@ -345,6 +345,16 @@
       "fact_type": "OBSERVED",
       "path": "visual.hp.vertical_inner_track_display",
       "value": "VISUAL_UNCALIBRATED",
+      "source_refs": [
+        "EV-VISUAL-ISHIWATA-HP-IMG8932-20261104"
+      ],
+      "usable_for_decision": false
+    },
+    {
+      "fact_id": "FACT-HP-OBS-CORRECTION",
+      "fact_type": "OBSERVED",
+      "path": "pipeline.hp.source_linked_correction",
+      "value": "SUPPORTED",
       "source_refs": [
         "EV-VISUAL-ISHIWATA-HP-IMG8932-20261104"
       ],

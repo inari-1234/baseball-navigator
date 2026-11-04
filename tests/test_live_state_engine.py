@@ -390,6 +390,34 @@ class LiveStateRegression(unittest.TestCase):
             replay([e(1,"HP_OBSERVATION",branch="ACCEPTED",
                source={"kind":"RAW_SCREEN","locator":"IMG_8932.png"},
                entries=[{"player":"石渡","reading_kind":"USER_EXACT_PERCENT","reported_percent":80}])])
+    def test_hp_user_correction_rebinds_player_without_mutating_source(self):
+        original=e(1,"HP_OBSERVATION",branch="ACCEPTED",
+           source={"kind":"RAW_SCREEN","locator":"IMG_8932.png"},
+           entries=[{"player":"仮","reading_kind":"VERTICAL_BAR",
+                     "identity_evidence":"SELECTED_PLAYER_PANEL",
+                     "geometry_px":{"center_x":1300,"track_top":543,"track_bottom":594,
+                                    "fill_top":557,"edge_uncertainty":1}}])
+        update=e(2,"CORRECTION",source={"kind":"USER_CORRECTION","locator":"User: this bar is 石渡"},
+           target_event_id="E1",patch={"entries":[{
+                 "player":"石渡","reading_kind":"VERTICAL_BAR","identity_evidence":"SELECTED_PLAYER_PANEL",
+                 "geometry_px":{"center_x":1300,"track_top":543,"track_bottom":594,
+                                "fill_top":557,"edge_uncertainty":1}}]})
+        s=replay([original,update])
+        self.assertEqual(set(s["hp_by_player"]),{"石渡"})
+        self.assertEqual(s["hp_by_player"]["石渡"]["hp_corrected_by_event_id"],"E2")
+        self.assertEqual(original["entries"][0]["player"],"仮")
+    def test_hp_correction_rejects_wrong_kind_and_source(self):
+        original=e(1,"MATCH_ATTEMPT",match_id="M",opponent="花さか",
+                   attempt=1,our_runs=2,their_runs=1,branch="ACCEPTED")
+        patch={"entries":[{"player":"石渡","reading_kind":"USER_APPROX_PERCENT",
+                           "reported_percent":80}]}
+        with self.assertRaises(ObservationError):
+            replay([original,e(2,"CORRECTION",source={"kind":"USER_CORRECTION","locator":"user"},
+                 target_event_id="E1",patch=patch)])
+        hp=e(1,"HP_OBSERVATION",branch="ACCEPTED",entries=[
+                 {"player":"石渡","reading_kind":"USER_APPROX_PERCENT","reported_percent":80}])
+        with self.assertRaises(ObservationError):
+            replay([hp,e(2,"CORRECTION",target_event_id="E1",patch=patch)])
     def test_late_historical_completion_preserves_new_snapshot(self):
         s=replay([screen(1,8),e(2,"MATCHES_COMPLETED",7)])
         self.assertTrue(s["resources"]["fresh"])
