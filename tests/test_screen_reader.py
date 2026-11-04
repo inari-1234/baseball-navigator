@@ -162,6 +162,23 @@ class ScorePixelReaderRegression(unittest.TestCase):
 
     def _put(self,im,digit,x,y,alphabet,ink):
         from PIL import ImageDraw
+        if ink==(255,255,255) and str(digit) in {"1","4"}:
+            # Native white pixel glyphs preserve contiguous column topology.
+            rows=(
+                ["......#####"]*5+["###########"]*5+["......#####"]*26
+                if str(digit)=="1" else
+                ["................#####....."]*5+
+                ["..........###########....."]*5+
+                [".....#####......#####....."]*5+
+                ["#####...........#####....."]*11+
+                ["##########################"]*5+
+                ["................#####....."]*5
+            )
+            draw=ImageDraw.Draw(im)
+            for yy,line in enumerate(rows):
+                for xx,ch in enumerate(line):
+                    if ch=="#":draw.point((x+xx,y+yy),fill=ink)
+            return
         dim=(12,16) if ink==(29,73,153) else (10,14)
         bits=alphabet[str(digit)][0]
         draw=ImageDraw.Draw(im)
