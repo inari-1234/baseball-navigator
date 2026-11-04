@@ -78,3 +78,25 @@ Actual-image local comparison (original PNG bytes stay in Library, **not GitHub*
 `_read_batter_number()` now distinguishes a genuinely empty tens position from a **present but unrecognized** blue pixel-font glyph. The latter returns `None`, causing `NEEDS_REVIEW` for that batting page; a team-total failure also prevents nine-row acceptance. The tens ROI excludes the ones ROI's first column. Verified historical samples show 0 source-blue tens pixels in each single-digit field on `IMG_8926` and 1150 in the `25` at-bats total's tens cell on `IMG_8927`. Unsupported blue 9 remains unsupported. No optimistic substitution or automatic player binding has been added.
 
 GitHub Actions Run Guard for candidate code `e978187fa802ae96025dd21c798dc9e8f81eb1ff`: [run 41931474550](https://github.com/inari-1234/baseball-navigator/actions/runs/41931474550), guard/contract/replay PASS and 90 unittest cases PASS. Synthetic unit fixtures do not establish unseen-source recognition accuracy.
+
+## Roster numeric ability reader (v1.3, 2026-11-05)
+
+Source owner: \`screen_reader.py\`. It now extracts **numeric ability fields only** on native iOS Ver1.42 \`2622×1206\` pages \`ROSTER_LIST\` 2/6 and 3/6. The existing page-header classifier is required: no recognized page, changed scale, or unsupported layout yields no numeric records.
+
+- Page 2: \`roster_batting_values.rows[1..7]\` each contains \`visible_row\`, \`batting\`, \`slugging\`, \`running\`.
+- Page 3: \`roster_pitching_values.rows[1..7]\` each contains \`visible_row\`, \`velocity_kmh\`, \`control\`, \`breaking\`.
+- Both types return \`status=PASS\` only if every numeric glyph in all seven visible rows is source-verified. On any unknown glyph (including unobserved \`9\`), missing value, or unexpected extra leading digit: the affected field is \`null\`, \`status=NEEDS_REVIEW\`, and its row is listed in \`errors\`. Do not silently truncate a two-/three-digit value.
+- Exact source-derived navy-pixel font signatures 0–8 are used; no general OCR, font scaling, rank E/F OCR, player-name mapping, scroll-position alignment, roster merging, in-game timestamp inference or live-state mutation is claimed. \`names_verified\`, \`player_identities_verified\`, \`ability_grades_verified\`, and \`live_state_current\` are all \`false\`. The JSON includes the source image SHA256.
+- The number reader is shared by the two page-specific APIs; the only differences are independently grounded column positions and field names.
+
+Actual-source review (screens in the user's Library, not placed in the repository; each native 2622×1206):
+| Image | Type | SHA256 | Manually cross-checked numeric cells |
+| --- | --- | --- | ---: |
+| IMG_8894.png | batting 2/6 | 216984a4e3ce56e65cb152eacaae168d3a3188dc455bca5a9c27bccc2b239a48 | 21/21 |
+| IMG_8895.png | batting 2/6 | 808f0ca72d81934cc1b83983fbb2ed71bc8cc106dc104abb98e57707b06fce98 | 21/21 |
+| IMG_8898.png | pitcher 3/6 | 2dbf3a0ea4d6c65f7ac950c75afc5c7df960c80c78548864eba6cecf1357083b | 21/21 |
+| IMG_8899.png | pitcher 3/6 | 03368ca8c1d5f994a331c37a4dcf634c4e10f8f50a3a696ee26773d1052a6637 | 21/21 |
+
+**84/84 is a same-source, source-family check, not an independent blind benchmark or unseen-game/font accuracy guarantee.** Screens 8894/8895 and 8898/8899 overlap in roster content, so this count is per visible numeric cell, not independent people. The generated code uses no private screenshots as test fixtures; CI uses synthesised silhouettes and state replay. For a new screenshot, review page and field consistency before accepting a roster observation.
+
+The current gameplay state is not changed. July matches remain complete and the present calendar/resources/HP are UNKNOWN. Future work requires independently corroborated row→player identity/scroll offset and new screenshots for unseen glyphs/layouts, plus separately grounded matchup/scoreboard recognition.
