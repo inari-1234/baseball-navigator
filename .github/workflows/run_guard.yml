@@ -16,6 +16,7 @@ on:
       - "CURRENT_LIVE_STATE.json"
       - "LIVE_EVENTS.jsonl"
       - "live_state_engine.py"
+      - "screen_reader.py"
       - "tests/**"
       - "docs/LIVE_OBSERVATION_CONTRACT.md"
       - "SAPPORO_SPRINT_STRATEGY.md"
@@ -65,6 +66,10 @@ jobs:
           python3 validate_decision_contract.py \
             --json-out "${RUNNER_TEMP}/DECISION_CONTRACT_RESULT.json"
           cat "${RUNNER_TEMP}/DECISION_CONTRACT_RESULT.json" >> "${GITHUB_STEP_SUMMARY}"
+
+      - name: Install screenshot reader image library
+        shell: bash
+        run: python3 -m pip install --disable-pip-version-check "Pillow==11.3.0"
 
       - name: Test live state ingestion and replay
         shell: bash
