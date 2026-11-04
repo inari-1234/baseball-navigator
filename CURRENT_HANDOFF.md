@@ -60,3 +60,11 @@ Repo change is the ingestion/reconciliation owner; `Excel-Tests` is not mutated.
 - A later source-linked USER_CORRECTION can replace only an earlier `HP_OBSERVATION.entries` extraction, not unrelated match/score events. The original raw event persists in the append-only event log; derived state includes `hp_corrected_by_event_id`.
 - Image-reading limitation remains: measured pixel segments are manually extracted. No automation is claimed to identify the player or derive exact game HP from a bar. Historical IMG_8932 is not current post-July HP.
 - Final acceptance evidence: Guard + Decision Contract + replay + expanded HP regressions on candidate and final main.
+
+## Screenshot pixel-reading v1 implementation boundary (2026-11-04)
+- `screen_reader.py` is the code owner for deterministic iOS 1.42 full-screen formation gauges. It classifies relevant result/list/world screen kinds but **does not read text or scores**.
+- Native screenshot `IMG_8932.png` (2622x1206, SHA256 d3966cd2762b991774e98e5b69feb48f069f7123447ef41fab7a2cf1aedca299) was read in the cloud working environment: 9/9 formation positions found. Graphical green fill: LF/CF/RF/P ~70.6%, SS/2B ~80.4%, 3B/1B/C ~90.2%. These are graphics, NOT game numeric HP and NOT fresh after July.
+- The same actual image was independently probed at 1311×603 and 1808×832 (nearest-neighbor scaling); all nine tracks detected at each scale. A structural-candidate evaluation fixed an earlier half-size detection failure.
+- 91 existing PNG screenshots were classified locally (no image bytes uploaded into the repo). Categories included 1 formation, 19 batter results, 11 pitcher results, 1 tournament, 39 world/overlay, 20 unsupported; **all category labels have not been independently human-reviewed**.
+- 14 synthetic reader tests + 62 preexisting tests run in CI. `propose_hp_event()` requires explicit verified position→name mapping and timeline anchor and is only a draft; the parser never writes `LIVE_EVENTS` by itself.
+- Remaining: automatic Japanese name recognition and numeric OCR; calibration of graphical bars to actual game HP; current post-July images. Do not claim automated general screenshot transcription.

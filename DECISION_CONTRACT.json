@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0",
-  "contract_version": "1.3.0",
+  "contract_version": "1.4.0",
   "status": "ACTIVE",
   "built_from": {
     "legacy_sources": [
@@ -490,6 +490,13 @@
       "type": "HARD_CONSTRAINT",
       "layer": "LIVE_EVIDENCE",
       "rule": "A HP reading needs a named player, evidence of player identity, screenshot/user source, period and accepted branch. Measure vertical green fill inside the inner usable track; visual fill is not a calibrated numeric HP percentage. About 80% is not full/near full. Expire HP after matches, training, items, resets. Hard numeric thresholds require explicitly exact user-reported HP or corroborated in-game calibration; uncertain HP-dependent claims must be refused."
+    },
+    {
+      "rule_id": "DC-SCREEN-001",
+      "status": "ACTIVE",
+      "type": "PROCESS",
+      "layer": "LIVE_EVIDENCE",
+      "rule": "For accessible v1.42 screenshot bytes, run a supported pixel/template screen reader before extracting gauges. The parser may recognize formation positions and graphical green fill, but MUST NOT claim Japanese name or numerical score OCR, assign a player without independently verified position mapping, convert the bar to exact game HP, or treat an older screenshot as current. Unsupported layouts fail closed; document source hash and recognition scope."
     }
   ],
   "material_event_names": [
@@ -519,6 +526,8 @@
     "replay_does_not_prove_visual_transcription": true,
     "hp_observation": "HP_OBSERVATION: source-bound visual inner-track geometry or directly user-reported percent, separate from actual numeric HP",
     "hp_stale_on": "MATCH/TRAINING/ITEM_USE, MATCHES_COMPLETED, ROLLBACK",
-    "hp_gate": "visual bars never prove full, near-full, or numeric thresholds"
+    "hp_gate": "visual bars never prove full, near-full, or numeric thresholds",
+    "image_pixel_reader": "screen_reader.py (formation gauges only, positions unbound to player names)",
+    "image_reader_scope": "Formation graphical fill+category classification; unsupported screen or text/digit fields remain UNKNOWN"
   }
 }

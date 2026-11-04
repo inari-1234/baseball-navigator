@@ -19,6 +19,7 @@ on:
       - "screen_reader.py"
       - "tests/**"
       - "docs/LIVE_OBSERVATION_CONTRACT.md"
+      - "docs/SCREEN_READER.md"
       - "SAPPORO_SPRINT_STRATEGY.md"
       - ".github/workflows/run_guard.yml"
   workflow_dispatch:
