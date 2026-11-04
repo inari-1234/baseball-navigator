@@ -167,6 +167,10 @@ def read_image(path: str | Path) -> dict[str, Any]:
         result = read_formation(im)
         if result["screen_type"] == "UNSUPPORTED":
             result["screen_type"] = _other_screen_type(im.convert("RGB"))
+        if result["screen_type"]=="BATTER_RESULTS":
+            result["batter_stats"]=read_batter_stats(im)
+        elif result["screen_type"]=="PITCHER_RESULTS":
+            result["pitcher_stats"]=read_pitcher_stats(im)
         result["image_size"] = [im.width, im.height]
     result["source"] = {
         "sha256": hashlib.sha256(raw).hexdigest(), "filename": path.name,
@@ -214,6 +218,202 @@ def propose_hp_event(reading: dict[str, Any], verified_names: dict[str, str],
         "period": {"year": year, "month": month},
         "branch": "ACCEPTED", "after_event_id": after_event_id, "entries": entries,
     }
+
+
+# Native v1.42 pixel-font glyph fingerprints. They are 12x16 (blue font)
+# and 10x14 (white pitcher panel) nearest-neighbor silhouettes. 9 is not
+# observed in the blue batting font; unfamiliar symbols fail closed.
+_BLUE_DIGITS: dict[str, tuple[int, ...]] = {
+    "0": (0x7fe7fee078f18f18f18f18f18f18f18f18f18f1e077fe7fe,
+          0x7fc7fcc078e38e38e38e38e38e38e38e38e38e3c077fc7fc),
+    "1": (0xffcffcc1cc1cc1cc1cc1cc1cc1cc1fc1fc03c03c1fffcffc,),
+    "2": (0xffffff801ff1ff17c77c7e3fe3f8f18f18f18f1e077fe7fe,
+          0xffffff803fe3fe3787787c7fc7f8e38e38e38e3c077fc7fc),
+    "3": (0x7fe7fee078f18f18ff8ffe09e098ff8ff8f18f1e077fe7fe,
+          0x7fc7fcc078e38e38ff8ffc1bc1b8ff8ff8e38e3c077fc7fc),
+    "4": (0x7f07f0e3f801801801801e31e3163763760760760e7f87f8,
+          0x7e07e0c7f803803803803c63c6346746740740741c7f87f8),
+    "5": (0x7fe7fee078f18f18f18f18ff8ff601601ff1ff1801ffffff,
+          0x7fc7fcc078e38e38e38e38ff8ff403403fe3fe3803ffffff),
+    "6": (0x7fc7fcc078e38e38e38e3c03c03fe3fe38e38e3c077fc7fc,
+          0x7fe7fee078f18f18f18f1e01e01ff1ff18f18f1e077fe7fe),
+    "7": (0x7e07e0460c60c6086086087f87f8e38e38e38e3803ffffff,),
+    "8": (0x7fc7fcc078e38e38e38e3c07c078e38e38e38e3c077fc7fc,),
+}
+_WHITE_DIGITS: dict[str, tuple[int, ...]] = {
+    ".": (0xfffffffffffffffffffffffffffffffffff,),
+    "0": (0x3f0fcc0f03c0f03c0f03c0f03c0f033f0fc,),
+    "1": (0xf83e0f83e0f83e0f83e0f83e0ffffff83e0,),
+    "2": (0xfffff00c030300c3c0f0c0300c0f033f0fc,),
+    "3": (0x3f0fcc0f03c03003c0f0c0300c0f033f0fc,),
+    "4": (0x300c0fffff30cc330cc3330cc3c0f0300c0,),
+    "5": (0x3fcffc0300c03003fcff00c0300c03fffff,),
+    "6": (0x3f0fcc0f03c0f033fcff00c03c0f033f0fc,),
+    "7": (0xc0300c0300c030300c0300c0c0300fffff,),
+    "8": (0x3f0fcc0f03c0f033f0fcc0f03c0f033f0fc,),
+    "9": (0x3f0fcc0f03c0300ff3fcc0f03c0f033f0fc,),
+}
+_BLUE_RGB=(29,73,153)
+_BATTER_Y=(256,437,617,798,979)
+_BATTER_NUM_X={"at_bats":1376,"hits":1569,"rbi":1768}
+
+
+def _pixel_font_fingerprint(occupied: list[list[bool]],
+                            width: int, height: int) -> int | None:
+    yy=[y for y,row in enumerate(occupied) if any(row)]
+    if not yy:
+        return None
+    xx=[x for x in range(len(occupied[0]))
+        if any(occupied[y][x] for y in range(len(occupied)))]
+    if not xx: return None
+    left,right,top,bottom=min(xx),max(xx),min(yy),max(yy)
+    cropped=Image.new("L",(right-left+1,bottom-top+1))
+    cropped.putdata([255 if occupied[y][x] else 0
+                     for y in range(top,bottom+1) for x in range(left,right+1)])
+    normalized=cropped.resize((width,height),Image.Resampling.NEAREST)
+    n=0
+    for i,v in enumerate(normalized.getdata()):
+        if v>127: n|=1<<i
+    return n
+
+
+def _nearest_digit(fp: int | None, alphabet: dict[str,tuple[int,...]],
+                   *, max_errors: int=2, min_margin: int=5) -> str | None:
+    if fp is None: return None
+    distances=sorted(((min((fp^template).bit_count() for template in variants),
+                        digit) for digit,variants in alphabet.items()))
+    best,digit=distances[0]
+    next_d=distances[1][0] if len(distances)>1 else 999
+    if best>max_errors or next_d-best<min_margin: return None
+    return digit
+
+
+def _font_mask(image: Image.Image, box: tuple[int,int,int,int],
+               color: tuple[int,int,int]) -> list[list[bool]]:
+    crop=image.crop(box).convert("RGB")
+    w,h=crop.size
+    pix=list(crop.getdata())
+    return [[pix[y*w+x]==color for x in range(w)] for y in range(h)]
+
+
+def _read_blue_cell(image: Image.Image, box: tuple[int,int,int,int]) -> int | None:
+    mask=_font_mask(image,box,_BLUE_RGB)
+    if sum(sum(row) for row in mask)<80:return None
+    digit=_nearest_digit(_pixel_font_fingerprint(mask,12,16),_BLUE_DIGITS)
+    return int(digit) if digit is not None else None
+
+
+def _read_batter_number(image: Image.Image, left: int, y: int) -> int | None:
+    # Fixed advance of 40 native pixels; never infer unseen tens as zero.
+    ones=_read_blue_cell(image,(left,y,left+41,y+46))
+    if ones is None: return None
+    tens=_read_blue_cell(image,(left-40,y,left+1,y+46))
+    return ones if tens is None else tens*10+ones
+
+
+def read_batter_stats(image: Image.Image) -> dict[str, Any]:
+    """Source-agnostic counts only: no player names or inferred match state."""
+    im=image.convert("RGB")
+    if im.size!=(BASE_W,BASE_H):
+        return {"status":"UNSUPPORTED_SCALE","rows":[],"team_total":None}
+    # On the second page, row 5 is the team-total strip rather than player 5.
+    anchor=im.getpixel((640,1004))
+    if all(c>235 for c in anchor):
+        page="TOP_1_TO_5"
+    elif 140<=anchor[0]<=190 and 155<=anchor[1]<=220 and anchor[2]>210:
+        page="BOTTOM_6_TO_9"
+    else:
+        return {"status":"UNSUPPORTED_PAGE","rows":[],"team_total":None}
+    records=[];errors=[]
+    for index,y in enumerate(_BATTER_Y):
+        values={field:_read_batter_number(im,x,y) for field,x in _BATTER_NUM_X.items()}
+        if any(v is None for v in values.values()):
+            errors.append(f"UNRECOGNIZED_GLYPH_ROW:{index+1}")
+        if values["at_bats"] is not None and values["hits"] is not None and values["hits"]>values["at_bats"]:
+            errors.append(f"INVALID_HITS_GT_AT_BATS_ROW:{index+1}")
+        records.append(values)
+    if page=="TOP_1_TO_5":
+        return {"status":"PASS" if not errors else "NEEDS_REVIEW",
+                "page":page,"rows":[{"lineup_slot":i+1,**v} for i,v in enumerate(records)],
+                "team_total":None,"errors":errors,"names_verified":False}
+    return {"status":"PASS" if not errors else "NEEDS_REVIEW",
+            "page":page,
+            "rows":[{"lineup_slot":i+6,**v} for i,v in enumerate(records[:4])],
+            "team_total":records[4],"errors":errors,"names_verified":False}
+
+
+def validate_batter_pages(top: dict[str, Any], bottom: dict[str, Any],
+                          *, verified_match_id: str | None=None) -> dict[str, Any]:
+    """Only a caller-verified common match permits page merge; never auto-pair."""
+    if not verified_match_id:
+        return {"status":"NEEDS_MATCH_ID","rows":[]}
+    if (top.get("page")!="TOP_1_TO_5" or bottom.get("page")!="BOTTOM_6_TO_9"
+        or top.get("status")!="PASS" or bottom.get("status")!="PASS"):
+        return {"status":"INVALID_PAGE_PAIR","rows":[]}
+    rows=top["rows"]+bottom["rows"]; total=bottom.get("team_total")
+    if not isinstance(total,dict):
+        return {"status":"MISSING_TOTAL","rows":[]}
+    sums={k:sum(row[k] for row in rows) for k in _BATTER_NUM_X}
+    if sums!=total:
+        return {"status":"TOTAL_MISMATCH","calculated":sums,"displayed":total,
+                "rows":[],"match_id":verified_match_id}
+    return {"status":"PASS","calculated":sums,"displayed":total,"rows":rows,
+            "match_id":verified_match_id,"names_verified":False}
+
+
+def _read_white_characters(image: Image.Image,
+                           box: tuple[int,int,int,int]) -> str | None:
+    mask=_font_mask(image,box,(255,255,255))
+    if not mask: return None
+    active=[x for x in range(len(mask[0])) if sum(row[x] for row in mask)>2]
+    if not active:return None
+    groups=[]
+    for x in active:
+        if not groups or x>groups[-1][-1]+1: groups.append([x])
+        else:groups[-1].append(x)
+    out=[]
+    for group in groups:
+        if len(group)<3:return None
+        cropped=[[row[x] for x in range(group[0],group[-1]+1)] for row in mask]
+        value=_nearest_digit(_pixel_font_fingerprint(cropped,10,14),
+                             _WHITE_DIGITS)
+        if value is None:return None
+        out.append(value)
+    return "".join(out)
+
+
+def read_pitcher_stats(image: Image.Image) -> dict[str, Any]:
+    """Native screenshot: pitching counts and cumulative panel fields."""
+    im=image.convert("RGB")
+    if im.size!=(BASE_W,BASE_H):
+        return {"status":"UNSUPPORTED_SCALE","fields":{}}
+    top_rects={
+        "innings_displayed":(1180,311,1230,357),
+        "hits_allowed":(1594,311,1641,357),
+        "runs_allowed":(1824,311,1867,357),
+    }
+    other_rects={
+        "earned_run_average":(900,396,1030,442),
+        "wins":(1460,396,1535,442),
+        "losses":(1850,396,1920,442),
+        "strikeouts":(1460,475,1535,525),
+        "walks":(1850,475,1920,525),
+    }
+    fields={key:_read_blue_cell(im,rect) for key,rect in top_rects.items()}
+    fields.update({key:_read_white_characters(im,rect)
+                   for key,rect in other_rects.items()})
+    errors=[f"UNRECOGNIZED:{key}" for key,val in fields.items() if val is None]
+    era=fields["earned_run_average"]
+    if era is not None and (
+            era.count(".")!=1 or not era.replace(".","").isdigit()
+            or len(era.split(".")[-1])!=2):
+        errors.append("INVALID_ERA_FORMAT")
+    for field in ("wins","losses","strikeouts","walks"):
+        value=fields[field]
+        if value is not None and not value.isdigit():errors.append(f"INVALID_DIGITS:{field}")
+        elif value is not None:fields[field]=int(value)
+    return {"status":"PASS" if not errors else "NEEDS_REVIEW",
+            "fields":fields,"errors":errors,"player_name_verified":False}
 
 
 def main():
