@@ -58,3 +58,12 @@ GitHub CI cannot validate the pixels, observe unsent future gameplay, or check e
 - A MATCH recommendation must specify both match_id and period, TRAIN requires all three players, actual Sports cost, and Cheer ON cost when applicable. ITEM/ACTIVITY actions must explicitly declare costs, even if zero.
 - Scope limitation: screenshot extraction is still a manual read, not independent pixel verification; evidence of source identity cannot prove a number was transcribed correctly.
 - ITEM action must declare a nonempty item/quantity selection even when inventory was observed; blank selection cannot bypass availability checks.
+
+## Vertical HP bar measurement and decision safety
+The formation/roster HP bar is vertical. Measure green inner fill divided by usable inner track height, excluding grey frame and dark headroom. Bind the bar to the selected named player or directly verified roster/position identity. This is a **graphical fill fraction, not game numeric HP**; the mapping is not yet calibrated.
+
+Example historical pixel fixture from user-supplied `IMG_8932.png` (June, not current): `center_x=1300, track_top=543, track_bottom=594, fill_top=557, edge_uncertainty=1`. Visually green fraction 37/51≈72.5%; conservative pixel reading 67..78%. It must not be described as HP=72.5% or as almost full.
+
+Record `HP_OBSERVATION` with `entries:[{player,reading_kind:"VERTICAL_BAR",identity_evidence:"SELECTED_PLAYER_PANEL",geometry_px:{center_x,track_top,track_bottom,fill_top,edge_uncertainty}}]`, screenshot source, period, accepted branch, and `after_event_id` referencing the immediately preceding live event if any. Other identity options: `VISIBLE_ROSTER_ROW`, `VERIFIED_FORMATION_SLOT`. An observation of the wrong month, unaccepted branch, unsourced player, or old post-mutation screen is stale/rejected.
+
+Direct user-quoted ~80% uses `USER_APPROX_PERCENT` with `reported_percent:80` and user source; only genuinely exact numeric user data may be `USER_EXACT_PERCENT`. A visual or approximate value never satisfies `hp_min_by_player` numeric thresholds. `hp_claims` checks FULL/NEAR_FULL against current observed evidence. State holds `hp_by_player` with freshness and provenance; accepted match, training, item or rollback invalidates the prior HP. A future image should be measured on its own. CI tests geometry logic and event sequencing, not actual screenshot recognition.

@@ -49,3 +49,9 @@ Repo change is the ingestion/reconciliation owner; `Excel-Tests` is not mutated.
 - All training counts are only confirmed in-log non-reverted executions; historical totals and hidden skill points remain UNKNOWN.
 - Pixel extraction accuracy is not proven by CI. Manual image comparison/source verification is still required; do not claim it has been automated.
 - Final v2 check: Run Guard, Decision Contract, event replay and 47-case regression on candidate branch; advance to main only after these PASS and re-read main.
+
+## HP gauge grounded-reading boundary (2026-11-04)
+- Inspected actual user's `IMG_8932.png` (2622×1206). Stone-pitcher 石渡's selected formation bar: inner track y543..594, green from y557..594 at x≈1300. Green graphical fraction 37/51 ≈72.5%, uncertainty 67..78% for ±1px; NOT an exact in-game HP value. Dark top and external frame are not fill.
+- `HP_OBSERVATION` stores player-identity evidence, source, period, branch and bar geometry or direct user numeric report. Uncalibrated bars cannot satisfy exact numerical HP gates or FULL/NEAR_FULL claims. HP is invalidated on match/training/item/rollback.
+- No current post-July HP image exists: actual present HP is UNKNOWN, historical June IMG_8932 must not be promoted as current.
+- CI verifies source-structured numerical geometry, chronology and action guards, NOT pixel segmentation, character recognition or true gauge-to-HP calibration.

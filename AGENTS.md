@@ -24,6 +24,8 @@ An event saying a match is *scheduled* is not proof of a played result. A user r
 
 Before actionable advice, check `CURRENT_LIVE_STATE.last_event_seq`, event ordering, completed periods, and resource freshness. Never reuse June resources after July match completion. On a match result, time change, reload, material resource spending, or correction, ingest the delta before recommending anything. If counters are stale, do not propose resource-paid training; request only the fresh counters actually needed.
 
+HP gauges are vertical green fill bars. Measure only the green part inside the usable inner track, not the grey border, dark gap, player icon, or team Cheer bar. Bind each observation to a visually grounded player and a source screenshot/branch. A graphical fill ratio is NOT a verified numeric game HP percentage. About 80% is neither full nor almost full. Record HP with HP_OBSERVATION; matches, training, item use and reloads expire prior HP. Do not use an uncertain visual bar to claim a precise HP threshold.
+
 Participant training counts are observations **only for recorded committed sessions**, not lifetime estimates. REJECTED retries and discarded rollback branches never increase the count. Never claim 4th-session skill-point thresholds from a partial record.
 
 Every actionable recommendation must be checked against `live_state_engine.validate_recommendation` semantics: ACTIVE rules, current state revision, not-yet-completed target, and available fresh resources. If the check fails, no action should be issued. The check is operationally required in chat; repository CI validates the event replay and regression tests, not the pixels of a screenshot or all ordinary chat replies.

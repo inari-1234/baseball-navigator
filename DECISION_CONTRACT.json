@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0",
-  "contract_version": "1.2.0",
+  "contract_version": "1.3.0",
   "status": "ACTIVE",
   "built_from": {
     "legacy_sources": [
@@ -483,6 +483,13 @@
       "type": "HARD_CONSTRAINT",
       "layer": "HARD_CONSTRAINT",
       "rule": "Before issuing an actionable recommendation, use the latest live event revision, ACTIVE rule IDs, and validated match/resource constraints. Reject actions targeting already completed matches and paid training when resource counters are stale or insufficient. TRAIN with Cheer ON requires explicitly checked Sports and Cheer costs; older-month target matches are never upcoming. ITEM actions must fail closed until inventory availability is verified."
+    },
+    {
+      "rule_id": "DC-HP-001",
+      "status": "ACTIVE",
+      "type": "HARD_CONSTRAINT",
+      "layer": "LIVE_EVIDENCE",
+      "rule": "A HP reading needs a named player, evidence of player identity, screenshot/user source, period and accepted branch. Measure vertical green fill inside the inner usable track; visual fill is not a calibrated numeric HP percentage. About 80% is not full/near full. Expire HP after matches, training, items, resets. Hard numeric thresholds require explicitly exact user-reported HP or corroborated in-game calibration; uncertain HP-dependent claims must be refused."
     }
   ],
   "material_event_names": [
@@ -504,11 +511,14 @@
     "period_level_completion": "CLOSE_REGISTERED_MATCHES_WITH_SCORE_UNKNOWN",
     "screenshot_reading": "MANUAL_SOURCE_LINKED_NOT_AUTOMATIC_OCR",
     "recommendation_requires_latest_event_seq": true,
-    "schema_version": "1.1",
+    "schema_version": "1.2",
     "rollback_semantics": "known restore_to_event_id discards subsequent active branch effects; unknown anchor blocks actions until evidenced recapture",
     "fresh_screen_after_mutation": "after_event_id must match last resource-invalidating event",
     "training_counts_scope": "recorded committed participants only; historical unrecorded training UNKNOWN",
     "supported_item_actions": "BLOCKED until a source-verified item inventory is modeled",
-    "replay_does_not_prove_visual_transcription": true
+    "replay_does_not_prove_visual_transcription": true,
+    "hp_observation": "HP_OBSERVATION: source-bound visual inner-track geometry or directly user-reported percent, separate from actual numeric HP",
+    "hp_stale_on": "MATCH/TRAINING/ITEM_USE, MATCHES_COMPLETED, ROLLBACK",
+    "hp_gate": "visual bars never prove full, near-full, or numeric thresholds"
   }
 }
