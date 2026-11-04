@@ -140,7 +140,7 @@ class ScorePixelReaderRegression(unittest.TestCase):
     """Deterministic digit silhouettes; real-game screenshot probes are external."""
     def test_blue_glyph_coverage_and_unknown(self):
         from screen_reader import _BLUE_DIGITS,_nearest_digit
-        self.assertEqual(set(_BLUE_DIGITS),"012345678")
+        self.assertEqual(set(_BLUE_DIGITS),set("012345678"))
         for digit,variants in _BLUE_DIGITS.items():
             for variant in variants:
                 self.assertEqual(_nearest_digit(variant,_BLUE_DIGITS),digit)
@@ -148,7 +148,7 @@ class ScorePixelReaderRegression(unittest.TestCase):
 
     def test_white_digits_0_to_9_and_decimal(self):
         from screen_reader import _WHITE_DIGITS,_nearest_digit
-        self.assertEqual(set(_WHITE_DIGITS),"0123456789.")
+        self.assertEqual(set(_WHITE_DIGITS),set("0123456789."))
         for digit,variants in _WHITE_DIGITS.items():
             for variant in variants:
                 self.assertEqual(_nearest_digit(variant,_WHITE_DIGITS),digit)
@@ -232,7 +232,7 @@ class ScorePixelReaderRegression(unittest.TestCase):
                 self._put(im,ch,x,y,_WHITE_DIGITS,(255,255,255))
                 x+=16
         result=read_pitcher_stats(im)
-        self.assertEqual(result["status"],"PASS")
+        self.assertEqual(result["status"],"PASS", result)
         self.assertEqual(result["fields"]["innings_displayed"],6)
         self.assertEqual(result["fields"]["hits_allowed"],3)
         self.assertEqual(result["fields"]["runs_allowed"],1)
