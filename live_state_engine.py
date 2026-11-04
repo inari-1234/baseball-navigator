@@ -233,7 +233,7 @@ def replay(events):
             clock=clock_minutes(e.get("clock"))
             stale=(historical or e.get("branch")!="ACCEPTED" or
                    (last_context_event_id is not None and after!=last_context_event_id) or
-                   (pk in closed and last_mutation_id is None) or
+                   (pk in closed and last_mutation_id is None and e.get("confirmed_after_period_completion") is not True) or
                    (last_screen_period==pk and last_screen_clock is not None and
                     clock is not None and clock<last_screen_clock and not e.get("confirmed_clock_reset")))
             if stale:
@@ -278,7 +278,7 @@ def replay(events):
                 m["classification"]=(("RESET_ASSISTED_WIN" if reset_assisted else "STABLE_WIN")
                     if a>b else ("DRAW" if a==b else "LOSS"))
                 if not historical:
-                    invalidate();state["current_exact_time"]="UNKNOWN";last_mutation_id=eid;last_context_event_id=eid;last_context_event_id=eid
+                    invalidate();state["current_exact_time"]="UNKNOWN";last_mutation_id=eid;last_context_event_id=eid
                     floor=max(floor,p) if floor else p
         elif kind=="MATCHES_COMPLETED":
             if e["source"]["kind"] not in {"USER_REPORT","USER_CORRECTION"}:
@@ -287,7 +287,7 @@ def replay(events):
             for m in matches.values():
                 if m["period"]==pk and m["status"]=="SCHEDULED":m["status"]="COMPLETED_SCORE_UNKNOWN"
             if not historical:
-                invalidate();state["current_exact_time"]="UNKNOWN";last_mutation_id=eid
+                invalidate();state["current_exact_time"]="UNKNOWN";last_mutation_id=eid;last_context_event_id=eid
                 floor=max(floor,p) if floor else p
         elif kind=="TRAINING":
             if e.get("branch")!="ACCEPTED":continue
@@ -308,7 +308,7 @@ def replay(events):
             state["training_history"].append({"event_id":eid,"drill":drill,"participants":list(players),
                 "drill_level":e.get("drill_level"),"cheer":e.get("cheer")})
             if not historical:
-                invalidate();state["current_exact_time"]="UNKNOWN";last_mutation_id=eid
+                invalidate();state["current_exact_time"]="UNKNOWN";last_mutation_id=eid;last_context_event_id=eid
                 floor=max(floor,p) if floor else p
         elif kind=="ITEM_USE":
             if e.get("branch")!="ACCEPTED":continue
@@ -325,7 +325,7 @@ def replay(events):
             state["item_effects"].append(item_entry)
             state["item_uses"].append(item_entry)
             if not historical:
-                invalidate();state["current_exact_time"]="UNKNOWN";last_mutation_id=eid
+                invalidate();state["current_exact_time"]="UNKNOWN";last_mutation_id=eid;last_context_event_id=eid
                 floor=max(floor,p) if floor else p
         elif kind=="ROLLBACK":
             invalidate();state["current_exact_time"]="UNKNOWN";last_mutation_id=eid;last_context_event_id=eid
