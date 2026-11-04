@@ -136,6 +136,55 @@ class ScreenReaderRegression(unittest.TestCase):
 
 
 
+class RosterPageRegression(unittest.TestCase):
+    """Synthesized masks; actual native images are verified outside GitHub."""
+    def _sample(self,page,with_title=True):
+        from screen_reader import _ROSTER_TITLE_MASK,_ROSTER_PAGE_MASKS
+        im=Image.new("RGB",(BASE_W,BASE_H),"white")
+        stamps=[]
+        if with_title:
+            stamps.append((_ROSTER_TITLE_MASK,(48,12),(1120,160,1375,220)))
+        stamps.append((_ROSTER_PAGE_MASKS[page],(12,16),(1390,163,1435,218)))
+        for bits,(w,h),(x1,y1,x2,y2) in stamps:
+            mask=Image.new("L",(w,h))
+            mask.putdata([255 if (bits>>i)&1 else 0 for i in range(w*h)])
+            mask=mask.resize((x2-x1,y2-y1),Image.Resampling.NEAREST)
+            im.paste((0,50,150),(x1,y1,x2,y2),mask)
+        return im
+
+    def test_native_roster_pages_1_to_6_are_classified_without_ocr(self):
+        from screen_reader import read_roster_page
+        for page in range(1,7):
+            with self.subTest(page=page):
+                read=read_roster_page(self._sample(page))
+                self.assertIsNotNone(read)
+                self.assertEqual(read["page_index"],page)
+                self.assertEqual(read["status"],"PAGE_ONLY")
+                self.assertFalse(read["names_verified"])
+                self.assertFalse(read["player_stats_verified"])
+                self.assertTrue(read["visible_rows_not_identified"])
+
+    def test_missing_title_or_unsupported_scale_fails_closed(self):
+        from screen_reader import read_roster_page
+        self.assertIsNone(read_roster_page(self._sample(2,with_title=False)))
+        self.assertIsNone(read_roster_page(
+            self._sample(2).resize((1311,603),Image.Resampling.NEAREST)))
+        self.assertIsNone(read_roster_page(Image.new("RGB",(BASE_W,BASE_H),"white")))
+
+    def test_roster_screen_reader_output_keeps_source_and_unknown_names(self):
+        from screen_reader import read_image
+        with tempfile.TemporaryDirectory() as tmp:
+            path=Path(tmp)/"roster.png"
+            self._sample(4).save(path)
+            digest=hashlib.sha256(path.read_bytes()).hexdigest()
+            read=read_image(path)
+        self.assertEqual(read["screen_type"],"ROSTER_LIST")
+        self.assertEqual(read["roster_page"]["page_index"],4)
+        self.assertFalse(read["roster_page"]["names_verified"])
+        self.assertEqual(read["positions"],{})
+        self.assertEqual(read["source"]["sha256"],digest)
+
+
 class ScorePixelReaderRegression(unittest.TestCase):
     """Deterministic digit silhouettes; real-game screenshot probes are external."""
     def test_blue_glyph_coverage_and_unknown(self):
