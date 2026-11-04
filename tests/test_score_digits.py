@@ -97,6 +97,19 @@ class ScoreDigitRegression(unittest.TestCase):
         self.assertEqual(outcome["status"],"ARITHMETIC_CONFLICT")
         self.assertIn("at_bats",outcome["mismatches"])
 
+    def test_unknown_two_digit_total_does_not_become_first_page(self):
+        im=batting_page(self.bottom,second=True)
+        px=im.load()
+        # Keep first glyph "2" and replace second digit by an unknown 41x46
+        # block. Width stays 81 pixels and page is still structurally TOTAL.
+        for y in range(979,1025):
+            for x in range(1377,1417):
+                px[x,y]=BLUE_COLORS[0]
+        result=read_batter_numbers(im)
+        self.assertEqual(result["page"],"BOTTOM_6_TO_9_AND_TOTAL")
+        self.assertEqual(result["status"],"PARTIAL_UNVERIFIED")
+        self.assertIsNone(result["rows"][4]["at_bats"])
+
     def test_wrong_page_rejected(self):
         top=read_batter_numbers(batting_page(self.top))
         self.assertEqual(reconcile_batter_pages(top,top)["status"],"PAGE_MISMATCH")
