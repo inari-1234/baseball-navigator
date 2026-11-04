@@ -52,7 +52,7 @@ def _find_track(image: Image.Image, center_x: int, top: int,
     x_radius = max(2, round(16*sx))
     y_radius = max(1, round(8*sy))
     inner_h = max(18, round(TRACK_HEIGHT*sy))
-    best = None
+    candidates = []
     for dy in range(-y_radius, y_radius+1):
         yy = top+dy
         if yy-round(9*sy) < 0 or yy+inner_h+round(4*sy) >= height:
@@ -73,47 +73,47 @@ def _find_track(image: Image.Image, center_x: int, top: int,
             if not all(checks):
                 continue
             displacement = abs(dx)/max(1, x_radius)+abs(dy)/max(1, y_radius)
-            if best is None or displacement < best[0]:
-                best = (displacement, xx, yy)
-    if best is None:
-        return None
-    _, xx, yy = best
+            candidates.append((displacement, xx, yy))
 
-    # Refine actual bar x-position by its green horizontal run (not just a
-    # nearby template coordinate). Zero-green bars retain the template centre.
-    edge_y = yy+inner_h-max(2, round(4*sy))
-    if _green(pix[xx, edge_y]):
-        left = right = xx
-        bound = max(10, round(27*sx))
-        while left > xx-bound and _green(pix[left-1, edge_y]):
-            left -= 1
-        while right < xx+bound and _green(pix[right+1, edge_y]):
-            right += 1
-        span = right-left+1
-        if round(23*sx) <= span <= round(38*sx):
-            xx = (left+right)//2
-
+    # The nearest template match may have a wrong fill boundary in downscaled
+    # pixel art. Test all structural candidates for one solid bottom green run.
     offsets = (-max(2, round(5*sx)), 0, max(2, round(5*sx)))
-    green_rows = []
-    for row in range(yy, yy+inner_h):
-        green_rows.append(sum(_green(pix[xx+d, row]) for d in offsets) >= 2)
-    count = sum(green_rows)
-    if any(green_rows[:inner_h-count]) or (count and not all(green_rows[inner_h-count:])):
-        return None
+    for _, xx, yy in sorted(candidates):
+        edge_y = yy+inner_h-max(2, round(4*sy))
+        if _green(pix[xx, edge_y]):
+            left = right = xx
+            bound = max(10, round(27*sx))
+            while left > xx-bound and _green(pix[left-1, edge_y]):
+                left -= 1
+            while right < xx+bound and _green(pix[right+1, edge_y]):
+                right += 1
+            span = right-left+1
+            if round(23*sx) <= span <= round(38*sx):
+                xx = (left+right)//2
 
-    edge = max(1, round(sy))
-    return {
-        "center_x": xx, "track_top": yy, "track_bottom_exclusive": yy+inner_h,
-        "fill_top": yy+inner_h-count if count else None,
-        "graphical_fill_estimate_pct": round(100*count/inner_h, 1),
-        "graphical_fill_range_pct": [
-            max(0, round(100*max(0, count-edge)/(inner_h+2*edge), 1)),
-            min(100, round(100*min(inner_h, count+edge)/(inner_h-2*edge), 1)),
-        ],
-        "green_height_px": count, "track_height_px": inner_h,
-        "visual_confidence": "TEMPLATE_VALIDATED_UNCALIBRATED",
-        "game_hp_percent": None,
-    }
+        green_rows = []
+        for row in range(yy, yy+inner_h):
+            green_rows.append(sum(_green(pix[xx+d, row]) for d in offsets) >= 2)
+        count = sum(green_rows)
+        if any(green_rows[:inner_h-count]) or (
+                count and not all(green_rows[inner_h-count:])):
+            continue
+
+        edge = max(1, round(sy))
+        return {
+            "center_x": xx, "track_top": yy,
+            "track_bottom_exclusive": yy+inner_h,
+            "fill_top": yy+inner_h-count if count else None,
+            "graphical_fill_estimate_pct": round(100*count/inner_h, 1),
+            "graphical_fill_range_pct": [
+                max(0, round(100*max(0, count-edge)/(inner_h+2*edge), 1)),
+                min(100, round(100*min(inner_h, count+edge)/(inner_h-2*edge), 1)),
+            ],
+            "green_height_px": count, "track_height_px": inner_h,
+            "visual_confidence": "TEMPLATE_VALIDATED_UNCALIBRATED",
+            "game_hp_percent": None,
+        }
+    return None
 
 
 def read_formation(image: Image.Image) -> dict[str, Any]:
