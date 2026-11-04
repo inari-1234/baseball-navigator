@@ -41,6 +41,12 @@ class ScreenReaderRegression(unittest.TestCase):
     def test_half_resolution_layout(self):
         self.assertEqual(len(read_formation(fixture(size=(1311, 603)))["positions"]), 9)
 
+    def test_nearest_neighbor_half_scale_pixel_art(self):
+        half = fixture().resize((1311, 603), Image.Resampling.NEAREST)
+        result = read_formation(half)
+        self.assertEqual(result["screen_type"], "FORMATION")
+        self.assertEqual(len(result["positions"]), 9)
+
     def test_slight_shift_tracked(self):
         result = read_formation(fixture(jitter=(8, 4)))
         self.assertEqual(result["screen_type"], "FORMATION")
