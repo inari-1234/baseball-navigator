@@ -635,6 +635,40 @@ class ItemUsePixelReaderRegression(unittest.TestCase):
         self.assertNotIn("item_use_event",result)
 
 
+class FastScreenRoutingRegression(unittest.TestCase):
+    def _fast(self,image):
+        with tempfile.TemporaryDirectory() as directory:
+            path=Path(directory)/"case.png"
+            image.save(path)
+            with unittest.mock.patch("screen_reader.read_formation",
+                    side_effect=AssertionError("unexpected HP scan")):
+                return read_image(path)
+
+    def test_item_and_roster_do_not_trigger_hp_search(self):
+        item=self._fast(ItemUsePixelReaderRegression()._synthetic())
+        self.assertEqual(item["screen_type"],"ITEM_USE_MENU")
+        roster=self._fast(RosterPageRegression()._sample(2))
+        self.assertEqual(roster["screen_type"],"ROSTER_LIST")
+        self.assertEqual(roster["roster_page"]["page_index"],2)
+
+    def test_result_panel_does_not_trigger_hp_search(self):
+        image=Image.new("RGB",(BASE_W,BASE_H),(85,124,233))
+        draw=ImageDraw.Draw(image)
+        draw.rectangle((1290,90,1310,110),fill=(223,0,3))
+        draw.rectangle((1290,280,1310,290),fill=(255,255,255))
+        self.assertEqual(self._fast(image)["screen_type"],"BATTER_RESULTS")
+
+    def test_formation_still_uses_hp_detector(self):
+        from screen_reader import read_formation
+        with tempfile.TemporaryDirectory() as directory:
+            path=Path(directory)/"formation.png"
+            fixture().save(path)
+            with unittest.mock.patch("screen_reader.read_formation",wraps=read_formation) as spy:
+                result=read_image(path)
+        self.assertEqual(result["screen_type"],"FORMATION")
+        spy.assert_called_once()
+
+
 class ScorePixelReaderRegression(unittest.TestCase):
     """Deterministic digit silhouettes; real-game screenshot probes are external."""
     def test_blue_glyph_coverage_and_unknown(self):
