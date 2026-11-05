@@ -329,6 +329,128 @@ class RosterBattingNumberRegression(unittest.TestCase):
         )["status"],"UNSUPPORTED_SCALE")
 
 
+class RosterIdentityLinkRegression(unittest.TestCase):
+    """Synthetic sprite evidence; no private gameplay screenshot is stored."""
+    def _image(self, page, order, stats=None):
+        from screen_reader import _ROSTER_BATTING_ROW_Y
+        if page == 1:
+            im = RosterPageRegression()._sample(1)
+        else:
+            im = RosterBattingNumberRegression()._image(stats, page=page)
+        draw = ImageDraw.Draw(im)
+        for row, player_idx in enumerate(order):
+            top = _ROSTER_BATTING_ROW_Y[row]
+            color = (20+player_idx*21, 50+player_idx*13, 70+player_idx*12)
+            draw.rectangle((838, top-22, 872, top+22), fill=color)
+            draw.rectangle((848, top-27, 856, top+27), fill=(12, 19, 25))
+            draw.rectangle((854, top-14, 861, top-9), fill=color)
+        return im
+
+    def _sources(self, directory, *, conflict=False, unknown=False):
+        names = [f"Player-{i}" for i in range(9)]
+        orders = [list(range(7)), list(range(2, 9))]
+        name_pages = []
+        for i, order in enumerate(orders):
+            image = self._image(1, order)
+            path = Path(directory)/f"name{i}.png"
+            image.save(path)
+            name_pages.append({
+                "path": path,
+                "verified_names": {row+1:names[p]
+                                   for row,p in enumerate(order)}
+            })
+        ability_pages = []
+        for page in [2, 3]:
+            for i, order in enumerate(orders):
+                stats = ([(10+p, 20+p, 30+p) for p in order] if page == 2 else
+                         [(80+p, 10+p, 20+p) for p in order])
+                if conflict and page == 2 and i == 1:
+                    stats[0] = (18, stats[0][1], stats[0][2])
+                img = self._image(page, order, stats)
+                if unknown and page == 2 and i == 0:
+                    self._stamp_unknown_avatar(img, 1)
+                path = Path(directory)/f"stat{page}-{i}.png"
+                img.save(path)
+                ability_pages.append(path)
+        return name_pages, ability_pages
+
+    def _stamp_unknown_avatar(self, im, row):
+        from screen_reader import _ROSTER_BATTING_ROW_Y
+        top = _ROSTER_BATTING_ROW_Y[row-1]
+        draw = ImageDraw.Draw(im)
+        draw.rectangle((822, top-30, 885, top+39), fill="white")
+        draw.rectangle((838, top-22, 872, top+22), fill=(0, 0, 130))
+        draw.rectangle((848, top-27, 856, top+27), fill=(12, 19, 25))
+
+    def _link(self, names, stats, **changes):
+        from screen_reader import link_verified_roster_pages
+        kwargs={"run_id":"synthetic-run", "snapshot_evidence":"synthetic-same-save",
+                "confirmed_same_snapshot":True}
+        kwargs.update(changes)
+        return link_verified_roster_pages(names, stats, **kwargs)
+
+    def test_scroll_and_page_shift_preserve_verified_face_identity(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            name_pages, ability_pages = self._sources(tmp)
+            result = self._link(name_pages, ability_pages)
+        self.assertEqual(result["status"], "PASS_DRAFT", result["errors"])
+        self.assertEqual(len(result["records"]), 28)
+        self.assertFalse(result["name_ocr_performed"])
+        self.assertFalse(result["live_state_current"])
+        self.assertTrue(result["requires_manual_acceptance"])
+        self.assertEqual(len(result["reference_image_sha256"]), 2)
+        by_name = {}
+        for item in result["records"]:
+            self.assertEqual(len(item["image_sha256"]), 64)
+            self.assertGreaterEqual(item["portrait_score"], 0.70)
+            by_name.setdefault(item["player_name"], {}).update(item["fields"])
+        self.assertEqual(set(by_name), {f"Player-{i}" for i in range(9)})
+        self.assertEqual(by_name["Player-2"]["batting"], 12)
+        self.assertEqual(by_name["Player-2"]["velocity_kmh"], 82)
+        self.assertEqual(by_name["Player-8"]["running"], 38)
+
+    def test_unknown_face_and_missing_snapshot_evidence_are_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            name_pages, ability_pages = self._sources(tmp, unknown=True)
+            result = self._link(name_pages, ability_pages)
+            missing = self._link(name_pages, ability_pages,
+                                 confirmed_same_snapshot=False)
+        self.assertEqual(result["status"], "NEEDS_REVIEW")
+        self.assertEqual(result["records"], [])
+        self.assertTrue(any("AMBIGUOUS_AVATAR" in e for e in result["errors"]))
+        self.assertEqual(missing["status"], "NEEDS_SNAPSHOT_ATTESTATION")
+        self.assertEqual(missing["records"], [])
+
+    def test_cross_scroll_conflicting_stats_fail_closed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            name_pages, ability_pages = self._sources(tmp, conflict=True)
+            result = self._link(name_pages, ability_pages)
+        self.assertEqual(result["status"], "NEEDS_REVIEW")
+        self.assertEqual(result["records"], [])
+        self.assertTrue(any("CONFLICTING_ABILITY" in e for e in result["errors"]))
+
+    def test_two_names_sharing_same_portrait_are_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            name_pages, ability_pages = self._sources(tmp)
+            # Mistakenly label the first two rows with different names while
+            # both rows show the same sprite; identity cannot be inferred.
+            im = self._image(1, [0, 0, 2, 3, 4, 5, 6])
+            im.save(name_pages[0]["path"])
+            result = self._link(name_pages, ability_pages)
+        self.assertEqual(result["status"], "AMBIGUOUS_NAME_PORTRAITS")
+        self.assertEqual(result["records"], [])
+
+    def test_conflicting_name_page_sprites_and_absent_labels_fail(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            name_pages, ability_pages = self._sources(tmp)
+            name_pages[1]["verified_names"][1] = "Player-0"
+            bad = self._link(name_pages, ability_pages)
+            del name_pages[0]["verified_names"][7]
+            missing = self._link(name_pages, ability_pages)
+        self.assertEqual(bad["status"], "CONFLICTING_NAME_REFERENCE")
+        self.assertEqual(bad["records"], [])
+        self.assertEqual(missing["status"], "NEEDS_VERIFIED_NAMES")
+
 class ScorePixelReaderRegression(unittest.TestCase):
     """Deterministic digit silhouettes; real-game screenshot probes are external."""
     def test_blue_glyph_coverage_and_unknown(self):
