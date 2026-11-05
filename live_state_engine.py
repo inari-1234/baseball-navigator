@@ -473,12 +473,15 @@ def observed_item_effect_samples(state):
         if not isinstance(name,str) or not name.strip() or not isinstance(delta,dict):
             continue
         by_item=result.setdefault(name,{"sample_n":0,"event_ids":[],
-                                        "deltas_by_metric":{}})
+                                        "deltas_by_metric":{},
+                                        "metric_event_ids":{}})
         by_item["sample_n"]+=1
         by_item["event_ids"].append(entry["event_id"])
         for metric,value in delta.items():
             if isinstance(metric,str) and type(value) is int:
                 by_item["deltas_by_metric"].setdefault(metric,[]).append(value)
+                by_item["metric_event_ids"].setdefault(metric,[]).append(
+                    entry["event_id"])
     return result
 
 
@@ -546,7 +549,8 @@ def prioritize_item_use_drafts(state,contract,options):
             "category":category,"priority_tier":tier,"priority_reason":why,
             "effect_metric":metric,"observed_single_use_deltas":list(samples),
             "observed_sample_n":len(samples),
-            "source_event_ids":list(observed[item]["event_ids"]),
+            "source_event_ids":list(
+                observed[item]["metric_event_ids"][metric]),
             "context_evidence_id":evidence,"action_draft":rec,
         })
     reviews.sort(key=lambda r:(-r["priority_tier"],r["candidate_index"]))
