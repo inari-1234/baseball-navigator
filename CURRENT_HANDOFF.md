@@ -3,6 +3,12 @@
 Last updated: 2026-11-06
 State: ACTIVE_Y1_JUNE_POST_ROLLBACK_CAPTURE — SAVEPOINT_UNKNOWN
 
+## Fast gameplay path (2026-11-06)
+- **Use `docs/FAST_PLAY_PROTOCOL.md`** for routine image questions: QUICK native screen classification and immediately useful sourced observations, DELTA ingestion only if the current state changed, FULL GitHub research/code/test work only for requested implementation, safety-significant contradiction or configured trigger. BOOT remains mandatory at new-chat/context-loss; reuse unchanged loaded authorities within the same chat.
+- `screen_reader.read_image` now prioritizes verified fixed item-use, roster and score-panel signatures **before** nine-position HP gauge scanning; formations still run the full HP detector. Source hash and unsupported glyph/field fail-closed behavior are preserved.
+- The change is latency engineering, not new OCR support or proof of lower wall-clock runtime. Regression tests verify routing; measure real-image elapsed times before claiming quantitative speedups. Normal screenshot answers should not await repository commit/CI unless the user asked to implement or audit.
+- Current run authority remains: Y1 June PM5:20 after user-confirmed rollback; exact restored SAVE anchor unknown; July 3 matches scheduled; four visible item icons do not make full inventory verified. No gameplay state or event was changed by this performance patch.
+
 ## Canonical runtime
 Read `AGENTS.md`, `RUN_GUARD_POLICY.yaml`, `DECISION_CONTRACT.json`, `CURRENT_LIVE_STATE.json`, this handoff, ledger/log, then Sprint strategy. The event log `LIVE_EVENTS.jsonl` is the underlying evidence, not a separate conflicting current state.
 
