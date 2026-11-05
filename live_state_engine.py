@@ -108,6 +108,15 @@ def apply_corrections(events):
             continue
         if target not in base or not isinstance(patch,dict) or not patch:
             raise ObservationError("correction needs earlier target and nonempty patch")
+        if "completion_retracted" in patch:
+            if (set(patch)!={"completion_retracted"}
+                    or patch["completion_retracted"] is not True
+                    or base[target]["kind"]!="MATCHES_COMPLETED"
+                    or e["source"]["kind"]!="USER_CORRECTION"
+                    or base[target].get("completion_retracted_by_event_id")):
+                raise ObservationError("completion retraction needs user correction targeting a completion event")
+            base[target]["completion_retracted_by_event_id"]=e["event_id"]
+            continue
         if "entries" in patch:
             if (base[target]["kind"]!="HP_OBSERVATION" or set(patch)!={"entries"} or
                 e["source"]["kind"]!="USER_CORRECTION" or not isinstance(patch["entries"],list) or
@@ -179,6 +188,8 @@ def replay(events):
            "matches":{},"completed_match_periods":[],"skills":[],
            "training_counts_by_player_drill":{},"training_counts_observed":{},"training_history":[],
            "item_effects":[],"item_uses":[],"inventory":{"fresh":False,"items":None},
+           "visible_item_slots":{"fresh":False,"rows":[],"source_event_id":None,
+                                 "complete_inventory":False},
            "observations_ignored_as_stale":[],"reverted_event_ids":discarded,
            "discarded_branch_event_ids":discarded,"rollback_count":rollback_count,
            "timeline_status":"UNKNOWN_AFTER_ROLLBACK" if unknown_after_rollback else "TRUSTED",
@@ -191,6 +202,7 @@ def replay(events):
         state["resources"]["values"]=None
         state["inventory"]["fresh"]=False
         state["inventory"]["items"]=None
+        state["visible_item_slots"]["fresh"]=False
         for value in state["hp_by_player"].values():value["fresh"]=False
     for e in active:
         kind=e["kind"];p=period(e);pk=label(p);eid=e["event_id"]
@@ -211,11 +223,47 @@ def replay(events):
                 state["observations_ignored_as_stale"].append(eid)
                 continue
             current_clock=clock_minutes(e.get("clock"))
-            if last_screen_period==pk and last_screen_clock is not None and current_clock is not None and current_clock<last_screen_clock and not e.get("confirmed_clock_reset"):
-                state["observations_ignored_as_stale"].append(eid)
-                continue
+            clock_regressed=(last_screen_period==pk and
+                last_screen_clock is not None and current_clock is not None
+                and current_clock<last_screen_clock and not e.get("confirmed_clock_reset"))
+            if clock_regressed:
+                attested=(e.get("user_attested_current") is True
+                    and isinstance(e.get("user_attestation_locator"),str)
+                    and bool(e["user_attestation_locator"].strip()))
+                if not attested:
+                    state["observations_ignored_as_stale"].append(eid)
+                    continue
+                # User confirms this is the current screen, not the cause of
+                # the earlier in-game clock. A SAVE/LOAD cannot be assumed.
+                state["timeline_status"]="UNRESOLVED_CAPTURE_CHRONOLOGY"
             state["last_seen_screen_period"]=pk
             state["resources"]={"fresh":True,"values":{k:vals[k] for k in COUNTERS},"last_observed":eid}
+            slots=e.get("visible_item_slots")
+            if slots is not None:
+                if not isinstance(slots,list) or not slots:
+                    raise ObservationError(f"{eid}: invalid visible item slots")
+                parsed=[];seen_slots=set()
+                for row in slots:
+                    if not isinstance(row,dict):
+                        raise ObservationError(f"{eid}: invalid item row")
+                    idx=row.get("slot");name=row.get("item")
+                    assigned=row.get("assigned");capacity=row.get("display_denominator")
+                    if (type(idx) is not int or idx<1 or idx in seen_slots
+                            or not isinstance(name,str) or not name.strip()
+                            or type(assigned) is not int or assigned<0
+                            or type(capacity) is not int or capacity<1
+                            or assigned>capacity):
+                        raise ObservationError(f"{eid}: invalid item slot label/count")
+                    stock=row.get("separately_verified_stock")
+                    if stock is not None and (type(stock) is not int or stock<0):
+                        raise ObservationError(f"{eid}: invalid separate stock")
+                    seen_slots.add(idx)
+                    parsed.append({"slot":idx,"item":name,"assigned":assigned,
+                        "display_denominator":capacity,
+                        "separately_verified_stock":stock})
+                state["visible_item_slots"]={
+                    "fresh":True,"rows":parsed,"source_event_id":eid,
+                    "complete_inventory":False}
             inventory=e.get("inventory")
             if inventory is not None:
                 if not isinstance(inventory,dict) or any(not isinstance(k,str) or type(v) is not int or v<0 for k,v in inventory.items()):
@@ -289,6 +337,8 @@ def replay(events):
                     invalidate();state["current_exact_time"]="UNKNOWN";last_mutation_id=eid;last_context_event_id=eid
                     floor=max(floor,p) if floor else p
         elif kind=="MATCHES_COMPLETED":
+            if e.get("completion_retracted_by_event_id"):
+                continue
             if e["source"]["kind"] not in {"USER_REPORT","USER_CORRECTION"}:
                 raise ObservationError(f"{eid}: period completion requires user assertion")
             closed.add(pk)
@@ -361,6 +411,8 @@ def validate_recommendation(rec,state,contract):
         errors.append("ACTION_TYPE_REQUIRED")
     if state.get("timeline_status")=="UNKNOWN_AFTER_ROLLBACK":
         errors.append("UNRESOLVED_ROLLBACK")
+    if state.get("timeline_status")=="UNRESOLVED_CAPTURE_CHRONOLOGY":
+        errors.append("UNRESOLVED_CAPTURE_CHRONOLOGY")
     if action_type=="MATCH":
         if not rec.get("target_match_id"):errors.append("MATCH_ID_REQUIRED")
         if not rec.get("target_period"):errors.append("MATCH_PERIOD_REQUIRED")
