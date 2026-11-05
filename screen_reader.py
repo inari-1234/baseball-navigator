@@ -318,6 +318,163 @@ def read_roster_pitching_values(image: Image.Image) -> dict[str, Any]:
         image, page_index=3, columns=_ROSTER_PITCHING_COLUMNS, label="PITCHING")
 
 
+
+# Native iOS v1.42 roster portrait ROI, indexed by visible row, NOT by
+# player or persistent roster order. Avatar matching is local to a verified
+# same-snapshot set; globally identical portraits are not player identities.
+_ROSTER_PORTRAIT_X = (822, 886)
+_ROSTER_PORTRAIT_Y_REL = (-30, 40)
+
+
+def _roster_portrait_pixels(image: Image.Image, visible_row: int) -> list[tuple[int,int,int]]:
+    if not 1 <= visible_row <= len(_ROSTER_BATTING_ROW_Y):
+        raise ValueError("invalid visible row")
+    top = _ROSTER_BATTING_ROW_Y[visible_row - 1]
+    x1, x2 = _ROSTER_PORTRAIT_X
+    y1, y2 = _ROSTER_PORTRAIT_Y_REL
+    return list(image.crop((x1, top+y1, x2, top+y2)).convert("RGB").getdata())
+
+
+def _roster_portrait_similarity(a: list[tuple[int,int,int]],
+                                b: list[tuple[int,int,int]]) -> float:
+    """Exact overlapping foreground RGB pixels / foreground union.
+
+    White and cyan row backgrounds are ignored; no learned classifier,
+    facial identity recognition or Japanese OCR is involved.
+    """
+    if len(a) != len(b):
+        return 0.0
+    hit = union = 0
+    for aa, bb in zip(a, b):
+        fa = aa[0] < 230 and aa[1] < 216 and aa[2] < 220
+        fb = bb[0] < 230 and bb[1] < 216 and bb[2] < 220
+        if fa or fb:
+            union += 1
+            if fa and fb and aa == bb:
+                hit += 1
+    return hit / union if union >= 500 else 0.0
+
+
+def link_verified_roster_pages(
+        name_pages: list[dict[str, Any]],
+        ability_pages: list[str | Path],
+        *, run_id: str, snapshot_evidence: str,
+        confirmed_same_snapshot: bool) -> dict[str, Any]:
+    """Draft source-linked roster joins; manual row-name labels are required.
+
+    name_pages: [{"path": image_path,
+                  "verified_names": {1: "name", ..., 7: "name"}}].
+    All screenshots MUST be independently confirmed to belong to one
+    unchanged run/snapshot. Avatar similarity alone cannot establish that.
+    Never mutate LIVE_EVENTS, CURRENT_LIVE_STATE or a player record here.
+    """
+    base = {"status": "NEEDS_REVIEW", "records": [], "errors": [],
+            "name_ocr_performed": False, "live_state_current": False,
+            "snapshot_evidence": snapshot_evidence}
+    if (not confirmed_same_snapshot or not run_id.strip()
+            or not snapshot_evidence.strip()):
+        return {**base, "status": "NEEDS_SNAPSHOT_ATTESTATION"}
+    if not name_pages or not ability_pages:
+        return {**base, "status": "MISSING_SOURCE_PAGES"}
+    atlas: dict[str, list[tuple[list[tuple[int,int,int]], str, int]]] = {}
+    reference_hashes = []
+    for item in name_pages:
+        if not isinstance(item, dict) or not isinstance(item.get("verified_names"), dict):
+            return {**base, "status": "NEEDS_VERIFIED_NAMES"}
+        path = Path(item["path"])
+        reading = read_image(path)
+        if (reading.get("screen_type") != "ROSTER_LIST"
+                or reading.get("roster_page", {}).get("page_index") != 1):
+            return {**base, "status": "INVALID_NAME_PAGE"}
+        labels = item["verified_names"]
+        if set(labels) != set(range(1, 8)):
+            return {**base, "status": "NEEDS_VERIFIED_NAMES"}
+        sha = reading["source"]["sha256"]
+        reference_hashes.append(sha)
+        with Image.open(path) as im:
+            for row in range(1, 8):
+                name = labels[row]
+                if not isinstance(name, str) or not name.strip():
+                    return {**base, "status": "NEEDS_VERIFIED_NAMES"}
+                avatar = _roster_portrait_pixels(im, row)
+                atlas.setdefault(name, []).append((avatar, sha, row))
+    # A name must have a repeatable portrait, and two different names may not
+    # share a matching portrait in the declared snapshot. Reject collisions
+    # instead of relying on nearby rows, uniform levels, or list order.
+    names = list(atlas)
+    for name, entries in atlas.items():
+        anchor = entries[0][0]
+        if any(_roster_portrait_similarity(anchor, entry[0]) < 0.70
+               for entry in entries[1:]):
+            return {**base, "status": "CONFLICTING_NAME_REFERENCE"}
+    for i, name in enumerate(names):
+        for other in names[i+1:]:
+            if any(_roster_portrait_similarity(a[0], b[0]) >= 0.70
+                   for a in atlas[name] for b in atlas[other]):
+                return {**base, "status": "AMBIGUOUS_NAME_PORTRAITS"}
+
+    records, errors = [], []
+    observed: dict[str, dict[str, int]] = {}
+    for source in ability_pages:
+        path = Path(source)
+        reading = read_image(path)
+        page = reading.get("roster_page", {}).get("page_index")
+        key = {2: "roster_batting_values", 3: "roster_pitching_values"}.get(page)
+        values = reading.get(key) if key else None
+        if reading.get("screen_type") != "ROSTER_LIST" or not values:
+            errors.append(f"UNSUPPORTED_ABILITY_PAGE:{path.name}")
+            continue
+        if values.get("status") != "PASS":
+            errors.append(f"UNVERIFIED_ABILITY_NUMBERS:{path.name}")
+            continue
+        with Image.open(path) as im:
+            for row in values["rows"]:
+                portrait = _roster_portrait_pixels(im, row["visible_row"])
+                scores = sorted(
+                    ((max(_roster_portrait_similarity(portrait, entry[0])
+                          for entry in entries), name)
+                     for name, entries in atlas.items()), reverse=True)
+                best, name = scores[0]
+                second = scores[1][0] if len(scores) > 1 else 0.0
+                if best < 0.70 or best-second < 0.20:
+                    errors.append(f"AMBIGUOUS_AVATAR:{path.name}:row{row['visible_row']}")
+                    continue
+                fields = {field: value for field, value in row.items()
+                          if field != "visible_row"}
+                prior = observed.setdefault(name, {})
+                if any(field in prior and prior[field] != value
+                       for field, value in fields.items()):
+                    errors.append(f"CONFLICTING_ABILITY:{name}:{path.name}")
+                    continue
+                prior.update(fields)
+                records.append({
+                    "player_name": name, "visible_row": row["visible_row"],
+                    "roster_page": page, "fields": fields,
+                    "image_sha256": reading["source"]["sha256"],
+                    "name_page_sha256": sorted(set(x[1] for x in atlas[name])),
+                    "portrait_score": round(best, 3),
+                    "manual_name_verification_required": True,
+                })
+    # A duplicate portrait cannot produce two different players on a single
+    # page even if a reference set was mistakenly supplied.
+    for source in ability_pages:
+        matching = [r for r in records if r["image_sha256"] ==
+                    __source_digest(Path(source))]
+        seen = [r["player_name"] for r in matching]
+        if len(seen) != len(set(seen)):
+            errors.append(f"DUPLICATE_IDENTITY:{Path(source).name}")
+    return {"status": "PASS_DRAFT" if not errors and records else "NEEDS_REVIEW",
+            "run_id": run_id, "snapshot_evidence": snapshot_evidence,
+            "reference_image_sha256": sorted(set(reference_hashes)),
+            "records": records if not errors else [],
+            "errors": errors, "name_ocr_performed": False,
+            "live_state_current": False, "requires_manual_acceptance": True}
+
+
+def __source_digest(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
 def read_image(path: str | Path) -> dict[str, Any]:
     path = Path(path)
     raw = path.read_bytes()
