@@ -355,6 +355,131 @@ def _roster_portrait_similarity(a: list[tuple[int,int,int]],
     return hit / union if union >= 500 else 0.0
 
 
+
+# Known-name text templates: source-verified labels only, not open-vocabulary
+# Japanese OCR. The normalized ROI is in full native iOS v1.42 pixels.
+_ROSTER_NAME_X1, _ROSTER_NAME_X2 = 922, 1352
+_ROSTER_NAME_Y_TOP, _ROSTER_NAME_Y_BOTTOM = -26, 36
+
+
+def _roster_name_ink(image: Image.Image, visible_row: int) -> frozenset[int]:
+    """Extract dark neutral text pixels, independently of cyan/white row fill."""
+    if not 1 <= visible_row <= len(_ROSTER_BATTING_ROW_Y):
+        raise ValueError("invalid roster row")
+    y = _ROSTER_BATTING_ROW_Y[visible_row-1]
+    crop = image.crop((_ROSTER_NAME_X1, y+_ROSTER_NAME_Y_TOP,
+                       _ROSTER_NAME_X2, y+_ROSTER_NAME_Y_BOTTOM)).convert("RGB")
+    return frozenset(
+        i for i, (r, g, b) in enumerate(crop.getdata())
+        if r < 140 and g < 140 and b < 140 and abs(r-g) < 5
+    )
+
+
+def _roster_text_similarity(a: frozenset[int], b: frozenset[int]) -> float:
+    if len(a) < 200 or len(b) < 200:
+        return 0.0
+    union = len(a | b)
+    return len(a & b)/union if union else 0.0
+
+
+def match_verified_roster_names(
+        reference_pages: list[dict[str, Any]], target_page: str | Path,
+        *, run_id: str, snapshot_evidence: str,
+        confirmed_same_snapshot: bool) -> dict[str, Any]:
+    """Closed-set replay of independently verified Japanese name *images*.
+
+    The known text glyph silhouettes and their manually checked names are
+    supplied at call time. Unknown names are NULL, never extrapolated from
+    a lookalike. These drafts MUST NOT feed `verified_names` automatically.
+    """
+    base = {"status": "NEEDS_REVIEW", "rows": [], "errors": [],
+            "japanese_ocr_performed": False, "live_state_current": False,
+            "requires_manual_acceptance": True}
+    if (not isinstance(run_id, str) or not run_id.strip()
+            or not isinstance(snapshot_evidence, str)
+            or not snapshot_evidence.strip() or not confirmed_same_snapshot):
+        return {**base, "status": "NEEDS_SNAPSHOT_ATTESTATION"}
+    if not reference_pages:
+        return {**base, "status": "NEEDS_VERIFIED_NAME_REFERENCES"}
+
+    target_path = Path(target_page)
+    target = read_image(target_path)
+    if (target.get("screen_type") != "ROSTER_LIST"
+            or target.get("roster_page", {}).get("page_index") != 1):
+        return {**base, "status": "UNSUPPORTED_TARGET_NAME_PAGE"}
+    target_sha = target["source"]["sha256"]
+    atlas: dict[str, list[tuple[frozenset[int], str]]] = {}
+    source_shas = []
+    for item in reference_pages:
+        if not isinstance(item, dict) or not isinstance(item.get("verified_names"), dict):
+            return {**base, "status": "NEEDS_VERIFIED_NAME_REFERENCES"}
+        path = Path(item["path"])
+        reading = read_image(path)
+        if (reading.get("screen_type") != "ROSTER_LIST"
+                or reading.get("roster_page", {}).get("page_index") != 1):
+            return {**base, "status": "UNSUPPORTED_REFERENCE_NAME_PAGE"}
+        sha = reading["source"]["sha256"]
+        if sha == target_sha:
+            return {**base, "status": "SELF_REFERENCE_NOT_VALIDATION"}
+        labels = item["verified_names"]
+        if set(labels) != set(range(1, 8)):
+            return {**base, "status": "NEEDS_VERIFIED_NAME_REFERENCES"}
+        if len(set(labels.values())) != 7 or any(
+                not isinstance(n, str) or not n.strip() for n in labels.values()):
+            return {**base, "status": "AMBIGUOUS_REFERENCE_NAMES"}
+        source_shas.append(sha)
+        with Image.open(path) as im:
+            for row in range(1, 8):
+                atlas.setdefault(labels[row], []).append(
+                    (_roster_name_ink(im, row), sha))
+    if len(atlas) < 2:
+        return {**base, "status": "INSUFFICIENT_NAME_REFERENCES"}
+    # A name's different reference images must agree, and distinct labels
+    # must not share an indistinguishable text silhouette.
+    names = list(atlas)
+    for n, records in atlas.items():
+        if any(_roster_text_similarity(records[0][0], rec[0]) < 0.70
+               for rec in records[1:]):
+            return {**base, "status": "CONFLICTING_NAME_TEMPLATES"}
+    for i, first in enumerate(names):
+        for second in names[i+1:]:
+            if any(_roster_text_similarity(x[0], y[0]) >= 0.70
+                   for x in atlas[first] for y in atlas[second]):
+                return {**base, "status": "AMBIGUOUS_NAME_TEMPLATES"}
+    candidates = []
+    with Image.open(target_path) as im:
+        for row in range(1, 8):
+            ink = _roster_name_ink(im, row)
+            ranked = sorted(
+                ((max(_roster_text_similarity(ink, m) for m, _ in records), name)
+                 for name, records in atlas.items()), reverse=True)
+            first_score, first_name = ranked[0]
+            second_score = ranked[1][0] if len(ranked) > 1 else 0.0
+            accepted = first_score >= 0.70 and first_score-second_score >= 0.20
+            candidates.append({
+                "visible_row": row, "candidate_name": first_name if accepted else None,
+                "similarity": round(first_score, 3),
+                "runner_up_similarity": round(second_score, 3),
+                "name_reference_sha256": sorted(
+                    {sha for _, sha in atlas[first_name]}) if accepted else [],
+                "source_image_sha256": target_sha,
+                "source_type": "KNOWN_NAME_IMAGE_TEMPLATE" if accepted else "UNKNOWN",
+            })
+    assigned = [row["candidate_name"] for row in candidates
+                if row["candidate_name"] is not None]
+    if len(assigned) != len(set(assigned)):
+        return {**base, "status": "DUPLICATE_NAME_MATCH",
+                "errors": ["multiple rows matched the same named template"]}
+    errors = [f"UNKNOWN_NAME_ROW:{row['visible_row']}" for row in candidates
+              if row["candidate_name"] is None]
+    return {**base, "status": ("PASS_DRAFT" if not errors else
+                              "PARTIAL_DRAFT" if assigned else "NEEDS_REVIEW"),
+            "run_id": run_id, "snapshot_evidence": snapshot_evidence,
+            "reference_image_sha256": sorted(set(source_shas)),
+            "target_image_sha256": target_sha, "rows": candidates,
+            "errors": errors}
+
+
 def link_verified_roster_pages(
         name_pages: list[dict[str, Any]],
         ability_pages: list[str | Path],
