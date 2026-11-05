@@ -451,6 +451,102 @@ class RosterIdentityLinkRegression(unittest.TestCase):
         self.assertEqual(bad["records"], [])
         self.assertEqual(missing["status"], "NEEDS_VERIFIED_NAMES")
 
+
+class KnownRosterNameTemplateRegression(unittest.TestCase):
+    """Synthetic character silhouettes. No user screenshot bytes are committed."""
+    def _page(self, players):
+        img = RosterPageRegression()._sample(1)
+        draw = ImageDraw.Draw(img)
+        from screen_reader import _ROSTER_BATTING_ROW_Y
+        for row, player in enumerate(players):
+            top = _ROSTER_BATTING_ROW_Y[row]
+            # Distinct 2-block fixed-width dark name silhouettes in the
+            # source-supported text area, with more than 200 ink pixels.
+            x = 932 + player*38
+            draw.rectangle((x, top-11, x+18, top+8), fill=(0,0,0))
+            draw.rectangle((x+2, top+15, x+19, top+26), fill=(0,0,0))
+        return img
+
+    def _data(self, folder, order_ref=None, order_target=None):
+        order_ref = order_ref or list(range(7))
+        order_target = order_target or list(range(2,9))
+        ref = Path(folder)/"reference.png"
+        target = Path(folder)/"target.png"
+        self._page(order_ref).save(ref)
+        self._page(order_target).save(target)
+        return [{"path":ref, "verified_names":{
+            row+1: f"MANUAL-{player}" for row,player in enumerate(order_ref)}}],target
+
+    def _read(self, refs, target, **opts):
+        from screen_reader import match_verified_roster_names
+        args={"run_id":"fixture-run", "snapshot_evidence":"fixture-capture",
+              "confirmed_same_snapshot":True}
+        args.update(opts)
+        return match_verified_roster_names(refs,target,**args)
+
+    def test_reordered_rows_match_known_names_and_leave_new_names_unknown(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            refs,target=self._data(tmp)
+            result=self._read(refs,target)
+        self.assertEqual(result["status"],"PARTIAL_DRAFT",result)
+        self.assertEqual([r["candidate_name"] for r in result["rows"]],
+                         [f"MANUAL-{n}" for n in range(2,7)]+[None,None])
+        self.assertEqual(result["errors"],
+                         ["UNKNOWN_NAME_ROW:6","UNKNOWN_NAME_ROW:7"])
+        self.assertFalse(result["japanese_ocr_performed"])
+        self.assertFalse(result["live_state_current"])
+        self.assertTrue(result["requires_manual_acceptance"])
+        self.assertEqual(len(result["target_image_sha256"]),64)
+        self.assertEqual(len(result["reference_image_sha256"]),1)
+
+    def test_reordered_all_known_names_pass_as_draft_only(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            refs,target=self._data(tmp, order_target=[6,4,2,0,5,3,1])
+            result=self._read(refs,target)
+        self.assertEqual(result["status"],"PASS_DRAFT",result)
+        self.assertEqual([r["candidate_name"] for r in result["rows"]],
+                         [f"MANUAL-{n}" for n in [6,4,2,0,5,3,1]])
+        self.assertEqual(result["errors"],[])
+
+    def test_attestation_self_reference_and_missing_name_labels_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            refs,target=self._data(tmp)
+            missing=self._read(refs,target,confirmed_same_snapshot=False)
+            selfref=self._read(refs,refs[0]["path"])
+            del refs[0]["verified_names"][7]
+            labels=self._read(refs,target)
+        self.assertEqual(missing["status"],"NEEDS_SNAPSHOT_ATTESTATION")
+        self.assertEqual(selfref["status"],"SELF_REFERENCE_NOT_VALIDATION")
+        self.assertEqual(labels["status"],"NEEDS_VERIFIED_NAME_REFERENCES")
+
+    def test_duplicate_target_name_does_not_create_two_player_matches(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            refs,target=self._data(tmp,order_target=[0,0,2,3,4,5,6])
+            result=self._read(refs,target)
+        self.assertEqual(result["status"],"DUPLICATE_NAME_MATCH")
+        self.assertEqual(result["rows"],[])
+
+    def test_conflicting_reference_templates_for_same_name_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            refs,target=self._data(tmp)
+            extra=Path(tmp)/"other_reference.png"
+            self._page([1,2,3,4,5,6,7]).save(extra)
+            refs.append({"path":extra,"verified_names":{
+                row+1:f"MANUAL-{row}" for row in range(7)}})
+            result=self._read(refs,target)
+        self.assertEqual(result["status"],"CONFLICTING_NAME_TEMPLATES")
+        self.assertEqual(result["rows"],[])
+
+    def test_unknown_target_screen_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            refs,target=self._data(tmp)
+            nonroster=Path(tmp)/"nonroster.png"
+            Image.new("RGB",(BASE_W,BASE_H),"black").save(nonroster)
+            result=self._read(refs,nonroster)
+        self.assertEqual(result["status"],"UNSUPPORTED_TARGET_NAME_PAGE")
+        self.assertEqual(result["rows"],[])
+
+
 class ScorePixelReaderRegression(unittest.TestCase):
     """Deterministic digit silhouettes; real-game screenshot probes are external."""
     def test_blue_glyph_coverage_and_unknown(self):
