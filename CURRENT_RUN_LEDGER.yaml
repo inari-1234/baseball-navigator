@@ -1,12 +1,12 @@
 {
   "schema_version": "1.0",
-  "ledger_version": 12,
+  "ledger_version": 13,
   "run_id": "SAPPORO_SPRINT_RESTART_20261103",
-  "expected_parent_sha": "16cb16482f0aca7309428144dcec58619c875ac6",
+  "expected_parent_sha": "3b2b49099733f90f5b027a8a957eb0f7b6a1bfc4",
   "run_status": {
     "previous_run": "ABANDONED_FOR_REDESIGN",
-    "new_run": "ACTIVE_Y1_JUNE_LIVE_CAPTURE_CHRONOLOGY_UNRESOLVED",
-    "reason": "User 2026-11-06 explicitly retracts the earlier July-completed report; July matches are scheduled. Native June PM5:20 screenshots explicitly attested as current, despite older June PM5:40 record; exact branch/time regression unresolved."
+    "new_run": "ACTIVE_Y1_JUNE_AFTER_USER_CONFIRMED_ROLLBACK_SAVEPOINT_UNKNOWN",
+    "reason": "The user confirms they rolled the game back because the assistant's investigation took too long, explaining current June PM5:20 after older PM5:40. Exact saved checkpoint and surviving earlier effects were not identified."
   },
   "goal": {
     "primary": {
@@ -25,13 +25,13 @@
     "month": 6,
     "clock": "PM 5:20",
     "earliest_confirmed_period": "Y1-06",
-    "interpretation": "User-attested current IMG_8971/8972, Y1 June PM5:20; earlier logged Y1 June PM5:40 snapshot conflicts; no SAVE/LOAD assumed."
+    "interpretation": "Current screenshot Y1 June PM5:20 after user-confirmed game rollback during assistant investigation. Earlier PM5:40 comes from prior branch/position, but save checkpoint is UNKNOWN."
   },
   "current_gate": {
-    "id": "CURRENT_JUNE_CLOCK_REGRESSION_RECONCILE",
+    "id": "ROLLBACK_SAVEPOINT_AUTHORITY_RECONCILE",
     "status": "BLOCKED_UNKNOWN",
     "reason_refs": [
-      "UNK-JUNE-CURRENT-CLOCK-REGRESSION"
+      "UNK-ROLLBACK-SAVEPOINT-20261106"
     ]
   },
   "canonical_strategy": {
@@ -163,6 +163,12 @@
       "kind": "RAW_EVIDENCE",
       "locator": "User-uploaded IMG_8971.png SHA256 de88e4b7fe160910ee10b543bc547f45239635fc120136bcddab3844bf6fc197; IMG_8972.png SHA256 c5ae334bd764fbecdba68ba0aafc03a300b6e5ccfb58074f32e601793903cd67",
       "notes": "Both show Y1 June PM5:20, 15,980 yen; on item menu four user-labeled visible icon slots show 0/1,0/2,0/2,0/2. Bottom independently displays Chocolate stock 1. No claim that 0/2 denominator equals full stock or that item was used."
+    },
+    {
+      "evidence_id": "EV-USER-20261106-ROLLBACK-CAUSE",
+      "kind": "USER_ASSERTION",
+      "statement": "The current game image shows Y1 June PM5:20 because the user rolled the game back while the assistant's investigation was taking too long. The reason for the clock regression is confirmed; restored savepoint unspecified.",
+      "locator": "User message 2026-11-06: あなたの調査が長引きロールバックしただけ"
     }
   ],
   "facts": [
@@ -454,6 +460,22 @@
         "EV-USER-20261106-JULY-SCHEDULED"
       ],
       "notes": "Denominators are slot display counters; only Chocolate bottom stock 1 separately confirmed. Not full inventory."
+    },
+    {
+      "fact_id": "FACT-JUNE-CLOCK-REGRESSION-IS-ROLLBACK",
+      "fact_type": "OBSERVED",
+      "value": {
+        "rollback_confirmed": true,
+        "restore_savepoint": "UNKNOWN",
+        "current_image_period": "Y1-06",
+        "current_image_clock": "PM 5:20",
+        "prior_recorded_clock": "PM 5:40"
+      },
+      "source_refs": [
+        "EV-USER-20261106-ROLLBACK-CAUSE",
+        "EV-RAW-Y1-JUNE-ITEM-MENUS-8971-8972"
+      ],
+      "notes": "Cause of clock regression confirmed by user; exact rollback anchor, lineage and retained prior branch effects are unresolved. Historical June match observations are audit evidence, not proof of current-branch completion."
     }
   ],
   "strategy_policy": {
@@ -614,11 +636,13 @@
     {
       "unknown_id": "UNK-JUNE-CURRENT-CLOCK-REGRESSION",
       "field": "new_run.current.capture_chronology",
-      "status": "OPEN",
-      "material_to_next_action": true,
+      "status": "RESOLVED",
+      "material_to_next_action": false,
       "material_to_goal": false,
       "default": "Treat latest user-attested Y1 June PM5:20 screenshot as current observation, but do not assume SAVE/LOAD or trusted continuity from earlier Y1 June PM5:40. Block paid actions/ITEM until branch chronology is independently reconciled.",
-      "resolve_by": "User confirms which game/save branch produced the PM5:20 current capture relative to the earlier PM5:40 screen, or supplies a source-anchored chronology correction."
+      "resolve_by": "User confirms which game/save branch produced the PM5:20 current capture relative to the earlier PM5:40 screen, or supplies a source-anchored chronology correction.",
+      "resolved_by": "EV-USER-20261106-ROLLBACK-CAUSE",
+      "notes": "Clock decrease is explained by the user-reported rollback during the assistant's investigation; exact SAVE anchor remains unknown separately."
     },
     {
       "unknown_id": "UNK-ITEM-SLOT-DENOMINATOR-STOCK",
@@ -628,6 +652,15 @@
       "material_to_goal": false,
       "default": "Preserve raw 0/1 and 0/2 display as per-slot assigned/denominator; only separately labelled Chocolate stock 1 is confirmed. Do not treat the four slots as a complete verified inventory.",
       "resolve_by": "Choose a different item on the same screen and verify its bottom 所持数 and corresponding slot denominator; capture unobserved item glyphs."
+    },
+    {
+      "unknown_id": "UNK-ROLLBACK-SAVEPOINT-20261106",
+      "field": "new_run.current.confirmed_rollback_restore_anchor",
+      "status": "OPEN",
+      "material_to_next_action": true,
+      "material_to_goal": false,
+      "default": "Recognize June PM5:20 as the current post-rollback screenshot. Do not assume any effects of matches, training, items or resources from pre-rollback captures survived; deny paid actions until the active SAVE branch and game state are reconciled. An explicit rollback report is not proof of which SAVE was restored.",
+      "resolve_by": "Independently identify the restored save/checkpoint or accept a new source-grounded baseline for the ongoing branch; check retained match/training/skills and current full inventory before acting."
     }
   ]
 }

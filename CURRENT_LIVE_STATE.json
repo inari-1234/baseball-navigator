@@ -1,6 +1,6 @@
 {
   "schema_version": "1.2",
-  "last_event_seq": 9,
+  "last_event_seq": 10,
   "period_floor": "Y1-06",
   "last_seen_screen_period": "Y1-06",
   "resources": {
@@ -84,7 +84,7 @@
   "training_counts_observed": {},
   "training_history": [],
   "discarded_branch_event_ids": [],
-  "timeline_status": "UNRESOLVED_CAPTURE_CHRONOLOGY",
+  "timeline_status": "ROLLBACK_CONFIRMED_SAVEPOINT_UNKNOWN",
   "training_counts_by_player_drill": {},
   "item_effects": [],
   "reverted_event_ids": [],
@@ -128,5 +128,6 @@
     ],
     "source_event_id": "LIVE-Y1-JUN-CURRENT-IMG8971-8972-20261106",
     "complete_inventory": false
-  }
+  },
+  "rollback_report_event_id": "LIVE-Y1-JUN-ROLLBACK-CAUSE-CONFIRMED-20261106"
 }

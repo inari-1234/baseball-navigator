@@ -1,12 +1,19 @@
 # CURRENT_HANDOFF
 
 Last updated: 2026-11-06
-State: ACTIVE_Y1_JUNE_CURRENT_CAPTURE — BLOCKED_ON_CLOCK_CHRONOLOGY
+State: ACTIVE_Y1_JUNE_POST_ROLLBACK_CAPTURE — SAVEPOINT_UNKNOWN
 
 ## Canonical runtime
 Read `AGENTS.md`, `RUN_GUARD_POLICY.yaml`, `DECISION_CONTRACT.json`, `CURRENT_LIVE_STATE.json`, this handoff, ledger/log, then Sprint strategy. The event log `LIVE_EVENTS.jsonl` is the underlying evidence, not a separate conflicting current state.
 
-## Current authority after user correction (2026-11-06)
+## Latest user correction — rollback cause established (2026-11-06)
+- **User statement**: 「あなたの調査が長引きロールバックしただけ」. The player intentionally rolled the game back during an extended assistant investigation; this **explains the current Y1 June PM5:20 appearing earlier than the prior June PM5:40 capture**. Do not ask again why the clock regressed or claim the cause is unknown.
+- The source-correcting append-only `CORRECTION` event `LIVE-Y1-JUN-ROLLBACK-CAUSE-CONFIRMED-20261106` targets the already-recorded current SCREEN `LIVE-Y1-JUN-CURRENT-IMG8971-8972-20261106` and marks the screenshot as following a user-confirmed rollback. `CURRENT_LIVE_STATE` derives `timeline_status=ROLLBACK_CONFIRMED_SAVEPOINT_UNKNOWN`, `last_event_seq=10`, `rollback_report_event_id` grounded in this correction.
+- **Separate unknown**: user did not identify the exact SAVE checkpoint/restore anchor. Don't assume earlier June matches, training/item effects or the pre-rollback branch survived. The current post-rollback June PM5:20 screenshot is legitimate, but until an active SAVE baseline is established, keep action recommendations blocked. Existing June match results are historical/audit records, not verified retained progress on this branch.
+- 7月3試合 are **SCHEDULED**. Current image displays チョコレート0/1、コーヒー0/2、鉄アレイ0/2、声だしメガホン0/2. Only チョコレート has an independently labeled `所持数1` field; full inventory is still unverified and item use isn't confirmed.
+- The earlier November 6 handoff text below saying “do not infer SAVE/reload” was correct **before** this subsequent user clarification; it is now superseded. No original event deleted. This change documents the real cause without inventing a specific savepoint.
+
+## Current authority after user correction (2026-11-06; cause explanation superseded)
 - **User correction is decisive**: `IMG_8971.png` and `IMG_8972.png` are real-time current-game screens, with **Y1 June PM5:20** visible; **July matches are scheduled, not completed**. The earlier `LIVE-Y1-JUL-ALL-MATCHES-COMPLETE` assertion is RETRACTED by append-only `LIVE-Y1-JUL-COMPLETION-RETRACTED-20261106` and may not close July. Preserve the three July `MATCH_SCHEDULE` entries.
 - Current screen source `LIVE-Y1-JUN-CURRENT-IMG8971-8972-20261106`: game money 15,980 yen; Study 4, Sports 28, Play 25, Nature 18, Cheer 100. Four visible items labeled by user: **チョコレート 0/1**, **コーヒー 0/2**, **鉄アレイ 0/2**, **声だしメガホン 0/2**. These `0/N` counters are per-slot displays; only the separately labeled bottom **チョコレート 所持数 1** is verified as stock. No item use has been confirmed. This is an incomplete item list, not `inventory.fresh=true`.
 - Historical image `IMG_8931.png` had Y1 June PM5:40, later than the user-attested current PM5:20. **Do not infer SAVE, reload, branch replacement or clock reset**. The replay records the current screen but marks `timeline_status=UNRESOLVED_CAPTURE_CHRONOLOGY`; all actionable recommendations fail closed until a sourced explanation. June match records remain historical evidence and must not be inferred to have occurred on the current branch.
