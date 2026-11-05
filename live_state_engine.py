@@ -385,10 +385,19 @@ def validate_recommendation(rec,state,contract):
         if not state.get("inventory",{}).get("fresh"):
             errors.append("ITEM_INVENTORY_NOT_VERIFIED")
         else:
+            # Two targets can consume the same item: check aggregate demand,
+            # not only the quantity of each individual request.
+            required={}
             for item in items:
-                if (not isinstance(item,dict) or not isinstance(item.get("item"),str) or
-                    type(item.get("quantity")) is not int or item["quantity"]<1 or
-                    state["inventory"]["items"].get(item["item"],0)<item["quantity"]):
+                if (not isinstance(item,dict) or not isinstance(item.get("item"),str)
+                        or not item["item"].strip() or
+                        type(item.get("quantity")) is not int or item["quantity"]<1):
+                    errors.append("INVALID_ITEM_SELECTION")
+                    continue
+                name=item["item"]
+                required[name]=required.get(name,0)+item["quantity"]
+            for name,count in required.items():
+                if state["inventory"]["items"].get(name,0)<count:
                     errors.append("INSUFFICIENT_ITEM_INVENTORY")
     # A bar's fill ratio is never an exact HP value without a live calibration.
     hp_claims=rec.get("hp_claims",{})
@@ -445,6 +454,110 @@ def validate_recommendation(rec,state,contract):
                 if key not in vals or type(value) is not int or value<0 or value>vals[key]:
                     errors.append(f"INSUFFICIENT_OR_UNKNOWN_RESOURCE:{key}")
     return errors
+
+def observed_item_effect_samples(state):
+    """Summarize source-replayed, accepted single-item/single-unit observations.
+
+    Multi-item bundles and bulk uses have no attributable per-item effect.
+    Historical observations remain samples; never turn them into fixed item
+    properties or predicted gains. Rollback filtering belongs to replay().
+    """
+    result={}
+    for entry in state.get("item_effects",[]):
+        bundle=entry.get("item_bundle",[])
+        if (len(bundle)!=1 or not isinstance(bundle[0],dict)
+                or bundle[0].get("quantity")!=1):
+            continue
+        name=bundle[0].get("item")
+        delta=entry.get("effect_deltas")
+        if not isinstance(name,str) or not name.strip() or not isinstance(delta,dict):
+            continue
+        by_item=result.setdefault(name,{"sample_n":0,"event_ids":[],
+                                        "deltas_by_metric":{}})
+        by_item["sample_n"]+=1
+        by_item["event_ids"].append(entry["event_id"])
+        for metric,value in delta.items():
+            if isinstance(metric,str) and type(value) is int:
+                by_item["deltas_by_metric"].setdefault(metric,[]).append(value)
+    return result
+
+
+def prioritize_item_use_drafts(state,contract,options):
+    """Evidence-led candidate sorting, not item recognition or automatic use.
+
+    Requires fresh inventory, independently sourced player/role/context, a
+    confirmed item cost, and replayed item effect samples. The fixed tiers
+    are only DC-ITEM-001 heuristics, not estimates of optimal expected value.
+    All results require user review; LIVE_EVENTS is never mutated here.
+    """
+    base={"status":"NEEDS_MORE_EVIDENCE","suggested":None,"candidates":[],
+          "errors":[],"rule_ids":["DC-ITEM-001","DC-ACTION-001"],
+          "requires_manual_acceptance":True,"automated_item_ocr":False,
+          "effect_is_guaranteed":False}
+    if not isinstance(options,list) or not options:
+        return {**base,"errors":["ITEM_CANDIDATES_REQUIRED"]}
+    observed=observed_item_effect_samples(state)
+    reviews=[];errors=[]
+    for ix,option in enumerate(options):
+        if not isinstance(option,dict):
+            errors.append(f"CANDIDATE_{ix}:INVALID_OPTION")
+            continue
+        item=option.get("item");player=option.get("player")
+        metric=option.get("effect_metric");category=option.get("category")
+        evidence=option.get("source_evidence_id")
+        if (not all(isinstance(v,str) and v.strip()
+                    for v in (item,player,metric,evidence))
+                or category not in {"ABILITY","RECOVERY"}
+                or type(option.get("quantity")) is not int
+                or option["quantity"]!=1
+                or type(option.get("based_on_event_seq")) is not int
+                or type(option.get("spend_verified")) is not bool
+                or not option["spend_verified"]
+                or not isinstance(option.get("spend"),dict)):
+            errors.append(f"CANDIDATE_{ix}:MISSING_VERIFIED_INPUT")
+            continue
+        samples=observed.get(item,{}).get("deltas_by_metric",{}).get(metric,[])
+        if not samples or any(v<=0 for v in samples):
+            errors.append(f"CANDIDATE_{ix}:NO_POSITIVE_SINGLE_ITEM_EFFECT_SAMPLE")
+            continue
+        # A caller-verified critical action unlock outranks a caller-verified
+        # low-level October core ability investment. No other priority
+        # mechanism or item category is inferred from Japanese item names.
+        if (category=="RECOVERY" and metric in {"hp","hp_percent"}
+                and option.get("unlocks_blocked_action") is True
+                and isinstance(option.get("blocked_action_evidence_id"),str)
+                and option["blocked_action_evidence_id"].strip()):
+            tier=2;why="RECOVERY_UNLOCKS_VERIFIED_BLOCKED_ACTION"
+        elif (category=="ABILITY" and option.get("october_core_verified") is True
+                and option.get("low_level_verified") is True):
+            tier=1;why="LOW_LEVEL_OCTOBER_CORE_ABILITY"
+        else:
+            errors.append(f"CANDIDATE_{ix}:PRIORITY_CONTEXT_UNVERIFIED")
+            continue
+        rec={"action_type":"ITEM","based_on_event_seq":option["based_on_event_seq"],
+             "rule_ids":["DC-ITEM-001","DC-ACTION-001"],
+             "items":[{"item":item,"quantity":1}],"spend":option["spend"]}
+        gate=validate_recommendation(rec,state,contract)
+        if gate:
+            errors.extend(f"CANDIDATE_{ix}:{code}" for code in gate)
+            continue
+        reviews.append({
+            "candidate_index":ix,"item":item,"player":player,
+            "category":category,"priority_tier":tier,"priority_reason":why,
+            "effect_metric":metric,"observed_single_use_deltas":list(samples),
+            "observed_sample_n":len(samples),
+            "source_event_ids":list(observed[item]["event_ids"]),
+            "context_evidence_id":evidence,"action_draft":rec,
+        })
+    reviews.sort(key=lambda r:(-r["priority_tier"],r["candidate_index"]))
+    if errors or not reviews:
+        return {**base,"candidates":reviews,"errors":errors or ["NO_SUPPORTED_CANDIDATE"]}
+    if len(reviews)>1 and reviews[0]["priority_tier"]==reviews[1]["priority_tier"]:
+        return {**base,"status":"TIED_REVIEW_REQUIRED","candidates":reviews,
+                "errors":["EQUAL_PRIORITY_UNRESOLVED"]}
+    return {**base,"status":"SINGLE_PRIORITY_DRAFT","candidates":reviews,
+            "suggested":reviews[0],"errors":[]}
+
 
 def main():
     ap=argparse.ArgumentParser()
