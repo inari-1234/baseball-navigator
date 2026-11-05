@@ -1,18 +1,24 @@
 {
   "schema_version": "1.2",
-  "last_event_seq": 7,
-  "period_floor": "Y1-07",
+  "last_event_seq": 9,
+  "period_floor": "Y1-06",
   "last_seen_screen_period": "Y1-06",
   "resources": {
-    "fresh": false,
-    "values": null,
-    "last_observed": "LIVE-Y1-JUN-POST-HANASAKA-SCREEN"
+    "fresh": true,
+    "values": {
+      "study": 4,
+      "sports": 28,
+      "play": 25,
+      "nature": 18,
+      "cheer": 100
+    },
+    "last_observed": "LIVE-Y1-JUN-CURRENT-IMG8971-8972-20261106"
   },
   "matches": {
     "Y1-JUL-HANASAKA": {
       "opponent": "花さか高校",
       "period": "Y1-07",
-      "status": "COMPLETED_SCORE_UNKNOWN",
+      "status": "SCHEDULED",
       "first_attempt": null,
       "accepted_attempt": null,
       "classification": null
@@ -20,7 +26,7 @@
     "Y1-JUL-MANRUI": {
       "opponent": "まんるい高校",
       "period": "Y1-07",
-      "status": "COMPLETED_SCORE_UNKNOWN",
+      "status": "SCHEDULED",
       "first_attempt": null,
       "accepted_attempt": null,
       "classification": null
@@ -28,7 +34,7 @@
     "Y1-JUL-SEINAN": {
       "opponent": "生南高校",
       "period": "Y1-07",
-      "status": "COMPLETED_SCORE_UNKNOWN",
+      "status": "SCHEDULED",
       "first_attempt": null,
       "accepted_attempt": null,
       "classification": null
@@ -70,17 +76,15 @@
       "classification": "RESET_ASSISTED_WIN"
     }
   },
-  "completed_match_periods": [
-    "Y1-07"
-  ],
+  "completed_match_periods": [],
   "skills": [],
   "observations_ignored_as_stale": [],
-  "current_exact_time": "UNKNOWN",
+  "current_exact_time": "PM 5:20",
   "item_uses": [],
   "training_counts_observed": {},
   "training_history": [],
   "discarded_branch_event_ids": [],
-  "timeline_status": "TRUSTED",
+  "timeline_status": "UNRESOLVED_CAPTURE_CHRONOLOGY",
   "training_counts_by_player_drill": {},
   "item_effects": [],
   "reverted_event_ids": [],
@@ -89,5 +93,40 @@
     "fresh": false,
     "items": null
   },
-  "hp_by_player": {}
+  "hp_by_player": {},
+  "visible_item_slots": {
+    "fresh": true,
+    "rows": [
+      {
+        "slot": 1,
+        "item": "チョコレート",
+        "assigned": 0,
+        "display_denominator": 1,
+        "separately_verified_stock": 1
+      },
+      {
+        "slot": 2,
+        "item": "コーヒー",
+        "assigned": 0,
+        "display_denominator": 2,
+        "separately_verified_stock": null
+      },
+      {
+        "slot": 3,
+        "item": "鉄アレイ",
+        "assigned": 0,
+        "display_denominator": 2,
+        "separately_verified_stock": null
+      },
+      {
+        "slot": 4,
+        "item": "声だしメガホン",
+        "assigned": 0,
+        "display_denominator": 2,
+        "separately_verified_stock": null
+      }
+    ],
+    "source_event_id": "LIVE-Y1-JUN-CURRENT-IMG8971-8972-20261106",
+    "complete_inventory": false
+  }
 }

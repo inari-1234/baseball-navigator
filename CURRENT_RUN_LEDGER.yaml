@@ -1,12 +1,12 @@
 {
   "schema_version": "1.0",
-  "ledger_version": 11,
+  "ledger_version": 12,
   "run_id": "SAPPORO_SPRINT_RESTART_20261103",
-  "expected_parent_sha": "09be290d2e778ee0c3bb61fcd6f57dcb93dda93f",
+  "expected_parent_sha": "16cb16482f0aca7309428144dcec58619c875ac6",
   "run_status": {
     "previous_run": "ABANDONED_FOR_REDESIGN",
-    "new_run": "ACTIVE_AFTER_JULY_MATCHES_REPORTED_COMPLETE",
-    "reason": "Current exact time/resources unknown after user reports July matches completed. LIVE_EVENTS is the event authority, ledger retains provenance."
+    "new_run": "ACTIVE_Y1_JUNE_LIVE_CAPTURE_CHRONOLOGY_UNRESOLVED",
+    "reason": "User 2026-11-06 explicitly retracts the earlier July-completed report; July matches are scheduled. Native June PM5:20 screenshots explicitly attested as current, despite older June PM5:40 record; exact branch/time regression unresolved."
   },
   "goal": {
     "primary": {
@@ -22,16 +22,16 @@
   },
   "time": {
     "year": 1,
-    "month": null,
-    "clock": "UNKNOWN",
-    "earliest_confirmed_period": "Y1-07",
-    "interpretation": "7月 matches reported completed; current exact calendar/date not observed"
+    "month": 6,
+    "clock": "PM 5:20",
+    "earliest_confirmed_period": "Y1-06",
+    "interpretation": "User-attested current IMG_8971/8972, Y1 June PM5:20; earlier logged Y1 June PM5:40 snapshot conflicts; no SAVE/LOAD assumed."
   },
   "current_gate": {
-    "id": "POST_JULY_LIVE_STATE_RECONCILE",
+    "id": "CURRENT_JUNE_CLOCK_REGRESSION_RECONCILE",
     "status": "BLOCKED_UNKNOWN",
     "reason_refs": [
-      "UNK-POST-JULY-CURRENT-SCREEN"
+      "UNK-JUNE-CURRENT-CLOCK-REGRESSION"
     ]
   },
   "canonical_strategy": {
@@ -118,7 +118,9 @@
     {
       "evidence_id": "EV-USER-JULY-MATCHES-DONE-20261104",
       "kind": "USER_ASSERTION",
-      "statement": "User explicitly corrected assistant: July matches are already completed; individual July match scores are not established in this captured event log."
+      "statement": "User explicitly corrected assistant: July matches are already completed; individual July match scores are not established in this captured event log.",
+      "superseded_by": "EV-USER-20261106-JULY-SCHEDULED",
+      "notes": "Earlier July-completed claim is retracted by subsequent user correction; historical assertion only, not current run status."
     },
     {
       "evidence_id": "EV-RAW-JUNE-RESOURCE-20261104",
@@ -149,6 +151,18 @@
       "kind": "RAW_EVIDENCE",
       "locator": "IMG_8928.png sha256=79d789059eb563b2137168f51c1c11c474d0c4a15c9ea4f415ff6838eeeff302",
       "statement": "Pitcher panel numeric shapes decode appearances6, hits allowed3, runs1, ERA1.20, W4 L0 K5 BB2, without player-name OCR."
+    },
+    {
+      "evidence_id": "EV-USER-20261106-JULY-SCHEDULED",
+      "kind": "USER_ASSERTION",
+      "statement": "The previously supplied June PM5:20 item/main screen is live/current; July matches are only scheduled, not finished; item icons are coffee, iron dumbbell and cheering megaphone.",
+      "locator": "User message 2026-11-06"
+    },
+    {
+      "evidence_id": "EV-RAW-Y1-JUNE-ITEM-MENUS-8971-8972",
+      "kind": "RAW_EVIDENCE",
+      "locator": "User-uploaded IMG_8971.png SHA256 de88e4b7fe160910ee10b543bc547f45239635fc120136bcddab3844bf6fc197; IMG_8972.png SHA256 c5ae334bd764fbecdba68ba0aafc03a300b6e5ccfb58074f32e601793903cd67",
+      "notes": "Both show Y1 June PM5:20, 15,980 yen; on item menu four user-labeled visible icon slots show 0/1,0/2,0/2,0/2. Bottom independently displays Chocolate stock 1. No claim that 0/2 denominator equals full stock or that item was used."
     }
   ],
   "facts": [
@@ -347,18 +361,33 @@
       "fact_id": "FACT-JULY-MATCHES-COMPLETE-REPORT",
       "fact_type": "OBSERVED",
       "path": "new_run.july.all_registered_matches_reported_completed",
-      "value": true,
+      "value": false,
       "source_refs": [
-        "EV-USER-JULY-MATCHES-DONE-20261104"
+        "EV-USER-JULY-MATCHES-DONE-20261104",
+        "EV-USER-20261106-JULY-SCHEDULED"
       ],
-      "usable_for_decision": true
+      "usable_for_decision": true,
+      "notes": "Former completion assertion superseded. Scheduled July matches stay SCHEDULED."
     },
     {
-      "fact_id": "FACT-POST-JULY-LIVE-RESOURCES",
-      "fact_type": "UNKNOWN",
+      "fact_id": "FACT-Y1-JUNE-LIVE-CAPTURE-COUNTERS",
+      "fact_type": "OBSERVED",
       "path": "new_run.current.resources",
-      "value": null,
-      "usable_for_decision": false
+      "value": {
+        "study": 4,
+        "sports": 28,
+        "play": 25,
+        "nature": 18,
+        "cheer": 100,
+        "money_yen": 15980,
+        "game_clock": "PM 5:20"
+      },
+      "usable_for_decision": false,
+      "source_refs": [
+        "EV-RAW-Y1-JUNE-ITEM-MENUS-8971-8972",
+        "EV-USER-20261106-JULY-SCHEDULED"
+      ],
+      "notes": "Visible current-capture counters only; live action gate blocked by unexplained earlier PM5:40 record."
     },
     {
       "fact_id": "FACT-HP-GAUGE-GRAPHICAL-ONLY",
@@ -389,6 +418,42 @@
         "EV-AUTO-FORMATION-IMG8932-20261104"
       ],
       "usable_for_decision": false
+    },
+    {
+      "fact_id": "FACT-FOUR-ITEM-SLOTS-IMG8972",
+      "fact_type": "OBSERVED",
+      "value": [
+        {
+          "slot": 1,
+          "item": "チョコレート",
+          "assigned": 0,
+          "display_denominator": 1,
+          "separately_verified_stock": 1
+        },
+        {
+          "slot": 2,
+          "item": "コーヒー",
+          "assigned": 0,
+          "display_denominator": 2
+        },
+        {
+          "slot": 3,
+          "item": "鉄アレイ",
+          "assigned": 0,
+          "display_denominator": 2
+        },
+        {
+          "slot": 4,
+          "item": "声だしメガホン",
+          "assigned": 0,
+          "display_denominator": 2
+        }
+      ],
+      "source_refs": [
+        "EV-RAW-Y1-JUNE-ITEM-MENUS-8971-8972",
+        "EV-USER-20261106-JULY-SCHEDULED"
+      ],
+      "notes": "Denominators are slot display counters; only Chocolate bottom stock 1 separately confirmed. Not full inventory."
     }
   ],
   "strategy_policy": {
@@ -511,11 +576,13 @@
     {
       "unknown_id": "UNK-POST-JULY-CURRENT-SCREEN",
       "field": "new_run.current.exact_calendar_and_resources",
-      "status": "OPEN",
-      "material_to_next_action": true,
+      "status": "RESOLVED",
+      "material_to_next_action": false,
       "material_to_goal": false,
       "default": "Never treat June resource screenshot or July entries as current. Do not authorize paid training until a new accepted runtime resource snapshot is available.",
-      "resolve_by": "Fresh in-game main screen displaying current period, currency, resource counters, and next match."
+      "resolve_by": "Fresh in-game main screen displaying current period, currency, resource counters, and next match.",
+      "resolved_by": "EV-USER-20261106-JULY-SCHEDULED",
+      "notes": "Post-July premise retracted; source now current June."
     },
     {
       "unknown_id": "UNK-HP-BAR-CALIBRATION",
@@ -543,6 +610,24 @@
       "material_to_goal": false,
       "default": "Return NEEDS_REVIEW rather than misread an unseen blue 9. Do not silently substitute a similar glyph.",
       "resolve_by": "New native v1.42 source where a known blue 9 appears, validate glyph against independent direct reading."
+    },
+    {
+      "unknown_id": "UNK-JUNE-CURRENT-CLOCK-REGRESSION",
+      "field": "new_run.current.capture_chronology",
+      "status": "OPEN",
+      "material_to_next_action": true,
+      "material_to_goal": false,
+      "default": "Treat latest user-attested Y1 June PM5:20 screenshot as current observation, but do not assume SAVE/LOAD or trusted continuity from earlier Y1 June PM5:40. Block paid actions/ITEM until branch chronology is independently reconciled.",
+      "resolve_by": "User confirms which game/save branch produced the PM5:20 current capture relative to the earlier PM5:40 screen, or supplies a source-anchored chronology correction."
+    },
+    {
+      "unknown_id": "UNK-ITEM-SLOT-DENOMINATOR-STOCK",
+      "field": "item_use.visible_slot_display_denominator_meaning",
+      "status": "OPEN",
+      "material_to_next_action": false,
+      "material_to_goal": false,
+      "default": "Preserve raw 0/1 and 0/2 display as per-slot assigned/denominator; only separately labelled Chocolate stock 1 is confirmed. Do not treat the four slots as a complete verified inventory.",
+      "resolve_by": "Choose a different item on the same screen and verify its bottom 所持数 and corresponding slot denominator; capture unobserved item glyphs."
     }
   ]
 }

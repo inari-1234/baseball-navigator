@@ -1,17 +1,24 @@
 # CURRENT_HANDOFF
 
-Last updated: 2026-11-05
-State: ACTIVE_POST_JULY_RECONCILIATION — BLOCKED_ON_CURRENT_COUNTERS
+Last updated: 2026-11-06
+State: ACTIVE_Y1_JUNE_CURRENT_CAPTURE — BLOCKED_ON_CLOCK_CHRONOLOGY
 
 ## Canonical runtime
 Read `AGENTS.md`, `RUN_GUARD_POLICY.yaml`, `DECISION_CONTRACT.json`, `CURRENT_LIVE_STATE.json`, this handoff, ledger/log, then Sprint strategy. The event log `LIVE_EVENTS.jsonl` is the underlying evidence, not a separate conflicting current state.
 
-## Confirmed
+## Current authority after user correction (2026-11-06)
+- **User correction is decisive**: `IMG_8971.png` and `IMG_8972.png` are real-time current-game screens, with **Y1 June PM5:20** visible; **July matches are scheduled, not completed**. The earlier `LIVE-Y1-JUL-ALL-MATCHES-COMPLETE` assertion is RETRACTED by append-only `LIVE-Y1-JUL-COMPLETION-RETRACTED-20261106` and may not close July. Preserve the three July `MATCH_SCHEDULE` entries.
+- Current screen source `LIVE-Y1-JUN-CURRENT-IMG8971-8972-20261106`: game money 15,980 yen; Study 4, Sports 28, Play 25, Nature 18, Cheer 100. Four visible items labeled by user: **チョコレート 0/1**, **コーヒー 0/2**, **鉄アレイ 0/2**, **声だしメガホン 0/2**. These `0/N` counters are per-slot displays; only the separately labeled bottom **チョコレート 所持数 1** is verified as stock. No item use has been confirmed. This is an incomplete item list, not `inventory.fresh=true`.
+- Historical image `IMG_8931.png` had Y1 June PM5:40, later than the user-attested current PM5:20. **Do not infer SAVE, reload, branch replacement or clock reset**. The replay records the current screen but marks `timeline_status=UNRESOLVED_CAPTURE_CHRONOLOGY`; all actionable recommendations fail closed until a sourced explanation. June match records remain historical evidence and must not be inferred to have occurred on the current branch.
+- Exact event/snapshot and ledger authorities are `LIVE_EVENTS.jsonl` / `CURRENT_LIVE_STATE.json` / `CURRENT_RUN_LEDGER.yaml`. No gameplay action or ITEM_USE was added. Source PNGs remain conversation attachments; they are not GitHub fixtures.
+- **All earlier statements below that describe July as already completed, June screens as necessarily stale, or post-July unknown current resources are superseded.** Do not use those historical notes as current policy.
+
+## Confirmed (historical; superseded where inconsistent)
 - Objective: Y1 October Sapporo.
-- User explicitly confirmed **all July matches are already over**. July tournament registrations for まんるい・花さか・生南 are historical, never upcoming.
+- SUPERSEDED 2026-11-06: earlier July-completed assertion has been retracted. July registrations for まんるい・花さか・生南 remain SCHEDULED.
 - Two grounded June reset pairs: 生南 initial 0-1, accepted 3-0; 花さか initial 0-0, accepted 6-1. Both count as RESET_ASSISTED, not STABLE.
 - Latest older resource screenshot: Y1 June PM5:40, money 15,980; Study 4 / Sports 28 / Play 25 / Nature 18 / Cheer 100. These numbers are **STALE** after July.
-- Current exact month/time, Sports, Cheer, HP and next match: **UNKNOWN**, do not reconstruct from June or assume current month is July.
+- SUPERSEDED 2026-11-06 for month/time/counters: current screenshot Y1 June PM5:20; current branch chronology remains unresolved. HP is UNKNOWN.
 - Initial batting core 入江, pitching core 石渡, secondary 今井; these are older roster anchors and not newly measured current stats.
 - Skill-point accumulation / 4th committed drill threshold is an EXPERIMENTAL user hypothesis, not a verified hidden mechanic.
 
@@ -127,3 +134,7 @@ Repo change is the ingestion/reconciliation owner; `Excel-Tests` is not mutated.
 - Both screenshots manually display **Y1 June PM5:20**, which predates the authoritative user report that all Y1 July matches finished. The June menu is historical; its `所持数1` and resource counters **do not** freshen current post-July inventory or time, and the visible `決定` button is not evidence of completed use. `CURRENT_LIVE_STATE` remains `last_event_seq=7`, `inventory.fresh=false`, post-July time/resources/HP UNKNOWN.
 - Synthetic CI covers 6 new cases (including mask bit widths from real image), known selected item, unknown name, unknown stock, missing title/label, altered scale, source SHA dispatch/no live event. The initial test code at `0958613866577be15e68e337a9ac3cdc3d26484f` passed synth CI but failed the separate real screenshot label probe because a handwritten fingerprint was missing three hex nibbles; corrected at `6abe987f4fd80573e89a9e7da3e4c95671d5ee82` and pinned bit width/count at `ec276b9be971895f82acf1f84b88722c5a8d9e49`. That code commit had [GitHub Actions 42033974163](https://github.com/inari-1234/baseball-navigator/actions/runs/42033974163) PASS: Guard, Decision Contract, replay and **125 tests**. Final docs/handoff/main need own readback and CI.
 - Next evidence boundary: screenshots of other selected items or known `所持数 2+` / 0 to establish additional glyphs; independent pre/post confirmation with stable screenshot identity to measure observed item effects. Until then don't infer item catalogue, use consumption, current inventory or benefits from these images.
+
+## Replay correction implementation v1.8 (2026-11-06)
+- Cause owner: `live_state_engine.py`, `tests/test_live_state_engine.py`. Completion retraction supported only by a genuine `USER_CORRECTION` to an earlier `MATCHES_COMPLETED` event (append-only, no historical deletion). Time-regressed but user-attested current image is stored with conflict status and blocks recommendations. Four icon-slot labels are observations and never promoted to full inventory. Expected ledger_version 12 and event seq 9, regression suite includes five new cases.
+- Keep `CURRENT_RUN_LEDGER.yaml` and `DECISION_LOG.jsonl` synchronized in one atomic commit, with `expected_parent_sha` equal to the actual Git parent. Final GitHub Actions evidence must be checked after main fast-forward.
