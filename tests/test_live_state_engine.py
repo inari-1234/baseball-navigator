@@ -571,4 +571,92 @@ class ItemEvidencePriorityRegression(unittest.TestCase):
                       unverified_cost["errors"])
 
 
+
+class LiveJulyAndItemCorrectionRegression(unittest.TestCase):
+    def _screen(self,n,clock,*,attested=False):
+        ev={**screen(n),"clock":clock}
+        if attested:
+            ev["source"]={"kind":"RAW_SCREEN","locator":"IMG_8971.png+IMG_8972.png"}
+            ev["user_attested_current"]=True
+            ev["user_attestation_locator"]="user 2026-11-06: these images are real time"
+            ev["visible_item_slots"]=[
+                {"slot":1,"item":"チョコレート","assigned":0,
+                 "display_denominator":1,"separately_verified_stock":1},
+                {"slot":2,"item":"コーヒー","assigned":0,"display_denominator":2},
+                {"slot":3,"item":"鉄アレイ","assigned":0,"display_denominator":2},
+                {"slot":4,"item":"声だしメガホン","assigned":0,"display_denominator":2},
+            ]
+        return ev
+
+    def test_user_correction_retracts_only_completion_not_schedule(self):
+        events=[
+            e(1,"MATCH_SCHEDULE",7,entries=[
+                {"match_id":"J1","opponent":"まんるい高校"},
+                {"match_id":"J2","opponent":"花さか高校"}]),
+            e(2,"MATCHES_COMPLETED",7),
+            e(3,"CORRECTION",source={"kind":"USER_CORRECTION","locator":
+                "User: July matches are only scheduled"},
+              target_event_id="E2",patch={"completion_retracted":True})]
+        result=replay(events)
+        self.assertEqual(result["last_event_seq"],3)
+        self.assertEqual(result["completed_match_periods"],[])
+        self.assertEqual(result["matches"]["J1"]["status"],"SCHEDULED")
+        self.assertEqual(result["matches"]["J2"]["status"],"SCHEDULED")
+
+    def test_no_fake_retraction_of_noncompletion_or_without_user(self):
+        schedule=e(1,"MATCH_SCHEDULE",7,entries=[
+            {"match_id":"J1","opponent":"まんるい"}])
+        forged=e(2,"CORRECTION",target_event_id="E1",
+                 patch={"completion_retracted":True})
+        with self.assertRaises(ObservationError):
+            replay([schedule,forged])
+        completion=e(1,"MATCHES_COMPLETED",7)
+        with self.assertRaises(ObservationError):
+            replay([completion,e(2,"CORRECTION",target_event_id="E1",
+                patch={"completion_retracted":True})])
+        with self.assertRaises(ObservationError):
+            replay([completion,e(2,"CORRECTION",source={
+                "kind":"USER_CORRECTION","locator":"test"},
+                target_event_id="E1",patch={"completion_retracted":False})])
+
+    def test_attested_earlier_current_screen_keeps_clock_uncertainty(self):
+        recent=self._screen(2,"PM 5:20",attested=True)
+        state=replay([self._screen(1,"PM 5:40"),recent])
+        self.assertEqual(state["current_exact_time"],"PM 5:20")
+        self.assertEqual(state["period_floor"],"Y1-06")
+        self.assertEqual(state["timeline_status"],
+                         "UNRESOLVED_CAPTURE_CHRONOLOGY")
+        self.assertTrue(state["resources"]["fresh"])
+        self.assertEqual(state["visible_item_slots"]["rows"][1]["item"],
+                         "コーヒー")
+        self.assertEqual(state["visible_item_slots"]["rows"][2]
+                         ["display_denominator"],2)
+        self.assertFalse(state["visible_item_slots"]["complete_inventory"])
+        self.assertFalse(state["inventory"]["fresh"])
+        result=validate_recommendation({
+            "based_on_event_seq":2,"action_type":"ITEM",
+            "items":[{"item":"チョコレート","quantity":1}],
+            "spend":{},"rule_ids":["DC-ITEM-001"]},
+            state,{"rules":[{"rule_id":"DC-ITEM-001","status":"ACTIVE"}]})
+        self.assertIn("UNRESOLVED_CAPTURE_CHRONOLOGY",result)
+        self.assertIn("ITEM_INVENTORY_NOT_VERIFIED",result)
+
+    def test_unattested_backward_screen_remains_stale(self):
+        state=replay([self._screen(1,"PM 5:40"),
+                      self._screen(2,"PM 5:20")])
+        self.assertEqual(state["current_exact_time"],"PM 5:40")
+        self.assertEqual(state["observations_ignored_as_stale"],["E2"])
+        self.assertEqual(state["timeline_status"],"TRUSTED")
+
+    def test_duplicate_slot_and_bad_capacity_rejected(self):
+        first=self._screen(1,"PM 5:20",attested=True)
+        first["visible_item_slots"][1]["slot"]=1
+        with self.assertRaises(ObservationError):
+            replay([first])
+        first=self._screen(1,"PM 5:20",attested=True)
+        first["visible_item_slots"][2]["display_denominator"]=0
+        with self.assertRaises(ObservationError):
+            replay([first])
+
+
 if __name__=="__main__":unittest.main()
