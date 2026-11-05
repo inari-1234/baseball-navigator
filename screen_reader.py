@@ -600,6 +600,81 @@ def __source_digest(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+# Native v1.42 item-use menu; exact, source-derived text silhouettes from
+# IMG_8972.png. They are NOT Japanese OCR or a catalogue of all items/counts.
+# The title and stock-label shapes serve as independent screen anchors.
+_ITEM_USE_TITLE = ((1030,146,1460,208),(58,11),
+    0x119460000000001819020f0608020803408c810200820510522080804081f46448202c103e510e003f0c14001f4081000608000103f04001020031f8101000800000000000000000)
+_ITEM_USE_STOCK_LABEL = ((1470,1120,1615,1178),(48,11),
+    0xc7b840418c6038f84c41984033f8405190406820c0c194404fd1fe43f44045f810f030000958fe41f7e0000000000000000000000)
+_ITEM_USE_CHOCOLATE = ((960,1120,1298,1178),(58,11),
+    0x40003c7f1f80801000111004004004000844010010190fe21100400400c00004401000001000011007e00004000047f0003c01000010000020000000000000000)
+_ITEM_USE_STOCK_ONE = ((1690,1128,1716,1170),(14,20),
+    0xfc03f00fc03f00fc03f00fc03f00fc03f00ff03fc0ff03f00fc0000)
+
+
+def _item_use_mask(image: Image.Image, spec, *, kind: str) -> int:
+    box, size, _ = spec
+    crop = image.crop(box).convert("RGB")
+    if kind == "title":
+        bits = [255 if r < 45 and g < 105 and 90 <= b <= 210 else 0
+                for r,g,b in crop.getdata()]
+    elif kind == "white":
+        bits = [255 if r >= 235 and g >= 235 and b >= 235 else 0
+                for r,g,b in crop.getdata()]
+    elif kind == "stock_digit":
+        bits = [255 if r >= 215 and g >= 215 and b >= 215 else 0
+                for r,g,b in crop.getdata()]
+    else:
+        raise ValueError("unknown item pixel class")
+    ink = Image.new("L",crop.size)
+    ink.putdata(bits)
+    small = ink.resize(size,Image.Resampling.NEAREST)
+    return sum(1 << i for i,px in enumerate(small.getdata()) if px)
+
+
+def read_item_use_page(image: Image.Image) -> dict[str, Any] | None:
+    """Recognize one verified item-use layout and selected-item stock only.
+
+    The screenshot does not prove the Confirm button was pressed or that the
+    visible stock is current. Do not promote this to a complete inventory
+    snapshot or an accepted ITEM_USE event. Unknown items/digits remain null.
+    """
+    if image.size != (BASE_W,BASE_H):
+        return None
+    if (_item_use_mask(image,_ITEM_USE_TITLE,kind="title") ^
+            _ITEM_USE_TITLE[2]).bit_count() > 6:
+        return None
+    if (_item_use_mask(image,_ITEM_USE_STOCK_LABEL,kind="white") ^
+            _ITEM_USE_STOCK_LABEL[2]).bit_count() > 5:
+        return None
+    item_name = "チョコレート" if (
+        _item_use_mask(image,_ITEM_USE_CHOCOLATE,kind="white") ^
+        _ITEM_USE_CHOCOLATE[2]).bit_count() <= 5 else None
+    quantity = 1 if (
+        _item_use_mask(image,_ITEM_USE_STOCK_ONE,kind="stock_digit") ^
+        _ITEM_USE_STOCK_ONE[2]).bit_count() <= 5 else None
+    errors=[]
+    if item_name is None:
+        errors.append("UNRECOGNIZED_SELECTED_ITEM_NAME")
+    if quantity is None:
+        errors.append("UNRECOGNIZED_SELECTED_ITEM_STOCK")
+    return {
+        "status": "PASS_DRAFT" if not errors else "NEEDS_REVIEW",
+        "recognized_layout": "IOS_V1_42_ITEM_USE_FIXED",
+        "selected_item_name": item_name,
+        "selected_item_stock": quantity,
+        "stock_scope": "SELECTED_ITEM_ONLY",
+        "stock_glyph_scope": "KNOWN_ONE_ONLY",
+        "errors": errors,
+        "full_inventory_verified": False,
+        "selected_player_verified": False,
+        "event_time_verified": False,
+        "item_use_confirmed": False,
+        "requires_manual_acceptance": True,
+    }
+
+
 def read_image(path: str | Path) -> dict[str, Any]:
     path = Path(path)
     raw = path.read_bytes()
@@ -615,7 +690,12 @@ def read_image(path: str | Path) -> dict[str, Any]:
                 elif roster["page_index"]==3:
                     result["roster_pitching_values"]=read_roster_pitching_values(im)
             else:
-                result["screen_type"] = _other_screen_type(im.convert("RGB"))
+                item_use = read_item_use_page(im)
+                if item_use is not None:
+                    result={"screen_type":"ITEM_USE_MENU", "positions":{},
+                            "item_use_page":item_use}
+                else:
+                    result["screen_type"] = _other_screen_type(im.convert("RGB"))
         if result["screen_type"]=="BATTER_RESULTS":
             result["batter_stats"]=read_batter_stats(im)
         elif result["screen_type"]=="PITCHER_RESULTS":
