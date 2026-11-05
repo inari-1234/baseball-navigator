@@ -573,6 +573,19 @@ class ItemUsePixelReaderRegression(unittest.TestCase):
             im.paste(ink,box[:2],mask)
         return im
 
+    def test_source_derived_item_mask_widths_cannot_be_shifted(self):
+        from screen_reader import (
+            _ITEM_USE_TITLE, _ITEM_USE_STOCK_LABEL,
+            _ITEM_USE_CHOCOLATE, _ITEM_USE_STOCK_ONE)
+        for spec, highest_bit, ink_count in (
+            (_ITEM_USE_TITLE,573,113),
+            (_ITEM_USE_STOCK_LABEL,432,127),
+            (_ITEM_USE_CHOCOLATE,515,76),
+            (_ITEM_USE_STOCK_ONE,220,96),
+        ):
+            self.assertEqual(spec[2].bit_length(),highest_bit)
+            self.assertEqual(spec[2].bit_count(),ink_count)
+
     def test_known_item_and_stock_are_draft_only(self):
         from screen_reader import read_item_use_page
         result=read_item_use_page(self._synthetic())
