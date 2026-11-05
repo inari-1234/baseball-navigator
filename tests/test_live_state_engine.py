@@ -478,6 +478,16 @@ class ItemEvidencePriorityRegression(unittest.TestCase):
         self.assertFalse(result["effect_is_guaranteed"])
         self.assertEqual(s["item_uses"][0]["event_id"],"E1")
 
+    def test_metric_effect_provenance_does_not_include_unrelated_item_events(self):
+        from live_state_engine import prioritize_item_use_drafts
+        s=self._ready(self._item_use(1,"バナナ",{"wisdom":7}),
+                      self._item_use(2,"バナナ",{"batting":3}))
+        result=prioritize_item_use_drafts(s,self._contract(),
+                                          [self._candidate(s)])
+        self.assertEqual(result["status"],"SINGLE_PRIORITY_DRAFT",result)
+        self.assertEqual(result["suggested"]["source_event_ids"],["E2"])
+        self.assertEqual(result["suggested"]["observed_sample_n"],1)
+
     def test_unknown_effect_and_unverified_inventory_block(self):
         from live_state_engine import prioritize_item_use_drafts
         blank=self._ready()
