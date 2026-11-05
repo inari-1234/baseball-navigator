@@ -422,4 +422,143 @@ class LiveStateRegression(unittest.TestCase):
         s=replay([screen(1,8),e(2,"MATCHES_COMPLETED",7)])
         self.assertTrue(s["resources"]["fresh"])
 
+
+class ItemEvidencePriorityRegression(unittest.TestCase):
+    def _contract(self):
+        return {"rules":[{"rule_id":"DC-ITEM-001","status":"ACTIVE"},
+                         {"rule_id":"DC-ACTION-001","status":"ACTIVE"}]}
+
+    def _item_use(self,n,item,delta,quantity=1):
+        return e(n,"ITEM_USE",branch="ACCEPTED",
+                 item_bundle=[{"item":item,"quantity":quantity}],
+                 effect_deltas=delta)
+
+    def _ready(self,*uses,inventory=None):
+        if inventory is None: inventory={"バナナ":2,"回復あめ":1}
+        nextseq=len(uses)+1
+        return replay(list(uses)+[{**screen(nextseq),
+                    "after_event_id":f"E{len(uses)}" if uses else None,
+                    "inventory":inventory}])
+
+    def _candidate(self,state,**changes):
+        candidate={"item":"バナナ","quantity":1,"player":"入江",
+                   "category":"ABILITY","effect_metric":"batting",
+                   "source_evidence_id":"SRC-RECENT-PLAYER-LEVEL",
+                   "october_core_verified":True,"low_level_verified":True,
+                   "based_on_event_seq":state["last_event_seq"],
+                   "spend_verified":True,"spend":{}}
+        candidate.update(changes)
+        return candidate
+
+    def test_two_selections_of_one_item_sum_to_inventory_demand(self):
+        s=self._ready(inventory={"バナナ":1})
+        errs=validate_recommendation({
+            "action_type":"ITEM","based_on_event_seq":s["last_event_seq"],
+            "rule_ids":["DC-ITEM-001"],"spend":{},
+            "items":[{"item":"バナナ","quantity":1},{"item":"バナナ","quantity":1}]
+        },s,self._contract())
+        self.assertIn("INSUFFICIENT_ITEM_INVENTORY",errs)
+
+    def test_single_attributed_effect_and_core_candidate_yield_draft(self):
+        from live_state_engine import (
+            observed_item_effect_samples,prioritize_item_use_drafts)
+        s=self._ready(self._item_use(1,"バナナ",{"batting":3}))
+        stats=observed_item_effect_samples(s)
+        self.assertEqual(stats["バナナ"]["deltas_by_metric"]["batting"],[3])
+        self.assertEqual(stats["バナナ"]["sample_n"],1)
+        result=prioritize_item_use_drafts(s,self._contract(),
+                                          [self._candidate(s)])
+        self.assertEqual(result["status"],"SINGLE_PRIORITY_DRAFT",result)
+        self.assertEqual(result["suggested"]["player"],"入江")
+        self.assertEqual(result["suggested"]["observed_single_use_deltas"],[3])
+        self.assertEqual(result["suggested"]["priority_reason"],
+                         "LOW_LEVEL_OCTOBER_CORE_ABILITY")
+        self.assertTrue(result["requires_manual_acceptance"])
+        self.assertFalse(result["automated_item_ocr"])
+        self.assertFalse(result["effect_is_guaranteed"])
+        self.assertEqual(s["item_uses"][0]["event_id"],"E1")
+
+    def test_unknown_effect_and_unverified_inventory_block(self):
+        from live_state_engine import prioritize_item_use_drafts
+        blank=self._ready()
+        unknown=prioritize_item_use_drafts(blank,self._contract(),
+                                            [self._candidate(blank)])
+        self.assertEqual(unknown["status"],"NEEDS_MORE_EVIDENCE")
+        self.assertIn("CANDIDATE_0:NO_POSITIVE_SINGLE_ITEM_EFFECT_SAMPLE",
+                      unknown["errors"])
+        stale=replay([self._item_use(1,"バナナ",{"batting":3})])
+        result=prioritize_item_use_drafts(stale,self._contract(),
+                                          [self._candidate(stale)])
+        self.assertEqual(result["status"],"NEEDS_MORE_EVIDENCE")
+        self.assertIn("CANDIDATE_0:ITEM_INVENTORY_NOT_VERIFIED",result["errors"])
+
+    def test_explicit_action_unblocking_recovery_outprioritizes_core_ability(self):
+        from live_state_engine import prioritize_item_use_drafts
+        s=self._ready(self._item_use(1,"バナナ",{"batting":3}),
+                      self._item_use(2,"回復あめ",{"hp":20}))
+        ability=self._candidate(s)
+        recovery=self._candidate(s,item="回復あめ",player="石渡",
+            category="RECOVERY",effect_metric="hp",
+            unlocks_blocked_action=True,
+            blocked_action_evidence_id="SRC-MATCH-BLOCKED")
+        r=prioritize_item_use_drafts(s,self._contract(),[ability,recovery])
+        self.assertEqual(r["status"],"SINGLE_PRIORITY_DRAFT",r)
+        self.assertEqual(r["suggested"]["item"],"回復あめ")
+        self.assertEqual(r["suggested"]["priority_reason"],
+                         "RECOVERY_UNLOCKS_VERIFIED_BLOCKED_ACTION")
+        self.assertEqual(r["suggested"]["observed_sample_n"],1)
+
+    def test_equal_priority_does_not_choose_unjustified_winner(self):
+        from live_state_engine import prioritize_item_use_drafts
+        s=self._ready(self._item_use(1,"バナナ",{"batting":3}))
+        a=self._candidate(s,player="入江")
+        b=self._candidate(s,player="今井")
+        result=prioritize_item_use_drafts(s,self._contract(),[a,b])
+        self.assertEqual(result["status"],"TIED_REVIEW_REQUIRED")
+        self.assertIsNone(result["suggested"])
+
+    def test_unsupported_effect_bundles_are_not_attributed_or_divided(self):
+        from live_state_engine import observed_item_effect_samples
+        s=self._ready(
+            e(1,"ITEM_USE",branch="ACCEPTED",
+                item_bundle=[{"item":"バナナ","quantity":1},
+                             {"item":"回復あめ","quantity":1}],
+                effect_deltas={"batting":5,"hp":20}),
+            self._item_use(2,"バナナ",{"batting":8},quantity=2))
+        self.assertEqual(observed_item_effect_samples(s),{})
+
+    def test_rollback_discards_item_effect_evidence(self):
+        from live_state_engine import observed_item_effect_samples
+        s=replay([e(1,"SAVE_CHECKPOINT"),
+                  self._item_use(2,"バナナ",{"batting":4}),
+                  e(3,"ROLLBACK",to_checkpoint_id="E1")])
+        self.assertEqual(observed_item_effect_samples(s),{})
+        self.assertEqual(s["item_uses"],[])
+
+    def test_stale_candidate_and_unverified_context_do_not_pass(self):
+        from live_state_engine import prioritize_item_use_drafts
+        s=self._ready(self._item_use(1,"バナナ",{"batting":3}))
+        stale=prioritize_item_use_drafts(
+            s,self._contract(),[self._candidate(s,based_on_event_seq=1)])
+        self.assertIn("CANDIDATE_0:STALE_REVISION",stale["errors"])
+        uncertain=prioritize_item_use_drafts(
+            s,self._contract(),[self._candidate(s,low_level_verified=False)])
+        self.assertIn("CANDIDATE_0:PRIORITY_CONTEXT_UNVERIFIED",
+                      uncertain["errors"])
+
+    def test_unknown_cost_or_effect_conflict_prevents_selection(self):
+        from live_state_engine import prioritize_item_use_drafts
+        s=self._ready(self._item_use(1,"バナナ",{"batting":3}),
+                      self._item_use(2,"バナナ",{"batting":-1}))
+        conflict=prioritize_item_use_drafts(s,self._contract(),
+                                             [self._candidate(s)])
+        self.assertEqual(conflict["status"],"NEEDS_MORE_EVIDENCE")
+        self.assertIn("CANDIDATE_0:NO_POSITIVE_SINGLE_ITEM_EFFECT_SAMPLE",
+                      conflict["errors"])
+        unverified_cost=prioritize_item_use_drafts(s,self._contract(),
+            [self._candidate(s,spend_verified=False)])
+        self.assertIn("CANDIDATE_0:MISSING_VERIFIED_INPUT",
+                      unverified_cost["errors"])
+
+
 if __name__=="__main__":unittest.main()
