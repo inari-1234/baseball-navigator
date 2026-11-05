@@ -641,6 +641,46 @@ class LiveJulyAndItemCorrectionRegression(unittest.TestCase):
         self.assertIn("UNRESOLVED_CAPTURE_CHRONOLOGY",result)
         self.assertIn("ITEM_INVENTORY_NOT_VERIFIED",result)
 
+    def test_user_confirmed_rollback_resolves_cause_but_not_savepoint(self):
+        report=self._screen(2,"PM 5:20",attested=True)
+        correction=e(3,"CORRECTION",source={
+            "kind":"USER_CORRECTION","locator":"User confirms rollback during investigation"},
+            target_event_id="E2",patch={"preceded_by_rollback":True})
+        state=replay([self._screen(1,"PM 5:40"),report,correction])
+        self.assertEqual(state["last_event_seq"],3)
+        self.assertEqual(state["timeline_status"],
+                         "ROLLBACK_CONFIRMED_SAVEPOINT_UNKNOWN")
+        self.assertEqual(state["rollback_report_event_id"],"E3")
+        self.assertEqual(state["current_exact_time"],"PM 5:20")
+        self.assertTrue(state["resources"]["fresh"])
+        self.assertFalse(state["inventory"]["fresh"])
+        rec={"based_on_event_seq":3,"action_type":"ITEM",
+             "items":[{"item":"チョコレート","quantity":1}],
+             "spend":{},"rule_ids":["DC-ITEM-001"]}
+        errors=validate_recommendation(
+            rec,state,{"rules":[{"rule_id":"DC-ITEM-001","status":"ACTIVE"}]})
+        self.assertIn("ROLLBACK_SAVEPOINT_UNKNOWN",errors)
+        self.assertIn("ITEM_INVENTORY_NOT_VERIFIED",errors)
+
+    def test_rollback_explanation_must_not_rewrite_noncurrent_event(self):
+        report=self._screen(1,"PM 5:40")
+        correction=e(2,"CORRECTION",source={
+            "kind":"USER_CORRECTION","locator":"test"},
+            target_event_id="E1",patch={"preceded_by_rollback":True})
+        with self.assertRaises(ObservationError):
+            replay([report,correction])
+        other=self._screen(1,"PM 5:20",attested=True)
+        forged=e(2,"CORRECTION",source={
+            "kind":"USER_REPORT","locator":"test"},
+            target_event_id="E1",patch={"preceded_by_rollback":True})
+        with self.assertRaises(ObservationError):
+            replay([other,forged])
+        false=e(2,"CORRECTION",source={
+            "kind":"USER_CORRECTION","locator":"test"},
+            target_event_id="E1",patch={"preceded_by_rollback":False})
+        with self.assertRaises(ObservationError):
+            replay([other,false])
+
     def test_unattested_backward_screen_remains_stale(self):
         state=replay([self._screen(1,"PM 5:40"),
                       self._screen(2,"PM 5:20")])
