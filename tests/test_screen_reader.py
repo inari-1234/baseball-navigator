@@ -547,6 +547,81 @@ class KnownRosterNameTemplateRegression(unittest.TestCase):
         self.assertEqual(result["rows"],[])
 
 
+class ItemUsePixelReaderRegression(unittest.TestCase):
+    """Synthetic fingerprints reconstructed from source-derived bit patterns."""
+    def _synthetic(self, *, item=True, count=True, title=True, label=True):
+        from screen_reader import (
+            _ITEM_USE_TITLE, _ITEM_USE_STOCK_LABEL,
+            _ITEM_USE_CHOCOLATE, _ITEM_USE_STOCK_ONE)
+        im=Image.new("RGB",(BASE_W,BASE_H),(20,120,205))
+        specs=[
+            (_ITEM_USE_TITLE,title,(0,50,150),(255,255,255)),
+            (_ITEM_USE_STOCK_LABEL,label,(255,255,255),(35,109,220)),
+            (_ITEM_USE_CHOCOLATE,item,(255,255,255),(55,83,169)),
+            (_ITEM_USE_STOCK_ONE,count,(248,248,251),(35,109,220)),
+        ]
+        for spec,enabled,ink,background in specs:
+            box,size,fingerprint=spec
+            ImageDraw.Draw(im).rectangle(box,fill=background)
+            if not enabled:
+                continue
+            img=Image.new("L",size)
+            img.putdata([255 if fingerprint >> i & 1 else 0
+                         for i in range(size[0]*size[1])])
+            mask=img.resize((box[2]-box[0],box[3]-box[1]),
+                            Image.Resampling.NEAREST)
+            im.paste(ink,box[:2],mask)
+        return im
+
+    def test_known_item_and_stock_are_draft_only(self):
+        from screen_reader import read_item_use_page
+        result=read_item_use_page(self._synthetic())
+        self.assertEqual(result["status"],"PASS_DRAFT",result)
+        self.assertEqual(result["selected_item_name"],"チョコレート")
+        self.assertEqual(result["selected_item_stock"],1)
+        self.assertEqual(result["stock_scope"],"SELECTED_ITEM_ONLY")
+        self.assertFalse(result["full_inventory_verified"])
+        self.assertFalse(result["item_use_confirmed"])
+        self.assertFalse(result["event_time_verified"])
+        self.assertFalse(result["selected_player_verified"])
+        self.assertTrue(result["requires_manual_acceptance"])
+
+    def test_missing_title_or_stock_label_are_not_item_screens(self):
+        from screen_reader import read_item_use_page
+        self.assertIsNone(read_item_use_page(self._synthetic(title=False)))
+        self.assertIsNone(read_item_use_page(self._synthetic(label=False)))
+        self.assertIsNone(read_item_use_page(
+            self._synthetic().resize((1311,603),Image.Resampling.NEAREST)))
+
+    def test_unknown_item_name_fails_closed_but_keeps_item_screen_type(self):
+        from screen_reader import read_item_use_page
+        result=read_item_use_page(self._synthetic(item=False))
+        self.assertEqual(result["status"],"NEEDS_REVIEW")
+        self.assertIsNone(result["selected_item_name"])
+        self.assertEqual(result["selected_item_stock"],1)
+        self.assertIn("UNRECOGNIZED_SELECTED_ITEM_NAME",result["errors"])
+
+    def test_unseen_stock_digit_does_not_become_one(self):
+        from screen_reader import read_item_use_page
+        result=read_item_use_page(self._synthetic(count=False))
+        self.assertEqual(result["status"],"NEEDS_REVIEW")
+        self.assertEqual(result["selected_item_name"],"チョコレート")
+        self.assertIsNone(result["selected_item_stock"])
+        self.assertIn("UNRECOGNIZED_SELECTED_ITEM_STOCK",result["errors"])
+
+    def test_read_image_dispatch_keeps_source_sha_and_no_live_event(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path=Path(tmp)/"item_menu.png"
+            self._synthetic().save(path)
+            digest=hashlib.sha256(path.read_bytes()).hexdigest()
+            result=read_image(path)
+        self.assertEqual(result["screen_type"],"ITEM_USE_MENU")
+        self.assertEqual(result["source"]["sha256"],digest)
+        self.assertEqual(result["item_use_page"]["status"],"PASS_DRAFT")
+        self.assertNotIn("inventory",result)
+        self.assertNotIn("item_use_event",result)
+
+
 class ScorePixelReaderRegression(unittest.TestCase):
     """Deterministic digit silhouettes; real-game screenshot probes are external."""
     def test_blue_glyph_coverage_and_unknown(self):
