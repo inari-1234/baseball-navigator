@@ -679,8 +679,14 @@ def read_image(path: str | Path) -> dict[str, Any]:
     path = Path(path)
     raw = path.read_bytes()
     with Image.open(io.BytesIO(raw)) as im:
-        result = read_formation(im)
-        if result["screen_type"] == "UNSUPPORTED":
+        # FAST: fixed native screen anchors are far cheaper than nine
+        # graphical HP track searches. A recognized non-formation view must
+        # never pay the formation cost or be mistaken for an HP observation.
+        item_use = read_item_use_page(im)
+        if item_use is not None:
+            result={"screen_type":"ITEM_USE_MENU", "positions":{},
+                    "item_use_page":item_use}
+        else:
             roster=read_roster_page(im)
             if roster is not None:
                 result={"screen_type":"ROSTER_LIST", "positions":{},
@@ -690,12 +696,16 @@ def read_image(path: str | Path) -> dict[str, Any]:
                 elif roster["page_index"]==3:
                     result["roster_pitching_values"]=read_roster_pitching_values(im)
             else:
-                item_use = read_item_use_page(im)
-                if item_use is not None:
-                    result={"screen_type":"ITEM_USE_MENU", "positions":{},
-                            "item_use_page":item_use}
+                # The score panels have an existing coarse fixed-palette
+                # signature. Other coarse UI hints are NOT strong enough
+                # to rule out a formation gauge, so they retain fallback.
+                coarse = _other_screen_type(im.convert("RGB"))
+                if coarse in {"BATTER_RESULTS", "PITCHER_RESULTS"}:
+                    result={"screen_type":coarse, "positions":{}}
                 else:
-                    result["screen_type"] = _other_screen_type(im.convert("RGB"))
+                    result=read_formation(im)
+                    if result["screen_type"] == "UNSUPPORTED":
+                        result["screen_type"]=coarse
         if result["screen_type"]=="BATTER_RESULTS":
             result["batter_stats"]=read_batter_stats(im)
         elif result["screen_type"]=="PITCHER_RESULTS":
