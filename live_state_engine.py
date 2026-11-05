@@ -108,6 +108,19 @@ def apply_corrections(events):
             continue
         if target not in base or not isinstance(patch,dict) or not patch:
             raise ObservationError("correction needs earlier target and nonempty patch")
+        if "preceded_by_rollback" in patch:
+            # This corrects capture chronology evidence, not the time/branch
+            # of a historical event. Without a save anchor, earlier match and
+            # item effects must NOT be asserted to survive the restore.
+            if (set(patch)!={"preceded_by_rollback"}
+                    or patch["preceded_by_rollback"] is not True
+                    or base[target]["kind"]!="SCREEN"
+                    or base[target].get("user_attested_current") is not True
+                    or e["source"]["kind"]!="USER_CORRECTION"
+                    or base[target].get("rollback_report_event_id")):
+                raise ObservationError("rollback explanation needs a user correction to an attested current SCREEN")
+            base[target]["rollback_report_event_id"]=e["event_id"]
+            continue
         if "completion_retracted" in patch:
             if (set(patch)!={"completion_retracted"}
                     or patch["completion_retracted"] is not True
@@ -194,7 +207,8 @@ def replay(events):
            "discarded_branch_event_ids":discarded,"rollback_count":rollback_count,
            "timeline_status":"UNKNOWN_AFTER_ROLLBACK" if unknown_after_rollback else "TRUSTED",
            "hp_by_player":{},
-           "current_exact_time":"UNKNOWN"}
+           "current_exact_time":"UNKNOWN",
+           "rollback_report_event_id":None}
     floor=None;closed=set();matches={};seen_attempts=set()
     last_mutation_id=None;last_screen_clock=None;last_screen_period=None;last_context_event_id=None
     def invalidate():
@@ -233,9 +247,14 @@ def replay(events):
                 if not attested:
                     state["observations_ignored_as_stale"].append(eid)
                     continue
-                # User confirms this is the current screen, not the cause of
-                # the earlier in-game clock. A SAVE/LOAD cannot be assumed.
-                state["timeline_status"]="UNRESOLVED_CAPTURE_CHRONOLOGY"
+                # The player may later explain why this earlier game clock
+                # is current. A user-confirmed rollback still does not prove
+                # which SAVE was restored, so keep the action gate closed.
+                if e.get("rollback_report_event_id"):
+                    state["timeline_status"]="ROLLBACK_CONFIRMED_SAVEPOINT_UNKNOWN"
+                    state["rollback_report_event_id"]=e["rollback_report_event_id"]
+                else:
+                    state["timeline_status"]="UNRESOLVED_CAPTURE_CHRONOLOGY"
             state["last_seen_screen_period"]=pk
             state["resources"]={"fresh":True,"values":{k:vals[k] for k in COUNTERS},"last_observed":eid}
             slots=e.get("visible_item_slots")
@@ -413,6 +432,8 @@ def validate_recommendation(rec,state,contract):
         errors.append("UNRESOLVED_ROLLBACK")
     if state.get("timeline_status")=="UNRESOLVED_CAPTURE_CHRONOLOGY":
         errors.append("UNRESOLVED_CAPTURE_CHRONOLOGY")
+    if state.get("timeline_status")=="ROLLBACK_CONFIRMED_SAVEPOINT_UNKNOWN":
+        errors.append("ROLLBACK_SAVEPOINT_UNKNOWN")
     if action_type=="MATCH":
         if not rec.get("target_match_id"):errors.append("MATCH_ID_REQUIRED")
         if not rec.get("target_period"):errors.append("MATCH_PERIOD_REQUIRED")
