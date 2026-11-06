@@ -156,6 +156,22 @@ class KnowledgeFixtures(unittest.TestCase):
                           r[0]["source"].update(sha256="incomplete"))
         self.expect_error("MISSING_SCREENSHOT_HASH")
 
+    def test_substituted_but_well_formed_image_hash_is_rejected(self):
+        self.mutate_jsonl("EVIDENCE_EVENTS.jsonl", lambda r:
+                          r[0]["source"].update(sha256="a"*64))
+        self.expect_error("IMAGE_DIGEST_CHANGED")
+
+    def test_future_manifest_required_claim_must_exist(self):
+        self.mutate_json("KNOWLEDGE_MANIFEST.json", lambda m:
+                         m["required_knowledge_ids"].append("NEW-IMPORTANT-DISCOVERY"))
+        self.expect_error("MANIFEST_REFERENCED_RECORD_MISSING")
+
+    def test_future_manifest_claim_status_must_match(self):
+        self.mutate_json("KNOWLEDGE_MANIFEST.json", lambda m:
+                         m["required_claim_statuses"].update(
+                             {"SKILL-4TH-PATTERN":"UNVERIFIED_HYPOTHESIS"}))
+        self.expect_error("MANIFEST_CLAIM_DOWNGRADED")
+
     def test_manifest_cannot_drop_required_claim(self):
         self.mutate_json("KNOWLEDGE_MANIFEST.json",lambda m:
                          m.update(required_knowledge_ids=[ACCEPTED]))
@@ -244,6 +260,18 @@ class NavigationGate(unittest.TestCase):
         self.assertEqual(out["knowledge"]["knowledge_status"],"OBSERVED_PATTERN")
         self.assertIn(FOURTH,out["knowledge_refs"])
         self.assertFalse(out["action_authorized"])
+
+    def test_skill_draft_cannot_bypass_gate_with_generic_question(self):
+        state=copy.deepcopy(self.state)
+        state["timeline_status"]="TRUSTED"
+        state["training_counts_by_player_drill"]={"入江|素振り":3}
+        rec=draft()
+        rec["knowledge_refs"]=[]
+        result=TextFastEngine(ROOT).plan(
+            "次は何をすべき？",state=state,contract=self.contract,
+            boot_verified=True,recommendation=rec)
+        self.assertEqual(result["status"],"ACTION_BLOCKED")
+        self.assertIn("FOURTH_KNOWLEDGE_REF_REQUIRED",result["errors"])
 
     def test_text_router_missing_evidence_fails_closed(self):
         with tempfile.TemporaryDirectory() as empty:
