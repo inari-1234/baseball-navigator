@@ -210,6 +210,55 @@ class TextFastSafetyRegression(unittest.TestCase):
         self.assertEqual(self.engine.route_hits,1)
         self.assertEqual(self.engine.action_validator_calls,0)
 
+    def test_real_current_match_schedule_is_read_only_and_not_completed(self):
+        canonical=json.loads(Path("CURRENT_LIVE_STATE.json").read_text(encoding="utf-8"))
+        p=self.route("今の試合予定を教えて",s=canonical)
+        self.assertEqual(p["status"],"READ_ONLY_READY",p)
+        obs=p["observation"]
+        self.assertEqual(obs["topic"],"MATCHES")
+        self.assertEqual(len(obs["scheduled_matches"]),3)
+        self.assertEqual(
+            {m["opponent"] for m in obs["scheduled_matches"]},
+            {"花さか高校","まんるい高校","生南高校"})
+        self.assertFalse(obs["prior_match_results_active_branch_verified"])
+        self.assertTrue(obs["historical_results_are_not_current_guide"])
+
+    def test_real_current_items_are_visible_slots_not_full_inventory(self):
+        canonical=json.loads(Path("CURRENT_LIVE_STATE.json").read_text(encoding="utf-8"))
+        p=self.route("現在のアイテム所持数は？",s=canonical)
+        obs=p["observation"]
+        self.assertEqual(obs["topic"],"ITEMS")
+        self.assertFalse(obs["full_inventory_verified"])
+        self.assertIsNone(obs["verified_inventory"])
+        self.assertEqual(len(obs["visible_item_rows"]),4)
+        self.assertEqual(obs["visible_item_rows"][0]["separately_verified_stock"],1)
+        self.assertTrue(all(r["separately_verified_stock"] is None
+                            for r in obs["visible_item_rows"][1:]))
+        self.assertFalse(obs["counter_denominator_is_stock_verified"])
+        self.assertFalse(obs["item_use_confirmed"])
+
+    def test_resources_project_only_truly_present_canonical_fields(self):
+        canonical=json.loads(Path("CURRENT_LIVE_STATE.json").read_text(encoding="utf-8"))
+        p=self.route("スポーツと研究ポイントの現在値は？",s=canonical)
+        obs=p["observation"]
+        self.assertEqual(obs["topic"],"RESOURCES")
+        self.assertTrue(obs["resource_fresh"])
+        self.assertEqual(obs["resource_values"]["sports"],28)
+        self.assertEqual(obs["resource_values"]["study"],4)
+        self.assertEqual(obs["source_event_id"],canonical["resources"]["last_observed"])
+        self.assertNotIn("money_yen",obs["resource_values"])
+
+    def test_returned_readonly_view_cannot_mutate_canonical_input(self):
+        s=state()
+        s["visible_item_slots"]={
+            "fresh":True, "source_event_id":"SRC","rows":[
+                {"item":"チョコレート","assigned":0,
+                 "display_denominator":1,"separately_verified_stock":1}]}
+        original=copy.deepcopy(s)
+        p=self.route("アイテムの所持数は？",s=s)
+        p["observation"]["visible_item_rows"][0]["item"]="改変"
+        self.assertEqual(s,original)
+
     def test_inactive_item_rule_fails_existing_validator(self):
         c=contract()
         c["rules"]=[r for r in c["rules"] if r["rule_id"]!="DC-ITEM-001"]
