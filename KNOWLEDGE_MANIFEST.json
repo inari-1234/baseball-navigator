@@ -1,0 +1,30 @@
+{
+  "schema_version": "1.0",
+  "required_knowledge_ids": [
+    "SKILL-4TH-PATTERN",
+    "SKILL-ACCEPTED-HISTORICAL"
+  ],
+  "required_experiment_trial_ids": [
+    "TR-SKILL-NO-RESULT-FIRST3",
+    "TR-SKILL-FOURTH-CONTROL",
+    "TR-SKILL-FOURTH-MEET"
+  ],
+  "required_evidence_ids": [
+    "EV-SKILL-IMG-1",
+    "EV-SKILL-IMG-2",
+    "EV-SKILL-IMG-3",
+    "EV-SKILL-IMG-4",
+    "EV-SKILL-IMG-5",
+    "EV-SKILL-IMG-6",
+    "EV-SKILL-USER-REPORT-20261106"
+  ],
+  "required_handoff_knowledge_ids": [
+    "SKILL-4TH-PATTERN",
+    "SKILL-ACCEPTED-HISTORICAL"
+  ],
+  "required_navigator_knowledge_ids": [
+    "SKILL-4TH-PATTERN"
+  ],
+  "fail_on_downgrade": true,
+  "description": "Fixed continuity fixture; required entries cannot silently disappear or be demoted in future handoffs."
+}
