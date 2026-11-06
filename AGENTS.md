@@ -46,6 +46,9 @@ Material decisions include at least: run abandonment/restart, official-tournamen
 
 Repeated `NO_RULE` of the same class is a candidate for contract amendment, not a license for silent improvisation.
 
+## TEXT FAST (text-only gameplay turns)
+After the ordered BOOT, when a text-only game turn needs routing and this repository's Python runtime is available, use `text_fast.py` to distinguish QUICK read-only queries, DELTA reports, actionable requests requiring the canonical validator, and FULL changes/development. Follow `docs/TEXT_FAST_PROTOCOL.md`. Its cached classification is never an action approval. Do not claim the program executed when it did not; without an executable runtime use the same safety boundaries and state that validation was not programmatic. Never skip live state, rules, rollback, or inventory checks.
+
 ## FAST mode
 Do not execute the full historical research pipeline every turn.
 Every turn must run the FAST core:
