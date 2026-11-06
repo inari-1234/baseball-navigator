@@ -8,6 +8,7 @@ Actions are only drafts after the canonical recommendation validator passes.
 from __future__ import annotations
 
 import argparse
+from copy import deepcopy
 import json
 import re
 import unicodedata
@@ -100,6 +101,63 @@ def classify_text(message: str) -> TextRoute:
     return TextRoute("NEEDS_CONTEXT", "REVIEW", "AMBIGUOUS_UNSUPPORTED_TEXT")
 
 
+def _read_only_projection(message: str, state: dict[str, Any]) -> dict[str, Any]:
+    """Return only already-grounded snapshot fields; no inference of events.
+
+    This is a small direct-answer path for frequent text queries. It never
+    promotes an unverified branch history or item counter to current stock.
+    """
+    text = _normalize(message)
+    topic = ("RESOURCES" if any(word in text for word in
+             ("所持金", "スポーツ", "研究", "応援", "資源", "ポイント", "お金"))
+             else "ITEMS" if any(word in text for word in
+             ("アイテム", "所持数", "チョコレート", "コーヒー", "鉄アレイ", "メガホン"))
+             else "MATCHES" if any(word in text for word in
+             ("試合", "対戦", "予定"))
+             else "STATUS")
+    branch_trusted = state.get("timeline_status") == "TRUSTED"
+    base = {
+        "topic": topic, "source_event_seq": state["last_event_seq"],
+        "current_game_period": state.get("period_floor"),
+        "current_game_clock": state.get("current_exact_time"),
+        "timeline_status": state.get("timeline_status", "UNKNOWN"),
+        "branch_trusted": branch_trusted,
+        "derived_not_independently_verified": True,
+    }
+    if topic == "RESOURCES":
+        resource = state.get("resources", {})
+        return {**base, "resource_fresh": resource.get("fresh") is True,
+                "source_event_id": resource.get("last_observed"),
+                "resource_values": deepcopy(resource.get("values"))
+                                   if resource.get("fresh") is True else None}
+    if topic == "ITEMS":
+        inv = state.get("inventory", {})
+        seen = state.get("visible_item_slots", {})
+        rows = seen.get("rows", []) if seen.get("fresh") is True else []
+        return {**base, "full_inventory_verified": inv.get("fresh") is True,
+                "verified_inventory": deepcopy(inv.get("items"))
+                    if inv.get("fresh") is True else None,
+                "visible_item_rows": deepcopy(rows),
+                "visible_item_rows_source_event_id": seen.get("source_event_id")
+                    if seen.get("fresh") is True else None,
+                "counter_denominator_is_stock_verified": False,
+                "item_use_confirmed": False}
+    if topic == "MATCHES":
+        matches = state.get("matches", {})
+        records = matches.values() if isinstance(matches, dict) else []
+        scheduled = [{"opponent": m.get("opponent"),
+                      "period": m.get("period"),
+                      "status": "SCHEDULED"}
+                     for m in records if isinstance(m, dict)
+                     and m.get("status") == "SCHEDULED"]
+        return {**base, "scheduled_matches": scheduled,
+                "prior_match_results_active_branch_verified": branch_trusted,
+                "historical_results_are_not_current_guide": not branch_trusted}
+    return {**base, "last_observed_resource_source_event_id":
+            state.get("resources", {}).get("last_observed"),
+            "inventory_complete": state.get("inventory", {}).get("fresh") is True}
+
+
 class TextFastEngine:
     """Cache only immutable text *routing*. Never cache a game action approval.
 
@@ -165,6 +223,7 @@ class TextFastEngine:
             # Source facts can be discussed; that does not authorize a game
             # action, and the model must still distinguish stale/UNKNOWN facts.
             return {**base, "status": "READ_ONLY_READY",
+                    "observation": _read_only_projection(message, state),
                     "fallback": "MARK_UNKNOWN_FIELDS"}
         if route.intent != "ACTION_EVALUATION":
             return {**base, "status": "NEEDS_CONTEXT"}
