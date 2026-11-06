@@ -113,7 +113,7 @@ def _read_only_projection(message: str, state: dict[str, Any]) -> dict[str, Any]
              else "ITEMS" if any(word in text for word in
              ("アイテム", "所持数", "チョコレート", "コーヒー", "鉄アレイ", "メガホン"))
              else "MATCHES" if any(word in text for word in
-             ("試合", "対戦", "予定"))
+             ("試合", "対戦"))
              else "STATUS")
     branch_trusted = state.get("timeline_status") == "TRUSTED"
     base = {
