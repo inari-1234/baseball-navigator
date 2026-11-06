@@ -3,6 +3,12 @@
 Last updated: 2026-11-06
 State: ACTIVE_Y1_JUNE_POST_ROLLBACK_CAPTURE — SAVEPOINT_UNKNOWN
 
+## Knowledge evidence continuity v1.0 (2026-11-06)
+- Required knowledge anchors: `KNOWLEDGE:SKILL-4TH-PATTERN` and `KNOWLEDGE:SKILL-ACCEPTED-HISTORICAL`. Their status and supporting trial/evidence links now live in `KNOWLEDGE_CLAIMS.json`, `EXPERIMENT_TRIALS.jsonl`, and `EVIDENCE_EVENTS.jsonl`, with `KNOWLEDGE_MANIFEST.json` specifying non-droppable fixtures.
+- CI/BOOT gate: `python3 knowledge_engine.py validate`. Image source metadata includes exact SHA-256s and conversation attachment IDs, **not GitHub-stored image bytes**. No screenshot is automatically interpreted as a distinct committed training attempt.
+- Skill advice is resolved through `knowledge_engine.skill_guidance`, and when actionable through `validate_skill_recommendation` plus the existing action validation. Skill advice without the fourth-session claim fails closed; only currently recorded committed `player|drill` training counts can qualify a specifically claimed fourth attempt. No progress or extra skill was added to current live projection.
+- The fourth-session finding is an observed historical pattern, not a universal guaranteed skill. At-report acceptance of 石渡／コントロールアップ and 入江／ミート力アップ remains independent of survival after the current unknown-anchor rollback. Use it for strategic choice without pretending the active branch retained historical skills.
+
 ## Skill acquisition: user-supplied repeat-trial evidence (2026-11-06; historical experiments)
 - **This supersedes the old wording '4th session is merely an unverified idea'.** The user supplied six dated in-game skill-acquisition screenshots plus their explicit SAVE/LOAD trial summary. Screens: IMG_8921(2).png (Y1 June AM10:20, **コントロールアップ**), IMG_8912(2).png, IMG_8911(3).png, IMG_8910(2).png, IMG_8909(2).png, IMG_8908(2).png (Y1 May AM10:10, **ミート力アップ**).
 - The user reports **all displayed skill-acquisition outcomes occurred on the fourth special-training attempt** and **about 40 reset attempts at sessions 1-3 yielded no skill acquisition**. This is meaningful observed evidence for a fourth-session activation hypothesis; it does not independently prove an unconditional guarantee, whether the counter is per-person or per-drill, or that ON/OFF rates match.
