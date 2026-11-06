@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Any
 
 from live_state_engine import validate_recommendation
+from knowledge_engine import KnowledgeError, skill_guidance, validate_skill_recommendation
 
 
 def _normalize(message: str) -> str:
@@ -38,7 +39,9 @@ _ACTION_QUERY = re.compile(
     r"優先(?:すべき|した方|順位)|使うべき|使った方|"
     r"特訓すべき|試合すべき|おすすめ|何をすべき|"
     r"次(?:は|に).{0,10}(?:すべき|何する|どうする)|"
-    r"勝つために|攻略(?:して|方針)|提案して)"
+    r"勝つために|攻略(?:して|方針)|提案して|"
+    r"スキル.{0,20}(?:狙|獲得|習得|優先|いい)|"
+    r"(?:4回目|四回目).{0,20}(?:特訓|スキル|練習))"
 )
 _HYPOTHETICAL = re.compile(r"(?:もし|仮に|(?:した|する)場合|(?:したら|すると|するなら|したとき)|としたら|ならば)")
 _QUESTION = re.compile(
@@ -165,7 +168,8 @@ class TextFastEngine:
     fetched by this library. Every plan checks the current revision again.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, knowledge_root: str | Path = ".") -> None:
+        self.knowledge_root = Path(knowledge_root)
         self._route_cache: dict[str, TextRoute] = {}
         self.route_hits = 0
         self.route_misses = 0
@@ -228,6 +232,17 @@ class TextFastEngine:
         if route.intent != "ACTION_EVALUATION":
             return {**base, "status": "NEEDS_CONTEXT"}
         base["rule_ids"] = base["rule_ids"] + ["DC-ACTION-001"]
+        is_skill_advice = ("スキル" in message or "skill" in _normalize(message)
+                           or "4回目" in message or "四回目" in message)
+        if is_skill_advice:
+            try:
+                base["knowledge"] = skill_guidance(state, root=self.knowledge_root)
+            except KnowledgeError as exc:
+                return {**base, "status": "KNOWLEDGE_GATE_FAILED",
+                        "errors": ["KNOWLEDGE_GATE:" + str(exc)],
+                        "fallback": "RESTORE_EVIDENCE_AND_RUN_CONTINUITY_GATE"}
+            base["knowledge_refs"] = base["knowledge"]["knowledge_refs"]
+            base["rule_ids"] = base["rule_ids"] + ["DC-TRAIN-001"]
         status = state.get("timeline_status")
         if status != "TRUSTED":
             return {**base, "status": "BLOCKED_UNVERIFIED_TIMELINE",
@@ -239,7 +254,10 @@ class TextFastEngine:
         # Validate every request, including repeats. The classifier cache
         # cannot cache this result and cannot bypass inventory/HP/period checks.
         self.action_validator_calls += 1
-        errors = validate_recommendation(recommendation, state, contract)
+        errors = (validate_skill_recommendation(
+            recommendation, state, contract, root=self.knowledge_root)
+            if is_skill_advice else
+            validate_recommendation(recommendation, state, contract))
         if errors:
             return {**base, "status": "ACTION_BLOCKED",
                     "errors": errors,
@@ -256,6 +274,8 @@ def main() -> None:
     parser.add_argument("text")
     parser.add_argument("--state", default="CURRENT_LIVE_STATE.json")
     parser.add_argument("--contract", default="DECISION_CONTRACT.json")
+    parser.add_argument("--knowledge-root", default=".",
+                        help="Read-only evidence/claims directory; validated for skill advice")
     parser.add_argument("--boot-verified", action="store_true",
                         help="Set only after ordered AGENTS.md BOOT verification")
     parser.add_argument("--expected-event-seq", type=int)
@@ -266,7 +286,7 @@ def main() -> None:
     contract = json.loads(Path(args.contract).read_text(encoding="utf-8"))
     rec = (json.loads(args.recommendation.read_text(encoding="utf-8"))
            if args.recommendation is not None else None)
-    result = TextFastEngine().plan(
+    result = TextFastEngine(args.knowledge_root).plan(
         args.text, state=state, contract=contract,
         boot_verified=args.boot_verified,
         expected_event_seq=args.expected_event_seq,
