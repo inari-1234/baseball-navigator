@@ -3,6 +3,14 @@
 Last updated: 2026-11-06
 State: ACTIVE_Y1_JUNE_POST_ROLLBACK_CAPTURE — SAVEPOINT_UNKNOWN
 
+## Skill acquisition: user-supplied repeat-trial evidence (2026-11-06; historical experiments)
+- **This supersedes the old wording '4th session is merely an unverified idea'.** The user supplied six dated in-game skill-acquisition screenshots plus their explicit SAVE/LOAD trial summary. Screens: IMG_8921(2).png (Y1 June AM10:20, **コントロールアップ**), IMG_8912(2).png, IMG_8911(3).png, IMG_8910(2).png, IMG_8909(2).png, IMG_8908(2).png (Y1 May AM10:10, **ミート力アップ**).
+- The user reports **all displayed skill-acquisition outcomes occurred on the fourth special-training attempt** and **about 40 reset attempts at sessions 1-3 yielded no skill acquisition**. This is meaningful observed evidence for a fourth-session activation hypothesis; it does not independently prove an unconditional guarantee, whether the counter is per-person or per-drill, or that ON/OFF rates match.
+- **SAVE/LOAD accepted-versus-discarded authority**: The user explicitly says retain only **石渡: コントロールアップ** and **入江: ミート力アップ, one accepted occurrence**. The other screenshots are discarded reroll outcomes, **not** independently acquired extra skills. Do not count each visible acquisition screenshot as committed.
+- The May/June trial screenshots precede the latest June PM5:20 post-rollback state. They establish a historical mechanism and the user's acceptance/discard reports, but cannot by themselves prove what survives the *later* unknown-anchor rollback. Do not silently add committed training counts or recovered skills to `CURRENT_LIVE_STATE.json` until active SAVE-branch provenance is reconciled.
+- **Gameplay decision**: Treat the fourth repetition as the first high-priority skill-roll checkpoint; avoid exhaustive reset-farming on attempts 1-3, focus rewards and SAVE/LOAD budget around the fourth, diversify participants where compatible with scoring gains and drill fit. This is an evidence-based operational preference, not a universal hard-coded acquisition probability. Report accepted skill, participant, drill and committed repetitions after the active branch is clear.
+- Fixed costs already in archival Authority; do not ask the player to re-enter them. Avoid full GitHub research during time-critical live play.
+
 ## TEXT FAST v1.0 — text-only routing authority (2026-11-06)
 - `text_fast.py` is now an executable, deterministic **text-only routing and safety-preflight tool**, documented in `docs/TEXT_FAST_PROTOCOL.md`, referenced from `AGENTS.md` and `docs/FAST_PLAY_PROTOCOL.md`. After ordered BOOT, execute it when a repository Python runtime is available for gameplay text routing; do not claim the chat platform automatically executes it.
 - QUICK handles familiar factual questions without replaying all `LIVE_EVENTS`; `observation` directly projects source-grounded current match schedules, visible item slots or fresh resource counters. DELTA routes explicitly reported changes to source-checking and ingestion; FULL is reserved for material game events, rollback, explicit development, and audit triggers. Unknown text and short `進めて` without task context return REVIEW.
@@ -40,7 +48,7 @@ Read `AGENTS.md`, `RUN_GUARD_POLICY.yaml`, `DECISION_CONTRACT.json`, `CURRENT_LI
 - Latest older resource screenshot: Y1 June PM5:40, money 15,980; Study 4 / Sports 28 / Play 25 / Nature 18 / Cheer 100. These numbers are **STALE** after July.
 - SUPERSEDED 2026-11-06 for month/time/counters: current screenshot Y1 June PM5:20; current branch chronology remains unresolved. HP is UNKNOWN.
 - Initial batting core 入江, pitching core 石渡, secondary 今井; these are older roster anchors and not newly measured current stats.
-- Skill-point accumulation / 4th committed drill threshold is an EXPERIMENTAL user hypothesis, not a verified hidden mechanic.
+- SUPERSEDED by the 2026-11-06 user-supplied fourth-session trial evidence above. The precise hidden threshold and per-player/drill counter scope remain unknown; the observed acquisition pattern is not unverified.
 
 ## Why prior gameplay advice failed
 AI analyzed screenshots and match reports but never committed their temporal deltas to an executable current-state model. It subsequently advised preparing for July matches already finished and reused June points for unverified later actions.
