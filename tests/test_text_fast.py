@@ -140,6 +140,24 @@ class TextFastSafetyRegression(unittest.TestCase):
         self.assertFalse(result["side_effects"])
         self.assertFalse(result["action_authorized"])
 
+    def test_quick_query_never_replays_the_full_event_history(self):
+        with patch("live_state_engine.replay",
+                   side_effect=AssertionError("full replay on QUICK")):
+            result=self.route("今の試合予定を教えて")
+        self.assertEqual(result["status"],"READ_ONLY_READY")
+        self.assertFalse(result["requires_full"])
+
+    def test_cached_route_cannot_bypass_newly_inactive_contract(self):
+        s=state()
+        self.route("今の試合予定を教えて",s=s)
+        other=contract()
+        other["rules"]=[r for r in other["rules"]
+                         if r["rule_id"]!="DC-PROC-002"]
+        result=self.engine.plan("今の試合予定を教えて",state=s,
+                                contract=other,boot_verified=True)
+        self.assertEqual(result["status"],"CONTRACT_REQUIRED")
+        self.assertGreater(self.engine.route_hits,0)
+
     def test_live_report_does_not_automatically_apply_delta(self):
         s=state()
         old=copy.deepcopy(s)
