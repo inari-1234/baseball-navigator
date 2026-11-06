@@ -82,6 +82,21 @@ class TextFastClassificationRegression(unittest.TestCase):
             with self.subTest(text=text):
                 self.assertFalse(classify_text(text).requires_ingest)
 
+    def test_conditional_advice_is_not_a_completed_event(self):
+        for text in ["特訓したら次は何をすべき？",
+                     "ロールバックしたらどうなる？",
+                     "もし試合に勝ったら何をする？"]:
+            with self.subTest(text=text):
+                r=classify_text(text)
+                self.assertFalse(r.requires_ingest)
+
+    def test_known_item_use_report_must_be_ingested_first(self):
+        for item in ["チョコレート", "鉄アレイ", "コーヒー", "声だしメガホン"]:
+            with self.subTest(item=item):
+                result=classify_text(item+"を使った")
+                self.assertEqual(result.intent,"STATE_REPORT")
+                self.assertTrue(result.requires_ingest)
+
     def test_ambiguous_followup_is_not_an_unapproved_action(self):
         for text in ["進めて","続けて","お願い",""]:
             with self.subTest(text=text):
