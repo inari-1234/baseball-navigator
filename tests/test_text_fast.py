@@ -204,6 +204,27 @@ class TextFastSafetyRegression(unittest.TestCase):
         self.assertEqual(p["status"],"ACTION_BLOCKED")
         self.assertIn("INVALID_RULE_ID",p["errors"])
 
+    def test_cli_uses_real_canonical_snapshot_and_writes_nothing(self):
+        import hashlib
+        import subprocess
+        import sys
+        paths=[Path("CURRENT_LIVE_STATE.json"),Path("DECISION_CONTRACT.json")]
+        before=[hashlib.sha256(path.read_bytes()).hexdigest() for path in paths]
+        proc=subprocess.run(
+            [sys.executable,"text_fast.py","アイテムを使うべき？",
+             "--boot-verified","--expected-event-seq","10"],
+            capture_output=True,text=True,check=True)
+        result=json.loads(proc.stdout)
+        self.assertEqual(result["status"],"BLOCKED_UNVERIFIED_TIMELINE",result)
+        self.assertFalse(result["side_effects"])
+        self.assertEqual(
+            [hashlib.sha256(path.read_bytes()).hexdigest() for path in paths],
+            before)
+        no_boot=subprocess.run(
+            [sys.executable,"text_fast.py","今の試合予定は？"],
+            capture_output=True,text=True,check=True)
+        self.assertEqual(json.loads(no_boot.stdout)["status"],"BOOT_REQUIRED")
+
     def test_full_development_route_does_not_trigger_match_action(self):
         with patch("text_fast.validate_recommendation",
                    side_effect=AssertionError("not an action")):
