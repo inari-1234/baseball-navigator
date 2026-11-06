@@ -26,5 +26,17 @@
     "SKILL-4TH-PATTERN"
   ],
   "fail_on_downgrade": true,
-  "description": "Fixed continuity fixture; required entries cannot silently disappear or be demoted in future handoffs."
+  "description": "Fixed continuity fixture; required entries cannot silently disappear or be demoted in future handoffs.",
+  "required_image_sha256s": {
+    "EV-SKILL-IMG-1": "7077824fe6136fdf9776fbd1b6f815f16c389e644bb625161a7dc931fbfb47d2",
+    "EV-SKILL-IMG-2": "318701b886e5b967a04e9e75563beffb600855ed5c471cb636fbcb90777cf8bb",
+    "EV-SKILL-IMG-3": "a599fdb5dfd894197a58c68a06d3f3041aff5f822b552c43e2b77882181ba266",
+    "EV-SKILL-IMG-4": "c1e0d4094a6d0febe475d343726fad7f447076488e9fc9d476d0d3d0905325b0",
+    "EV-SKILL-IMG-5": "7ac0ef40cf3d30e248c68e198be7639197b0981d5751743405d2aac38db27412",
+    "EV-SKILL-IMG-6": "a442bcca5ed1134d99cabc2be16542171b4d1001c52cd7b9de44582a610cda0f"
+  },
+  "required_claim_statuses": {
+    "SKILL-4TH-PATTERN": "OBSERVED_PATTERN",
+    "SKILL-ACCEPTED-HISTORICAL": "USER_REPORTED_HISTORICAL_ACCEPTANCE"
+  }
 }
