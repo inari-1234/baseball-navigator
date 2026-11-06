@@ -33,3 +33,6 @@ Deterministic CI checks that item/roster/score screens do **not** execute the HP
 
 ## Current boundary
 Y1 June PM5:20 current screenshot follows user-confirmed rollback; restored SAVE anchor unknown. Y1 July matches are SCHEDULED. Four item-slot icons are visible but not a fully verified inventory. Relevant rules: DC-PROC-001, DC-PROC-002, DC-INGEST-001, DC-STATE-001, DC-SCREEN-001, DC-ACTION-001.
+
+## Text-only questions
+Use `docs/TEXT_FAST_PROTOCOL.md` and its executable `text_fast.py` for ordinary text-only game questions when the repository runtime is available. QUICK may return source-grounded match schedule/item-slot/resource projections without full event replay. Reports route to DELTA or FULL and must be ingested separately; actions still call the live validator every time. Do not claim the Python code ran automatically in ChatGPT if it was not actually invoked.
