@@ -46,6 +46,11 @@ Material decisions include at least: run abandonment/restart, official-tournamen
 
 Repeated `NO_RULE` of the same class is a candidate for contract amendment, not a license for silent improvisation.
 
+## Evidence and knowledge continuity gate
+For experiments, screenshots and SAVE/LOAD results, keep immutable observations in `EVIDENCE_EVENTS.jsonl`, test-group histories in `EXPERIMENT_TRIALS.jsonl`, and promoted evidence-backed knowledge in `KNOWLEDGE_CLAIMS.json`. `KNOWLEDGE_MANIFEST.json` contains non-droppable key discoveries. Before claiming a skill mechanic is unverified, before skill-focused navigation and at every handoff/release, execute `knowledge_engine.py validate` or equivalent `validate_knowledge()`. If required evidence, accepted/discarded branch distinctions or a promoted discovery are missing, stop with `KNOWLEDGE_GATE` rather than silently demoting or inventing a conclusion.
+
+Use `knowledge_engine.skill_guidance` and `validate_skill_recommendation` for skill acquisition advice. A 4th-session screenshot confirms an observed result in an experiment but does not itself authorize current-run progress. Only committed training recorded on the active branch counts, and an unknown SAVE restore anchor must block paid actions. Screenshot hashes with `repository_bytes_persisted=false` are *metadata only*: do not claim the original screenshot image bytes are safely in GitHub. Full rules: `docs/KNOWLEDGE_PROTOCOL.md`.
+
 ## TEXT FAST (text-only gameplay turns)
 After the ordered BOOT, when a text-only game turn needs routing and this repository's Python runtime is available, use `text_fast.py` to distinguish QUICK read-only queries, DELTA reports, actionable requests requiring the canonical validator, and FULL changes/development. Follow `docs/TEXT_FAST_PROTOCOL.md`. Its cached classification is never an action approval. Do not claim the program executed when it did not; without an executable runtime use the same safety boundaries and state that validation was not programmatic. Never skip live state, rules, rollback, or inventory checks.
 
