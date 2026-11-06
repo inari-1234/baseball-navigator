@@ -58,3 +58,12 @@ This avoids unnecessary full historical replay for plain questions, but no numer
 - CLI integration using the actual committed state and contract; no source writes.
 
 No automatic game decisions, native ChatGPT response hooks, or external cache persistence are claimed. Only add them after separately verified end-to-end integration and tests.
+
+## Grounded direct-answer projections
+For READ_ONLY questions, `TextFastEngine.plan` now adds `observation` derived only from the supplied validated state projection:
+- `MATCHES`: scheduled match opponents/periods; past results are not asserted to survive an unknown rollback.
+- `ITEMS`: source-linked visible slot labels and the separately verified bottom-stock values; `0/2` remains a slot denominator, not 2 units of confirmed inventory.
+- `RESOURCES`: only snapshot fields with `resources.fresh=true` and source event ID; missing money/HP values are not invented.
+- `STATUS`: current period, game clock, timeline status and provenance, with unknown branch plainly marked.
+
+All projections are read-only and deep-copy nested source fields to prevent accidental mutation. Source limitations still apply: no independent OCR, no cache of a historical state, and no hidden-item extrapolation. A quick projection is **not** a complete gameplay decision.
