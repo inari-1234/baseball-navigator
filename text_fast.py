@@ -232,8 +232,12 @@ class TextFastEngine:
         if route.intent != "ACTION_EVALUATION":
             return {**base, "status": "NEEDS_CONTEXT"}
         base["rule_ids"] = base["rule_ids"] + ["DC-ACTION-001"]
-        is_skill_advice = ("スキル" in message or "skill" in _normalize(message)
-                           or "4回目" in message or "四回目" in message)
+        is_skill_advice = (
+            "スキル" in message or "skill" in _normalize(message)
+            or "4回目" in message or "四回目" in message
+            or (isinstance(recommendation, dict) and (
+                recommendation.get("skill_goal") is not None
+                or recommendation.get("claimed_fourth_checkpoint") is True)))
         if is_skill_advice:
             try:
                 base["knowledge"] = skill_guidance(state, root=self.knowledge_root)
