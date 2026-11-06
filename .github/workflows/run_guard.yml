@@ -16,6 +16,13 @@ on:
       - "CURRENT_LIVE_STATE.json"
       - "LIVE_EVENTS.jsonl"
       - "live_state_engine.py"
+      - "knowledge_engine.py"
+      - "text_fast.py"
+      - "EVIDENCE_EVENTS.jsonl"
+      - "EXPERIMENT_TRIALS.jsonl"
+      - "KNOWLEDGE_CLAIMS.json"
+      - "KNOWLEDGE_MANIFEST.json"
+      - "docs/KNOWLEDGE_PROTOCOL.md"
       - "screen_reader.py"
       - "tests/**"
       - "docs/LIVE_OBSERVATION_CONTRACT.md"
@@ -67,6 +74,13 @@ jobs:
           python3 validate_decision_contract.py \
             --json-out "${RUNNER_TEMP}/DECISION_CONTRACT_RESULT.json"
           cat "${RUNNER_TEMP}/DECISION_CONTRACT_RESULT.json" >> "${GITHUB_STEP_SUMMARY}"
+
+      - name: Validate evidence and knowledge continuity
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 knowledge_engine.py validate | tee "${RUNNER_TEMP}/KNOWLEDGE_RESULT.json"
+          cat "${RUNNER_TEMP}/KNOWLEDGE_RESULT.json" >> "${GITHUB_STEP_SUMMARY}"
 
       - name: Install screenshot reader image library
         shell: bash
