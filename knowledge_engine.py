@@ -93,6 +93,14 @@ def validate_knowledge(root: str | Path = ".", *, check_handoff: bool = True) ->
         refs = manifest.get(key)
         _require(isinstance(refs, list) and all(k in refs for k in mandatory),
                  "MANIFEST_MISSING:" + key)
+    # Any future mandatory ID added to the manifest must resolve, not just
+    # the two historically hard-coded baseline discoveries.
+    for key, actual in (
+        ("required_evidence_ids", ev),
+        ("required_experiment_trial_ids", trials),
+        ("required_knowledge_ids", claims)):
+        _require(all(i in actual for i in manifest[key]),
+                 "MANIFEST_REFERENCED_RECORD_MISSING:" + key)
     for key in ("schema_version", "knowledge_version"):
         _require(isinstance(_read_json(root / "KNOWLEDGE_CLAIMS.json").get(key), str),
                  "BAD_KNOWLEDGE_VERSION")
@@ -181,6 +189,21 @@ def validate_knowledge(root: str | Path = ".", *, check_handoff: bool = True) ->
                      row.get("observation", {}).get("approx_reset_attempts") == 40 and
                      row.get("observation", {}).get("negative_ordinal_range") == [1, 3],
                      "USER_SOURCE_NOT_CONSISTENT_WITH_CLAIM")
+    required_sha = manifest.get("required_image_sha256s")
+    _require(isinstance(required_sha, dict) and
+             all(e in required_sha for e in REQUIRED_EVIDENCE[:-1]),
+             "MANIFEST_IMAGE_HASHES_MISSING")
+    for eid, digest in required_sha.items():
+        _require(eid in ev and ev[eid].get("kind") == "SCREENSHOT" and
+                 ev[eid]["source"].get("sha256") == digest,
+                 "IMAGE_DIGEST_CHANGED:" + eid)
+    required_statuses = manifest.get("required_claim_statuses")
+    _require(isinstance(required_statuses, dict) and
+             all(c in required_statuses for c in REQUIRED_CLAIMS),
+             "MANIFEST_CLAIM_STATUSES_MISSING")
+    for cid, required_status in required_statuses.items():
+        _require(cid in claims and claims[cid].get("status") == required_status,
+                 "MANIFEST_CLAIM_DOWNGRADED:" + cid)
     if check_handoff:
         try:
             handoff = (root / "CURRENT_HANDOFF.md").read_text(encoding="utf-8")
