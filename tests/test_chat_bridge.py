@@ -53,6 +53,29 @@ class ChatBridgeTests(unittest.TestCase):
         self.assertEqual(r["context_source"], "NO_USER_CONTEXT_PUBLIC_REQUEST")
         self.assertTrue(r["source_is_current_only_at_this_commit"])
 
+    def test_boot_intent_returns_full_verified_resume_capsule(self):
+        response=bridge_response(request(intent="BOOT"),root=ROOT,
+                                 actual_main_sha=FAKE_SHA)
+        self.assertEqual(response["status"],"BOOT_VERIFIED_ACTIONS_BLOCKED")
+        self.assertEqual(response["state_event_seq"],10)
+        self.assertFalse(response["action_authorized"])
+        self.assertFalse(response["side_effects"])
+        self.assertIn("SKILL-4TH-PATTERN",response["knowledge_refs"])
+        self.assertIn("DC-STATE-001",response["rule_ids"])
+        self.assertEqual(response["boot_report"]["project_id"],
+                         "kairosoft-baseball-story-sapporo-sprint")
+        self.assertEqual(response["boot_report"]["state"]["period"],"Y1-06")
+        self.assertEqual(response["boot_report"]["state"]["current_skills"],
+                         "UNVERIFIED_AFTER_ROLLBACK")
+        self.assertTrue(response["boot_report"]["live_replay_verified"])
+        self.assertEqual(len(response["boot_report"]["boot_files_read"]),7)
+        self.assertFalse(response["boot_report"]["automatic_new_chat_invocation_guaranteed"])
+
+    def test_boot_intent_stale_event_seq_rejected(self):
+        with self.assertRaisesRegex(ChatBridgeError,"STALE_EVENT_REVISION"):
+            bridge_response(request(intent="BOOT",expected_event_seq=9),
+                            root=ROOT,actual_main_sha=FAKE_SHA)
+
     def test_all_intents_are_readonly(self):
         for intent in INTENTS:
             with self.subTest(intent=intent):
