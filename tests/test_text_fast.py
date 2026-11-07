@@ -52,6 +52,31 @@ class TextFastClassificationRegression(unittest.TestCase):
                 self.assertEqual(plan.intent,"ACTION_EVALUATION")
                 self.assertEqual(plan.mode,"QUICK")
 
+    def test_training_questions_are_not_ingested_as_completed_sessions(self):
+        for text in ["たきは3回特訓した？4回目スキル狙っていい？",
+                     "たきはすでに3回特訓してたっけ？",
+                     "何回特訓した？", "特訓した？"]:
+            with self.subTest(text=text):
+                result = classify_text(text)
+                self.assertFalse(result.requires_ingest)
+                self.assertNotEqual(result.intent, "STATE_REPORT")
+        self.assertEqual(
+            classify_text("たきは3回特訓した？4回目スキル狙っていい？").intent,
+            "ACTION_EVALUATION")
+
+    def test_cheer_on_off_questions_require_action_gate(self):
+        for text in ["応援はすべてONでいい？", "全て応援使う？",
+                     "応援OFFの方がいい？"]:
+            with self.subTest(text=text):
+                result = classify_text(text)
+                self.assertEqual(result.intent, "ACTION_EVALUATION")
+                self.assertFalse(result.requires_ingest)
+
+    def test_statement_before_question_still_requires_ingest(self):
+        result = classify_text("特訓した。次は何をすべき？")
+        self.assertEqual(result.intent, "STATE_REPORT")
+        self.assertTrue(result.requires_ingest)
+
     def test_development_is_explicit_full_not_silent_automatic(self):
         for text in ["コードとテストしてみよう", "ロジックを組んで",
                      "GitHubへ反映して", "設計して"]:
@@ -128,6 +153,29 @@ class TextFastSafetyRegression(unittest.TestCase):
         r=self.engine.plan("今の状態",state=state(),contract=incomplete,
                            boot_verified=True)
         self.assertEqual(r["status"],"CONTRACT_REQUIRED")
+
+    def test_training_count_query_does_not_claim_exact_total(self):
+        s = state(trusted=True)
+        s["training_counts_by_player_drill"] = {"たき|素振り": 3}
+        out = self.route("たきはすでに3回特訓してたっけ？", s=s)
+        self.assertEqual(out["status"], "READ_ONLY_READY")
+        obs = out["observation"]
+        self.assertEqual(obs["topic"], "TRAINING_COUNTS")
+        self.assertEqual(obs["exact_total_status"], "UNKNOWN")
+        self.assertEqual(obs["event_ledger_counts_lower_bound"], {"たき|素振り": 3})
+        self.assertFalse(obs["ledger_complete_from_run_start"])
+        self.assertFalse(obs["fourth_checkpoint_verified"])
+        s["timeline_status"] = "ROLLBACK_CONFIRMED_SAVEPOINT_UNKNOWN"
+        blocked = self.route("たきはすでに3回特訓してたっけ？", s=s)
+        self.assertEqual(blocked["observation"]["count_scope"],
+                         "UNVERIFIED_AFTER_ROLLBACK")
+        self.assertIsNone(blocked["observation"]["event_ledger_counts_lower_bound"])
+
+    def test_cheer_question_is_action_blocked_on_current_rollback(self):
+        s = state(trusted=False)
+        out = self.route("応援はすべてONでいい？", s=s)
+        self.assertEqual(out["status"], "BLOCKED_UNVERIFIED_TIMELINE")
+        self.assertFalse(out["action_authorized"])
 
     def test_no_implicit_event_write_and_readonly_skips_action_validation(self):
         s=state()
