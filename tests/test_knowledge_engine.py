@@ -17,7 +17,8 @@ from text_fast import TextFastEngine, classify_text
 
 ROOT = Path(__file__).resolve().parents[1]
 FIXTURES = (
-    "EVIDENCE_EVENTS.jsonl", "EXPERIMENT_TRIALS.jsonl",
+    "EVIDENCE_EVENTS.jsonl", "EVIDENCE_BACKUP_CHECKPOINTS.jsonl",
+    "EXPERIMENT_TRIALS.jsonl",
     "KNOWLEDGE_CLAIMS.json", "KNOWLEDGE_MANIFEST.json",
     "AGENTS.md", "CURRENT_HANDOFF.md",
 )
@@ -83,6 +84,45 @@ class KnowledgeFixtures(unittest.TestCase):
         self.assertEqual(len({e["source"]["sha256"] for e in imgs}),6)
         self.assertTrue(all(e["source"]["repository_bytes_persisted"] is False
                             for e in imgs))
+
+    def test_checkpoint_metadata_coverage_and_timepoint_semantics(self):
+        outcome = validate_knowledge(self.root)
+        self.assertEqual(outcome["private_backup_verified_at_checkpoint"], 6)
+        self.assertFalse(outcome["private_backup_current_access_verified_by_ci"])
+        backups=load_knowledge(self.root)["backups"]
+        self.assertEqual(len(backups), 6)
+        self.assertTrue(all(not row["original_bytes_in_repository"]
+                            and not row["private_locator_in_repository"]
+                            and row["availability_now_not_guaranteed"]
+                            for row in backups.values()))
+
+    def test_missing_backup_checkpoint_fails(self):
+        self.mutate_jsonl("EVIDENCE_BACKUP_CHECKPOINTS.jsonl",
+                          lambda rows: rows.pop())
+        self.expect_error("SCREENSHOT_BACKUP_COVERAGE_MISSING")
+
+    def test_public_attestation_sha_mismatch_fails(self):
+        self.mutate_jsonl("EVIDENCE_BACKUP_CHECKPOINTS.jsonl",
+                          lambda rows: rows[0].update(
+                              library_readback_sha256="a"*64))
+        self.expect_error("BACKUP_IMAGE_HASH_MISMATCH")
+
+    def test_duplicate_public_attestation_fails(self):
+        self.mutate_jsonl("EVIDENCE_BACKUP_CHECKPOINTS.jsonl",
+                          lambda rows: rows.append(copy.deepcopy(rows[0])))
+        self.expect_error("DUPLICATE_RECORD_ID")
+
+    def test_leaked_private_locator_rejected(self):
+        self.mutate_jsonl("EVIDENCE_BACKUP_CHECKPOINTS.jsonl",
+                          lambda rows: rows[0].update(
+                              library_file_id="libfile_SECRET"))
+        self.expect_error("PUBLIC_BACKUP_PRIVATE_FIELD_LEAK")
+
+    def test_misleading_permanent_availability_status_fails(self):
+        self.mutate_jsonl("EVIDENCE_BACKUP_CHECKPOINTS.jsonl",
+                          lambda rows: rows[0].update(
+                              availability_now_not_guaranteed=False))
+        self.expect_error("INVALID_BACKUP_ATTESTATION")
 
     def test_missing_image_evidence_fails(self):
         self.mutate_jsonl("EVIDENCE_EVENTS.jsonl", lambda r: r.pop(0))
