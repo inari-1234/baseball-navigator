@@ -65,10 +65,53 @@ def load_knowledge(root: str | Path = ".") -> dict[str, Any]:
     root = Path(root)
     return {
         "evidence": _index(_read_jsonl(root / "EVIDENCE_EVENTS.jsonl"), "evidence_id"),
+        "backups": _index(_read_jsonl(root / "EVIDENCE_BACKUP_CHECKPOINTS.jsonl"), "checkpoint_id"),
         "trials": _index(_read_jsonl(root / "EXPERIMENT_TRIALS.jsonl"), "trial_id"),
         "claims": _index(_read_json(root / "KNOWLEDGE_CLAIMS.json")["claims"], "claim_id"),
         "manifest": _read_json(root / "KNOWLEDGE_MANIFEST.json"),
     }
+
+
+def _validate_backup_checkpoints(evidence: dict[str, Any], backups: dict[str, Any],
+                                 manifest: dict[str, Any]) -> int:
+    """Check public checkpoint attestations only, NOT current Library access."""
+    allowed = {"checkpoint_id", "backup_batch_id", "evidence_id", "source_sha256",
+               "library_readback_sha256", "status", "storage_class",
+               "verification_method", "verified_at_utc", "private_manifest_sha256",
+               "original_bytes_in_repository", "private_locator_in_repository",
+               "availability_now_not_guaranteed"}
+    seen = set()
+    for checkpoint_id, entry in backups.items():
+        _require(set(entry) <= allowed, "PUBLIC_BACKUP_PRIVATE_FIELD_LEAK:" + checkpoint_id)
+        eid = entry.get("evidence_id")
+        _require(eid in evidence and evidence[eid].get("kind") == "SCREENSHOT",
+                 "BACKUP_UNKNOWN_SCREENSHOT:" + checkpoint_id)
+        _require(eid not in seen, "DUPLICATE_BACKUP_SCREENSHOT:" + str(eid))
+        seen.add(eid)
+        source_digest = evidence[eid]["source"].get("sha256")
+        _require(entry.get("source_sha256") == source_digest and
+                 entry.get("library_readback_sha256") == source_digest,
+                 "BACKUP_IMAGE_HASH_MISMATCH:" + checkpoint_id)
+        _require(entry.get("status") == "VERIFIED_AT_CHECKPOINT" and
+                 entry.get("storage_class") == "USER_LIBRARY" and
+                 entry.get("verification_method") == "UPLOAD_LIST_MATERIALIZE_SHA256" and
+                 entry.get("original_bytes_in_repository") is False and
+                 entry.get("private_locator_in_repository") is False and
+                 entry.get("availability_now_not_guaranteed") is True,
+                 "INVALID_BACKUP_ATTESTATION:" + checkpoint_id)
+        for key in ("private_manifest_sha256",):
+            _require(bool(HEX64.fullmatch(str(entry.get(key, "")))),
+                     "BACKUP_MANIFEST_HASH_REQUIRED:" + checkpoint_id)
+        _require(bool(entry.get("backup_batch_id")) and
+                 bool(entry.get("verified_at_utc")),
+                 "BACKUP_AUDIT_METADATA_MISSING:" + checkpoint_id)
+    expected = {e for e, data in evidence.items() if data.get("kind") == "SCREENSHOT"}
+    _require(seen == expected, "SCREENSHOT_BACKUP_COVERAGE_MISSING")
+    for required_id in manifest.get("required_backup_checkpoint_ids", []):
+        _require(required_id in backups, "MANIFEST_BACKUP_MISSING:" + required_id)
+    _require(manifest.get("backup_checkpoint_mode") == "HISTORICAL_READBACK_AT_TIME",
+             "BACKUP_SEMANTICS_UNCLEAR")
+    return len(seen)
 
 
 def validate_knowledge(root: str | Path = ".", *, check_handoff: bool = True) -> dict[str, Any]:
@@ -81,6 +124,7 @@ def validate_knowledge(root: str | Path = ".", *, check_handoff: bool = True) ->
     data = load_knowledge(root)
     ev, trials, claims, manifest = (
         data["evidence"], data["trials"], data["claims"], data["manifest"])
+    backup_count = _validate_backup_checkpoints(ev, data["backups"], manifest)
     for typ, actual, mandatory in (
         ("EVIDENCE", ev, REQUIRED_EVIDENCE),
         ("TRIAL", trials, REQUIRED_TRIALS),
@@ -216,9 +260,13 @@ def validate_knowledge(root: str | Path = ".", *, check_handoff: bool = True) ->
         _require("KNOWLEDGE_MANIFEST.json" in agents and
                  "knowledge_engine.py" in agents,
                  "AGENT_KNOWLEDGE_GATE_NOT_WIRED")
+        _require("BACKUP:BK-SKILL-20261107-01" in handoff,
+                 "HANDOFF_BACKUP_CHECKPOINT_MISSING")
         _require("EXPERIMENTAL user hypothesis, not a verified hidden mechanic" not in handoff,
                  "OUTDATED_HYPOTHESIS_PHRASE_REINTRODUCED")
     return {"result": "PASS", "claims": len(claims), "evidence": len(ev),
+            "private_backup_verified_at_checkpoint": backup_count,
+            "private_backup_current_access_verified_by_ci": False,
             "trial_groups": len(trials), "original_media_persisted": False,
             "required_claim_ids": list(REQUIRED_CLAIMS),
             "claim_status": claim["status"],
