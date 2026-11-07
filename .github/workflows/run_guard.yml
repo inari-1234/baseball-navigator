@@ -19,6 +19,8 @@ on:
       - "knowledge_engine.py"
       - "text_fast.py"
       - "EVIDENCE_EVENTS.jsonl"
+      - "EVIDENCE_BACKUP_CHECKPOINTS.jsonl"
+      - "backup_verifier.py"
       - "EXPERIMENT_TRIALS.jsonl"
       - "KNOWLEDGE_CLAIMS.json"
       - "KNOWLEDGE_MANIFEST.json"
