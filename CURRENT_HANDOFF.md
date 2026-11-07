@@ -3,6 +3,12 @@
 Last updated: 2026-11-06
 State: ACTIVE_Y1_JUNE_POST_ROLLBACK_CAPTURE — SAVEPOINT_UNKNOWN
 
+## Private image-original backup checkpoint (2026-11-07)
+- Required checkpoint: `BACKUP:BK-SKILL-20261107-01`. The six historical skill-acquisition PNG originals were uploaded into the existing user's Baseball Authority Library workspace, listed independently, materialized back into a fresh container location, and SHA-256 compared with each original and source manifest: **6/6 matched**. A private manifest mapping evidence ID -> Library file ID/path/readback SHA is retained in the same Library folder. The private locator details and original image bytes are **not** in public GitHub.
+- Public audit metadata: `EVIDENCE_BACKUP_CHECKPOINTS.jsonl` (six time-point readback attestations) and `KNOWLEDGE_MANIFEST.json` required checkpoint IDs. `knowledge_engine.validate_knowledge` checks every source SHA equals its attested readback SHA, rejects incomplete coverage and private locator leakage, but **GitHub Actions does not access private Library and does not prove future availability**.
+- Repeat retrieval verification: use `backup_verifier.py --private-manifest <private-file> --restored-dir <new-Library-download-folder>` with the repo's evidence and checkpoint files. No private manifest, Library IDs, Library paths or user-owned image bytes should be committed to GitHub.
+- Historical fourth-session skill evidence stays unchanged. No game event, skill or current-run resource was added by this archival work. Continue TEXT FAST gameplay; back up critical new screenshots at a separate evidence checkpoint rather than delaying each ordinary recommendation.
+
 ## Knowledge evidence continuity v1.0 (2026-11-06)
 - Required knowledge anchors: `KNOWLEDGE:SKILL-4TH-PATTERN` and `KNOWLEDGE:SKILL-ACCEPTED-HISTORICAL`. Their status and supporting trial/evidence links now live in `KNOWLEDGE_CLAIMS.json`, `EXPERIMENT_TRIALS.jsonl`, and `EVIDENCE_EVENTS.jsonl`, with `KNOWLEDGE_MANIFEST.json` specifying non-droppable fixtures.
 - CI/BOOT gate: `python3 knowledge_engine.py validate`. Image source metadata includes exact SHA-256s and conversation attachment IDs, **not GitHub-stored image bytes**. No screenshot is automatically interpreted as a distinct committed training attempt.
