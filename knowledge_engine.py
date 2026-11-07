@@ -260,8 +260,9 @@ def validate_knowledge(root: str | Path = ".", *, check_handoff: bool = True) ->
         _require("KNOWLEDGE_MANIFEST.json" in agents and
                  "knowledge_engine.py" in agents,
                  "AGENT_KNOWLEDGE_GATE_NOT_WIRED")
-        _require("BACKUP:BK-SKILL-20261107-01" in handoff,
-                 "HANDOFF_BACKUP_CHECKPOINT_MISSING")
+        for batch_id in manifest.get("required_handoff_backup_batch_ids", []):
+            _require(("BACKUP:" + batch_id) in handoff,
+                     "HANDOFF_BACKUP_CHECKPOINT_MISSING:" + batch_id)
         _require("EXPERIMENTAL user hypothesis, not a verified hidden mechanic" not in handoff,
                  "OUTDATED_HYPOTHESIS_PHRASE_REINTRODUCED")
     return {"result": "PASS", "claims": len(claims), "evidence": len(ev),
