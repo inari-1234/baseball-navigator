@@ -3,6 +3,12 @@
 Last updated: 2026-11-08
 State: ACTIVE_Y1_JUNE_POST_ROLLBACK_CAPTURE — SAVEPOINT_UNKNOWN
 
+## P6 actual ChatGPT-to-GitHub BOOT roundtrip verified (2026-11-08)
+- **E2E PASS:** connected ChatGPT created `bridge/p6-boot-proof-20261108-01` with strict `NAV_CHAT_REQUEST.json` (`intent=BOOT`), which ran GitHub Actions `42393501184` (SUCCESS; job `128465829395`). The actual job-log JSON was parsed and cross-checked in this conversation.
+- Request ID `p6-boot-proof-20261108-01`; source main SHA `8228a939cce1350cfe32f81ce53b3daa3683873d`; event seq 10. BOOT verified all 7 ordered sources, live event replay equality, knowledge continuity and required fourth-training pattern. The report maintained rollback unknown, scheduled July 3 matches, Sports28/Cheer100, historical at-report acceptance of 石渡コントロールアップ and 入江ミート力アップ, and the safe STOP on resource-paid actions.
+- Actual result: `BOOT_VERIFIED_ACTIONS_BLOCKED`, `action_authorized=false`, `side_effects=false`. It demonstrates a **tool-mediated read-only connection at this source revision**, not a globally automatic ChatGPT startup hook or completed SAVE reconciliation. Run: https://github.com/inari-1234/baseball-navigator/actions/runs/42393501184.
+- P6 candidate CI `42393275496` and first main CI `42393353470` succeeded with 311 tests and a source-pinned BOOT+P4 verification gate. Later main revisions require fresh SHA/seq validation; never reuse the old capsule as live current data.
+
 ## P6 one-phrase verified project resume (2026-11-08)
 - Canonical discovery: `PROJECT_ENTRYPOINT.json` identifies `inari-1234/baseball-navigator` for specific short phrases such as 「野球部ものがたりの続き」. Generic 「野球部」/「続き」 alone must NOT select this project.
 - Actual BOOT engine: `project_bootstrap.py` (protocol `docs/PROJECT_RESUME_P6.md`). It reads `AGENTS.md` first, all seven BOOT authorities in prescribed order, checks source SHA/revision, exactly replays `LIVE_EVENTS.jsonl` to `CURRENT_LIVE_STATE.json`, validates goal, latest decision and required ACTIVE rules, and runs `knowledge_engine.validate_knowledge`. Missing or inconsistent authority fails closed. Output includes file hashes, source commit, event 10, known resources and scheduled July matches, knowledge claim IDs and the next safe step; no state writes or game operation.
