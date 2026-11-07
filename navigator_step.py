@@ -160,9 +160,8 @@ def _train_candidate(drill: dict, cheer: str, state: dict[str, Any],
                                                root=context["_knowledge_root"])
     else:
         errors = validate_recommendation(recommendation, state, contract)
-    if cheer == "OFF":
-        # Skills have only been shown with Cheer ON in the recorded training.
-        required.append("SKILL_ACQUISITION_WITH_CHEER_OFF_NOT_ESTABLISHED")
+    # Cheer OFF can still be a valid ability/level progression action. Its
+    # skill acquisition probability remains UNKNOWN, never a proven benefit.
     blocked = sorted(set(required + errors))
     return {
         "id": drill["id"] + "_" + cheer,
