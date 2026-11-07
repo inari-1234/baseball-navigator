@@ -483,7 +483,9 @@ def main() -> None:
             out = {
                 "schema_version": "1.0",
                 "component": "navigator_step+p5_image",
-                "status": "IMAGE_OBSERVATION_READY",
+                "status": ("UNSUPPORTED_SCREEN_NEEDS_MANUAL_REVIEW"
+                           if picture.get("screen_type") == "UNSUPPORTED"
+                           else "IMAGE_OBSERVATION_READY"),
                 "source_event_seq": state.get("last_event_seq"),
                 "source_sha256": picture["source_sha256"],
                 "screenshot_observation": picture,
