@@ -27,6 +27,7 @@ INTENTS = {
     "MATCH": "試合すべき？",
     "RECOVERY": "アイテムを使うべき？",
     "STATUS": "現在の状態を教えて",
+    "TRAINING_COUNTS": "現在の本線の特訓回数の記録を確認して",
     "BOOT": "野球部ものがたりの続き",
 }
 REQUIRED_FIELDS = {
