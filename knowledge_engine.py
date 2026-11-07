@@ -124,7 +124,6 @@ def validate_knowledge(root: str | Path = ".", *, check_handoff: bool = True) ->
     data = load_knowledge(root)
     ev, trials, claims, manifest = (
         data["evidence"], data["trials"], data["claims"], data["manifest"])
-    backup_count = _validate_backup_checkpoints(ev, data["backups"], manifest)
     for typ, actual, mandatory in (
         ("EVIDENCE", ev, REQUIRED_EVIDENCE),
         ("TRIAL", trials, REQUIRED_TRIALS),
@@ -248,6 +247,7 @@ def validate_knowledge(root: str | Path = ".", *, check_handoff: bool = True) ->
     for cid, required_status in required_statuses.items():
         _require(cid in claims and claims[cid].get("status") == required_status,
                  "MANIFEST_CLAIM_DOWNGRADED:" + cid)
+    backup_count = _validate_backup_checkpoints(ev, data["backups"], manifest)
     if check_handoff:
         try:
             handoff = (root / "CURRENT_HANDOFF.md").read_text(encoding="utf-8")
