@@ -1,7 +1,7 @@
 {
   "schema_version": "1.0",
-  "request_id": "p4-resume-general-20261108-03",
-  "intent": "GENERAL",
+  "request_id": "p4-resume-skill-20261108-04",
+  "intent": "SKILL",
   "expected_main_sha": "309b5e540d9ef6431a886cbc2aa23bbe59c50d08",
   "expected_event_seq": 10
 }
