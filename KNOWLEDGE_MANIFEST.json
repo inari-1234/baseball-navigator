@@ -52,5 +52,29 @@
   "backup_checkpoint_limitations": "CI only validates immutable public attestation consistency; live private Library reachability requires separate raw-file re-materialization and SHA-256.",
   "required_handoff_backup_batch_ids": [
     "BK-SKILL-20261107-01"
-  ]
+  ],
+  "required_navigation_tactics": {
+    "TRAIN_CONTACT": {
+      "drill": "素振り",
+      "sports_cost": 6,
+      "cheer_on_cost": 20,
+      "historical_group": [
+        "岡治",
+        "今井",
+        "たき"
+      ]
+    },
+    "TRAIN_POWER": {
+      "drill": "ダンベル",
+      "sports_cost": 7,
+      "cheer_on_cost": null,
+      "historical_group": [
+        "芦田",
+        "今井",
+        "入江"
+      ]
+    }
+  },
+  "required_navigation_engine": "navigator_step.py",
+  "required_navigation_protocol": "docs/NAVIGATOR_STEP_PROTOCOL.md"
 }
