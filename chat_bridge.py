@@ -151,8 +151,11 @@ def bridge_response(request: Any, *, root: str | Path,
         raise ChatBridgeError("EXECUTION_BOUNDARY_VIOLATED")
     # No user input or source file paths are reflected in this public response.
     # Include enough evidence and stop reasons for the assistant to answer directly.
+    blocked_for_user = result.get("status") != "VALIDATED_DRAFT_REVIEW"
     result_candidate = None
-    cid = result.get("selected_candidate") or result.get("provisional_target")
+    # A blocked internal comparison is NOT a ChatGPT-facing action plan.
+    # Do not export its historical participants, Cheer setting or costs.
+    cid = result.get("selected_candidate") if not blocked_for_user else None
     if isinstance(cid, str):
         for item in result.get("candidates", []):
             if item.get("id") == cid:
@@ -179,9 +182,10 @@ def bridge_response(request: Any, *, root: str | Path,
         "timeline_status": state.get("timeline_status"),
         "status": result["status"],
         "primary_next_step": result.get("primary_next_step"),
-        "provisional_target": result.get("provisional_target"),
+        "provisional_target": None if blocked_for_user else result.get("provisional_target"),
         "selected_candidate": result.get("selected_candidate"),
         "candidate": result_candidate,
+        "blocked_candidate_suppressed": blocked_for_user,
         "failure_mode": result.get("failure_mode"),
         "rule_ids": result.get("rule_ids", []),
         "knowledge_refs": result.get("knowledge_refs", []),

@@ -3,6 +3,11 @@
 Last updated: 2026-11-08
 State: ACTIVE_Y1_JUNE_POST_ROLLBACK_CAPTURE — SAVEPOINT_UNKNOWN
 
+## Response boundary correction — candidate P7-A (2026-11-08)
+- Independent review identified a real output-boundary defect: P3 intentionally retains historical conditional training candidates while the P4 `SKILL` response exposed blocked candidate players, Cheer and costs. ChatGPT subsequently presented these historical candidates as an apparent next training plan and asserted unsupported current-run counts. The underlying P3 counter validation was not defective.
+- Candidate scope: clarify `AGENTS.md` and `docs/NAVIGATOR_STEP_PROTOCOL.md`; suppress P4 candidate and provisional target fields when status is not `VALIDATED_DRAFT_REVIEW`; invert the affected bridge regression. Do not change live events, current SAVE branch, training counters or historical experiments.
+- Acceptance: Run Guard regression PASS; blocked P4 response has no player/Cheer/cost plan, preserved blockers/source SHA/event seq, and known P6/knowledge invariants. This does not guarantee control of any unconstrained ChatGPT reply or tool invocation. Follow-up separate owner: precise question classification and complete-versus-lower-bound training counts.
+
 ## P6 actual ChatGPT-to-GitHub BOOT roundtrip verified (2026-11-08)
 - **E2E PASS:** connected ChatGPT created `bridge/p6-boot-proof-20261108-01` with strict `NAV_CHAT_REQUEST.json` (`intent=BOOT`), which ran GitHub Actions `42393501184` (SUCCESS; job `128465829395`). The actual job-log JSON was parsed and cross-checked in this conversation.
 - Request ID `p6-boot-proof-20261108-01`; source main SHA `8228a939cce1350cfe32f81ce53b3daa3683873d`; event seq 10. BOOT verified all 7 ordered sources, live event replay equality, knowledge continuity and required fourth-training pattern. The report maintained rollback unknown, scheduled July 3 matches, Sports28/Cheer100, historical at-report acceptance of 石渡コントロールアップ and 入江ミート力アップ, and the safe STOP on resource-paid actions.

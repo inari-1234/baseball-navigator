@@ -44,12 +44,14 @@ class ChatBridgeTests(unittest.TestCase):
         self.assertEqual(r["status"], "BLOCKED_UNVERIFIED_TIMELINE")
         self.assertIn("SKILL-4TH-PATTERN", r["knowledge_refs"])
         self.assertEqual(r["primary_next_step"], "VERIFY_CURRENT_SAVE_ANCHOR")
-        self.assertEqual(r["provisional_target"], "TRAIN_CONTACT_ON")
+        self.assertIsNone(r["provisional_target"])
         self.assertFalse(r["action_authorized"])
         self.assertFalse(r["side_effects"])
-        self.assertEqual(r["candidate"]["cost"], {"sports":6, "cheer":20})
-        self.assertEqual(r["candidate"]["participants"], ["岡治", "今井", "たき"])
-        self.assertTrue(r["candidate"]["skills_not_guaranteed"])
+        self.assertIsNone(r["candidate"])
+        self.assertTrue(r["blocked_candidate_suppressed"])
+        self.assertNotIn("岡治", json.dumps(r, ensure_ascii=False))
+        self.assertNotIn("たき", json.dumps(r, ensure_ascii=False))
+        self.assertNotIn("TRAIN_CONTACT_ON", json.dumps(r, ensure_ascii=False))
         self.assertEqual(r["context_source"], "NO_USER_CONTEXT_PUBLIC_REQUEST")
         self.assertTrue(r["source_is_current_only_at_this_commit"])
 
@@ -84,6 +86,9 @@ class ChatBridgeTests(unittest.TestCase):
                 self.assertEqual(r["intent"], intent)
                 self.assertFalse(r["action_authorized"])
                 self.assertFalse(r["side_effects"])
+                if r["status"] != "VALIDATED_DRAFT_REVIEW" and intent != "BOOT":
+                    self.assertIsNone(r.get("candidate"))
+                    self.assertIsNone(r.get("provisional_target"))
                 self.assertTrue(r["rule_ids"])
 
     def test_status_response_is_readonly_projection(self):

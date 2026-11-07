@@ -79,7 +79,7 @@ From repository root after actually verifying BOOT:
     python3 navigator_step.py "スキル獲得に向けて何をすべき？" --boot-verified --expected-event-seq 10
     python3 navigator_step.py "次は何をすべき？" --boot-verified --context /path/to/verified_context.json
 
-Current game: rollback confirmed, SAVE anchor unknown -> result BLOCKED_UNVERIFIED_TIMELINE. No item or training is authorized. The output nevertheless includes source-measured costs and historical candidate groups with conditional reasons.
+Current game: rollback confirmed, SAVE anchor unknown -> result BLOCKED_UNVERIFIED_TIMELINE. No item or training is authorized. The P3 internal candidate comparison can contain historical costs/groups, but the ChatGPT-facing P4 bridge MUST suppress all blocked candidate fields (including historical participant names, Cheer and costs). Respond with only the blocking status and evidence needed for current-run reconciliation; never turn a conditional internal candidate into a recommended sequence.
 
 With a trusted state and current-sourced readiness, result may be VALIDATED_DRAFT_REVIEW including exactly one selected validated draft, controlling ACTIVE rule IDs, evidence/knowledge IDs and fallback. action_authorized remains false in all cases, and no game state is modified.
 
