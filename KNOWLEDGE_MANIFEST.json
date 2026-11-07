@@ -49,5 +49,8 @@
     "CHK-BK-EV-SKILL-IMG-6"
   ],
   "backup_batch_id": "BK-SKILL-20261107-01",
-  "backup_checkpoint_limitations": "CI only validates immutable public attestation consistency; live private Library reachability requires separate raw-file re-materialization and SHA-256."
+  "backup_checkpoint_limitations": "CI only validates immutable public attestation consistency; live private Library reachability requires separate raw-file re-materialization and SHA-256.",
+  "required_handoff_backup_batch_ids": [
+    "BK-SKILL-20261107-01"
+  ]
 }
