@@ -1,7 +1,7 @@
 {
   "schema_version": "1.0",
-  "request_id": "p6-boot-proof-20261108-01",
+  "request_id": "p6-boot-proof-20261108-02",
   "intent": "BOOT",
-  "expected_main_sha": "8228a939cce1350cfe32f81ce53b3daa3683873d",
+  "expected_main_sha": "309b5e540d9ef6431a886cbc2aa23bbe59c50d08",
   "expected_event_seq": 10
 }
