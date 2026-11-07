@@ -19,6 +19,8 @@ on:
       - "knowledge_engine.py"
       - "text_fast.py"
       - "navigator_step.py"
+      - "quick_image_pipeline.py"
+      - "docs/P5_QUICK_IMAGE_PROTOCOL.md"
       - "chat_bridge.py"
       - "docs/CHAT_BRIDGE_P4.md"
       - ".github/workflows/chat_bridge.yml"
@@ -125,6 +127,28 @@ jobs:
       - name: Install screenshot reader image library
         shell: bash
         run: python3 -m pip install --disable-pip-version-check "Pillow==11.3.0"
+
+      - name: P5 local screenshot benchmark (synthetic, not iPhone latency)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          import tempfile
+          from pathlib import Path
+          from PIL import Image
+          from quick_image_pipeline import benchmark_local
+          with tempfile.TemporaryDirectory() as directory:
+              path=Path(directory)/"synthetic_world.png"
+              image=Image.new("RGB",(2622,1206),(10,20,30))
+              image.putpixel((100,80),(10,150,240))
+              image.save(path)
+              result=benchmark_local(path,repeats=9)
+          assert result["unique_pixel_decode_calls"] == 1
+          assert result["chat_latency_measured"] is False
+          print("P5_SYNTHETIC_LOCAL_BENCHMARK:"+json.dumps(
+              result,ensure_ascii=False))
+          PY
 
       - name: Test live state ingestion and replay
         shell: bash
