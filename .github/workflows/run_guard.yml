@@ -23,6 +23,9 @@ on:
       - "docs/P5_QUICK_IMAGE_PROTOCOL.md"
       - "docs/FAST_PLAY_PROTOCOL.md"
       - "chat_bridge.py"
+      - "project_bootstrap.py"
+      - "PROJECT_ENTRYPOINT.json"
+      - "docs/PROJECT_RESUME_P6.md"
       - "docs/CHAT_BRIDGE_P4.md"
       - ".github/workflows/chat_bridge.yml"
       - "NAV_TACTICS.json"
@@ -125,6 +128,34 @@ jobs:
                "status":result["status"]},ensure_ascii=False))
           PY
 
+      - name: P6 verify one-phrase BOOT and bridge with exact source SHA
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 project_bootstrap.py "野球部ものがたりの続き" --expected-main-sha "${GITHUB_SHA}" > "${RUNNER_TEMP}/PROJECT_BOOT.json"
+          python3 - <<'PY'
+          import json, os
+          from chat_bridge import bridge_response
+          sha = os.environ["GITHUB_SHA"]
+          report = json.load(open(os.environ["RUNNER_TEMP"] + "/PROJECT_BOOT.json", encoding="utf-8"))
+          assert report["source_commit_sha"] == sha
+          assert report["status"] == "BOOT_VERIFIED_ACTIONS_BLOCKED"
+          assert report["live_replay_verified"] is True
+          assert report["knowledge_integrity_verified"] is True
+          assert "SKILL-4TH-PATTERN" in report["knowledge"]["required_claim_ids"]
+          assert report["action_authorized"] is False
+          request = {"schema_version": "1.0", "request_id": "p6-ci-resume",
+                     "intent": "BOOT", "expected_main_sha": sha,
+                     "expected_event_seq": report["state"]["event_seq"]}
+          returned = bridge_response(request, root=".", actual_main_sha=sha)
+          assert returned["status"] == report["status"]
+          assert returned["source_commit_sha"] == sha
+          assert returned["action_authorized"] is False
+          print("P6_ONE_PHRASE_BOOT_PASS:" + json.dumps({
+              "source_sha": sha, "event_seq": report["state"]["event_seq"],
+              "status": returned["status"], "knowledge": returned["knowledge_refs"]
+          }, ensure_ascii=False))
+          PY
       - name: Install screenshot reader image library
         shell: bash
         run: python3 -m pip install --disable-pip-version-check "Pillow==11.3.0"
