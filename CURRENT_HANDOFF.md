@@ -1,7 +1,14 @@
 # CURRENT_HANDOFF
 
-Last updated: 2026-11-06
+Last updated: 2026-11-07
 State: ACTIVE_Y1_JUNE_POST_ROLLBACK_CAPTURE — SAVEPOINT_UNKNOWN
+
+## Navigator Step P3 integration (2026-11-07)
+- Next-action engine: NAVIGATOR:navigator_step.py, grounded historical tactics NAV_TACTICS.json, protocol docs/NAVIGATOR_STEP_PROTOCOL.md; candidate choices compare batting contact, slugging/power, scheduled matches, and item-based recovery with the same current-snapshot revision and ACTIVE rule gate.
+- Knowledge source: KNOWLEDGE:SKILL-4TH-PATTERN. The fourth-session historical popup pattern and negative 1–3 reset evidence are used for skill targeting; **accepted branch only** supplies current skill/count progress, and ability/skill results are never copied from discarded experiments.
+- Current canonical state remains Y1 June PM5:20, last_event_seq=10, Sports28/Cheer100, July matches SCHEDULED, timeline_status=ROLLBACK_CONFIRMED_SAVEPOINT_UNKNOWN, inventory not complete. Thus P3 currently outputs BLOCKED_UNVERIFIED_TIMELINE and candidate comparison without authorizing paid gameplay.
+- No automatic ChatGPT/Python bridge has been installed: the agent must explicitly invoke the CLI when available, or apply the same source checks manually. A validated draft is not an executed game action. Original image Library backups and public metadata have not changed.
+- P3 release requires the new tests/test_navigator_step.py as well as prior Run Guard, decision trace, evidence continuity, backup and event replay CI checks. Current game files/ledger/decision log remain unchanged by this development.
 
 ## Private image-original backup checkpoint (2026-11-07)
 - Required checkpoint: `BACKUP:BK-SKILL-20261107-01`. The six historical skill-acquisition PNG originals were uploaded into the existing user's Baseball Authority Library workspace, listed independently, materialized back into a fresh container location, and SHA-256 compared with each original and source manifest: **6/6 matched**. A private manifest mapping evidence ID -> Library file ID/path/readback SHA is retained in the same Library folder. The private locator details and original image bytes are **not** in public GitHub.
