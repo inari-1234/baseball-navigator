@@ -27,7 +27,7 @@ Failure-mode preference is ordinal, not a claim of expected runs:
 - CONTACT: poor contact -> contact training.
 - CONVERSION: hits but 0–1 run -> power/high-impact skills.
 - ADEQUATE: only if a current-period match is genuinely ready.
-- RECOVERY_REQUIRED: only with proven player need, stocked item and fresh player HP.
+- RECOVERY_REQUIRED: only with proven player need, stocked item, fresh player HP and verified actual recovery effect of that item.
 - UNKNOWN: ask for the minimal current match failure signal; keep conditional comparisons instead of prescribing a paid action.
 
 Skill training checks the experimental fourth-session pattern (about 40 negative rerolls at 1–3, positive popup on four). The exact game-internal counter unit and guaranteed reward are UNKNOWN. A specifically claimed next-fourth session requires *three accepted sessions for that player and drill on a TRUSTED active branch*. Retired screenshots never add current skills. For Cheer ON, return ACCEPT/RELOAD criteria; do not recommend exhaustive reloads at steps 1–3.
@@ -40,7 +40,7 @@ Optional caller-reviewed context JSON is divided into failure_assessment, traini
 - branch: ACCEPTED
 - evidence_refs: nonempty source references
 
-The module checks those keys but cannot authenticate the truth of a caller's verified flag. The source-ingestion layer or assistant MUST independently inspect and bind reports/screenshots before setting the flag. Do not infer HP, hidden skill or match playability from older pictures.
+The module checks those keys but cannot authenticate the truth of a caller's verified flag or item-effect claim. The source-ingestion layer or assistant MUST independently inspect and bind reports/screenshots before setting the flag. Do not infer HP, hidden skill or match playability from older pictures.
 
 Example source-attested context structure (replace placeholders with actually validated current evidence, not fabricated):
 
