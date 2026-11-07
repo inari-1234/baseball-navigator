@@ -15,6 +15,11 @@ At the start of a new chat or after context loss, read in this order before reco
 
 If any required BOOT authority cannot be read, do not reconstruct it from conversation memory and do not recommend gameplay actions. State the missing authority.
 
+## P6 one-phrase project resume and BOOT
+A user starting a new chat with a distinctive phrase such as **「野球部ものがたりの続き」** should not have to paste a long handoff text. When the connected GitHub source is available, first read this `AGENTS.md` file, identify this project using the narrow aliases in `PROJECT_ENTRYPOINT.json`, and execute the ordered BOOT immediately. If the Python checkout is available, use `project_bootstrap.py` to verify all seven BOOT files, full `LIVE_EVENTS.jsonl` replay, current goal, active rules, last decision/ledger integrity and mandatory fourth-training evidence. In the established connected P4 GitHub bridge, use the new enum `BOOT` and verify the returned source revision and read-only `boot_report`.
+
+Do not auto-select this project from generic words like 「野球部」 or 「続き」. Do not treat historical skill evidence or an unconfirmed SAVE restore as active state. No repository file can **guarantee** that ChatGPT automatically calls tools on every new chat; the assistant must actually invoke the available connector and report a failure when the canonical source is unavailable. A successful BOOT is not an authorized game action. Use the brief protocol `docs/PROJECT_RESUME_P6.md`. This avoids putting project-restart text, screenshots or private Library references into PUBLIC GitHub request branches.
+
 ## Live observation state gate
 Screenshots and user reports must be structured as source-linked observations before making recommendations. Use `LIVE_EVENTS.jsonl` as the append-only live event history and `CURRENT_LIVE_STATE.json` as the validated derived runtime state. This is not an automatic OCR tool: the assistant must read screenshots, mark uncertain fields UNKNOWN, and retain provenance.
 
