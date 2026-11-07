@@ -293,12 +293,24 @@ class NavigatorStepRegression(unittest.TestCase):
         state = self.trusted()
         ctx = context_for(state, "RECOVERY_REQUIRED")
         ctx["recovery"] = attested(state, player="石渡", item="チョコレート",
-                                   needed=True)
+                                   needed=True, verified_recovery_effect=True)
         out = self.navigate(state=state, context=ctx)
         self.assertEqual(out["status"], "BLOCKED_CANDIDATE")
         self.assertEqual(out["provisional_target"], "RECOVERY")
         self.assertIn("CURRENT_FULL_INVENTORY_UNVERIFIED", out["blocking_reasons"])
         self.assertIn("CURRENT_TARGET_HP_UNVERIFIED", out["blocking_reasons"])
+
+    def test_recovery_item_requires_effect_evidence_not_just_ownership(self):
+        state = self.trusted()
+        state["inventory"] = {"fresh": True, "items": {"チョコレート": 1}}
+        state.setdefault("hp_by_player", {})["石渡"] = {"fresh": True}
+        ctx = context_for(state, "RECOVERY_REQUIRED")
+        ctx["recovery"] = attested(state, player="石渡", item="チョコレート",
+                                   needed=True)
+        out = self.navigate(state=state, context=ctx)
+        self.assertEqual(out["status"], "BLOCKED_CANDIDATE")
+        self.assertIn("ITEM_RECOVERY_EFFECT_NOT_SOURCE_VERIFIED",
+                      out["blocking_reasons"])
 
     def test_verified_recovery_item_yields_only_draft(self):
         state = self.trusted()
@@ -306,7 +318,7 @@ class NavigatorStepRegression(unittest.TestCase):
         state.setdefault("hp_by_player", {})["石渡"] = {"fresh": True}
         ctx = context_for(state, "RECOVERY_REQUIRED")
         ctx["recovery"] = attested(state, player="石渡", item="チョコレート",
-                                   needed=True)
+                                   needed=True, verified_recovery_effect=True)
         out = self.navigate(state=state, context=ctx)
         self.assertEqual(out["status"], "VALIDATED_DRAFT_REVIEW")
         self.assertEqual(out["selected_candidate"], "RECOVERY")
