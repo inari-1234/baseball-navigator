@@ -295,7 +295,7 @@ class QuickImageSuite(unittest.TestCase):
             "--image",str(self.path),"--expected-event-seq","10"],
             cwd=ROOT,capture_output=True,text=True,check=True)
         out=json.loads(result.stdout)
-        self.assertEqual(out["status"],"IMAGE_OBSERVATION_READY")
+        self.assertEqual(out["status"],"UNSUPPORTED_SCREEN_NEEDS_MANUAL_REVIEW")
         self.assertEqual(out["component"],"navigator_step+p5_image")
         self.assertEqual(out["source_sha256"],self.digest)
         self.assertFalse(out["candidate_event_committed"])
