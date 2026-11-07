@@ -21,6 +21,7 @@ on:
       - "navigator_step.py"
       - "quick_image_pipeline.py"
       - "docs/P5_QUICK_IMAGE_PROTOCOL.md"
+      - "docs/FAST_PLAY_PROTOCOL.md"
       - "chat_bridge.py"
       - "docs/CHAT_BRIDGE_P4.md"
       - ".github/workflows/chat_bridge.yml"
