@@ -3,11 +3,11 @@
 Last updated: 2026-11-08
 State: ACTIVE_Y1_JUNE_POST_ROLLBACK_CAPTURE — SAVEPOINT_UNKNOWN
 
-## Reply classification and count-safety correction — P7-B candidate (2026-11-08)
+## Reply classification and count-safety correction — P7-B PASS (2026-11-08)
 - Independent review regression: interrogative 「たきは3回特訓した？4回目スキル狙っていい？」 must not become a confirmed TRAINING event; 「応援はすべてONでいい？」 must use ACTION_EVALUATION and obey rollback hard stop. A declarative report followed by a question still requires ingest.
 - Cause owner: `text_fast.py` clause-level report classifier, targeted Cheer-mode action routing, and a read-only `TRAINING_COUNTS` projection. A missing or incomplete per-player counter is UNKNOWN, never 0 or 3, and a logged count is a lower bound without a verified run-start baseline. The P4 enum-only bridge exposes safe count status without copying private chat text to public GitHub.
 - Updated `tests/test_text_fast.py`, `tests/test_chat_bridge.py`, `docs/TEXT_FAST_PROTOCOL.md`, `docs/CHAT_BRIDGE_P4.md`. No changes to `LIVE_EVENTS.jsonl`, `CURRENT_LIVE_STATE.json`, historical skill research, or the action validator. Follow-up distinct cause: existing 4th-checkpoint eligibility still needs explicit complete-run baseline provenance before it can be certified on a future TRUSTED timeline.
-- Acceptance requires Run Guard regression PASS, candidate→main no-force fast-forward, source SHA readback, and a real P4 `TRAINING_COUNTS` request pinned to the new main/event seq. This still cannot guarantee ChatGPT invokes the connector for every answer.
+- Acceptance: Run Guard 42426703201 PASS (317/317) and no-force fast-forward on main `6c2584bdaf2a482c4fc9926b856830f631757da9`. Real connected P4 `TRAINING_COUNTS` run 42426791960 PASS, request `p7-training-counts-20261108-01`, pinned source SHA/event 10; actual response status `READ_ONLY_READY`, exact total `UNKNOWN`, no lower-bound counts promoted after rollback, fourth checkpoint false, candidate null, no actions or writes. This cannot compel ChatGPT to invoke tools or forbid unsupported free-form claims.
 
 ## Response boundary correction — P7-A PASS (2026-11-08)
 - Independent review identified a real output-boundary defect: P3 intentionally retains historical conditional training candidates while the P4 `SKILL` response exposed blocked candidate players, Cheer and costs. ChatGPT subsequently presented these historical candidates as an apparent next training plan and asserted unsupported current-run counts. The underlying P3 counter validation was not defective.
