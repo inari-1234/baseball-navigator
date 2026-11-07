@@ -203,6 +203,61 @@ class NavigatorStepRegression(unittest.TestCase):
         self.assertEqual(out["status"], "BLOCKED_CANDIDATE")
         self.assertIn("DRILL_AVAILABILITY_UNVERIFIED", out["blocking_reasons"])
 
+    def test_current_verified_group_overrides_historical_fixed_three(self):
+        state = self.trusted()
+        ctx = context_for(state)
+        ctx["training_readiness"]["preferred_participant_groups"] = {
+            "素振り": {
+                "players": ["入江", "今井", "たき"],
+                "basis": "CURRENT_OCTOBER_LINEUP_SCORING_NEED",
+                "evidence_refs": ["EV-ACTIVE-LINEUP-DECISION"],
+            }
+        }
+        out = self.navigate(state=state, context=ctx)
+        self.assertEqual(out["status"], "VALIDATED_DRAFT_REVIEW")
+        self.assertEqual(out["selected_candidate"], "TRAIN_CONTACT_ON")
+        self.assertEqual(out["action_draft"]["participants"], ["入江", "今井", "たき"])
+        candidate = next(x for x in out["candidates"] if x["id"] == "TRAIN_CONTACT_ON")
+        self.assertFalse(candidate["participants_are_historical_candidates"])
+        self.assertEqual(candidate["participant_selection_basis"],
+                         "CURRENT_OCTOBER_LINEUP_SCORING_NEED")
+        self.assertEqual(candidate["participant_selection_evidence_refs"],
+                         ["EV-ACTIVE-LINEUP-DECISION"])
+
+    def test_unsubstantiated_current_group_override_blocks_not_silently_falls_back(self):
+        state = self.trusted()
+        ctx = context_for(state)
+        ctx["training_readiness"]["preferred_participant_groups"] = {
+            "素振り": {
+                "players": ["入江", "今井", "たき"],
+                "basis": "CURRENT_OCTOBER_LINEUP_SCORING_NEED",
+                "evidence_refs": [],
+            }
+        }
+        out = self.navigate(state=state, context=ctx)
+        self.assertEqual(out["status"], "BLOCKED_CANDIDATE")
+        self.assertIn("LIVE_PARTICIPANT_GROUP_OVERRIDE_NOT_VERIFIED",
+                      out["blocking_reasons"])
+
+    def test_catalog_valid_looking_mutation_is_rejected_by_manifest(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            for name in ("NAV_TACTICS.json", "KNOWLEDGE_MANIFEST.json"):
+                shutil.copyfile(ROOT / name, base / name)
+            path = base / "NAV_TACTICS.json"
+            data = json.loads(path.read_text(encoding="utf-8"))
+            data["drills"][0]["sports_cost"] = 8
+            path.write_text(json.dumps(data), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "NAV_TACTICS_SOURCE_INTEGRITY_MISMATCH"):
+                _load_catalog(base)
+
+    def test_handoff_retains_navigation_entrypoint(self):
+        handoff=(ROOT / "CURRENT_HANDOFF.md").read_text(encoding="utf-8")
+        agents=(ROOT / "AGENTS.md").read_text(encoding="utf-8")
+        self.assertIn("NAVIGATOR:navigator_step.py", handoff)
+        self.assertIn("navigator_step.py", agents)
+        self.assertTrue((ROOT / "docs/NAVIGATOR_STEP_PROTOCOL.md").is_file())
+
     def test_current_player_not_ready_blocks(self):
         state = self.trusted()
         ctx = context_for(state)
