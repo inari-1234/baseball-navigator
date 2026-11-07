@@ -119,13 +119,24 @@ class NavigatorStepRegression(unittest.TestCase):
         self.assertFalse(out["action_authorized"])
         self.assertTrue(out["requires_manual_acceptance"])
 
-    def test_conversion_mode_does_not_invent_power_cheer_cost(self):
+    def test_conversion_skill_goal_does_not_invent_power_cheer_cost(self):
         state = self.trusted()
-        out = self.navigate(state=state, context=context_for(state, "CONVERSION"))
+        out = self.navigate("スキル獲得なら次は何をすべき？",
+                            state=state, context=context_for(state, "CONVERSION"))
         self.assertEqual(out["status"], "BLOCKED_CANDIDATE")
         self.assertEqual(out["provisional_target"], "TRAIN_POWER_ON")
         self.assertIn("EXACT_CHEER_ON_COST_UNVERIFIED", out["blocking_reasons"])
         self.assertIn("DC-OFF-002", out["rule_ids"])
+        self.assertFalse(out["action_authorized"])
+
+    def test_conversion_ability_goal_can_use_verified_power_off(self):
+        state = self.trusted()
+        out = self.navigate(state=state, context=context_for(state, "CONVERSION"))
+        self.assertEqual(out["status"], "VALIDATED_DRAFT_REVIEW")
+        self.assertEqual(out["selected_candidate"], "TRAIN_POWER_OFF")
+        self.assertEqual(out["action_draft"]["spend"], {"sports": 7})
+        target = next(x for x in out["candidates"] if x["id"] == "TRAIN_POWER_OFF")
+        self.assertEqual(target["skill_popup_evidence"], "UNKNOWN")
         self.assertFalse(out["action_authorized"])
 
     def test_source_attested_power_cheer_cost_unlocks_draft(self):
