@@ -1,0 +1,61 @@
+{
+  "schema_version": "1.0",
+  "catalog_version": "1.0.0",
+  "note": "Historical confirmed fixed costs and group results, NOT a guarantee of current availability, current HP or an optimal lineup.",
+  "drills": [
+    {
+      "id": "TRAIN_CONTACT",
+      "drill": "素振り",
+      "purpose": "CONTACT",
+      "sports_cost": 6,
+      "cheer_on_cost": 20,
+      "cost_basis": "HISTORICAL_EXPLICIT_MEASUREMENT",
+      "cheer_cost_basis": "HISTORICAL_EXPLICIT_MEASUREMENT",
+      "historical_group": [
+        "岡治",
+        "今井",
+        "たき"
+      ],
+      "group_basis": "HISTORICAL_45_PERCENT_BATTING_FIT",
+      "skill_chain_candidates": [
+        "ミート力アップ",
+        "ジャストミート",
+        "安打製造機"
+      ],
+      "skill_chain_level_uncertain": true,
+      "supports_skill_popup_with_cheer_on": true,
+      "historical_notes": "45% batting affinity observed; 3x batter EXP+139 with Cheer ON in historical branch; at least one Meet Up popup observed, but no individual historical result proves the current save retained the skill."
+    },
+    {
+      "id": "TRAIN_POWER",
+      "drill": "ダンベル",
+      "purpose": "CONVERSION",
+      "sports_cost": 7,
+      "cheer_on_cost": null,
+      "cost_basis": "HISTORICAL_EXPLICIT_MEASUREMENT",
+      "cheer_cost_basis": "UNKNOWN_FOR_THIS_EXACT_DRILL",
+      "historical_group": [
+        "芦田",
+        "今井",
+        "入江"
+      ],
+      "group_basis": "HISTORICAL_ABILITY_GAINS_NOT_OPTIMALITY_PROOF",
+      "skill_chain_candidates": [
+        "長打力アップ",
+        "スーパーパワー",
+        "チャンスに強い"
+      ],
+      "skill_chain_level_uncertain": true,
+      "supports_skill_popup_with_cheer_on": "UNKNOWN",
+      "historical_notes": "Historical Cheer ON dumbbell had positive slugging gains; precise cheer cost and present participants' HP are not verified."
+    }
+  ],
+  "priority_policy": {
+    "CONTACT": "TRAIN_CONTACT",
+    "CONVERSION": "TRAIN_POWER",
+    "ADEQUATE": "MATCH",
+    "RECOVERY_REQUIRED": "RECOVERY",
+    "UNKNOWN": "ASSESS_FAILURE_MODE"
+  },
+  "eligibility_policy": "Current accepted-branch revision and source-backed readiness must validate; historical participants are proposals only. No game mutation is executed."
+}
