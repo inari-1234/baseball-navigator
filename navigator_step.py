@@ -120,6 +120,28 @@ def _train_candidate(drill: dict, cheer: str, state: dict[str, Any],
     players = list(drill["historical_group"])
     readiness = context.get("training_readiness")
     ready_source = _context_current(readiness, state)
+    group_selected_from_live = False
+    invalid_group_override = False
+    if ready_source:
+        groups = readiness.get("preferred_participant_groups", {})
+        override = groups.get(drill["drill"]) if isinstance(groups, dict) else None
+        if override is not None:
+            if (isinstance(override, dict)
+                    and isinstance(override.get("players"), list)
+                    and len(override["players"]) == 3
+                    and all(isinstance(p, str) and p.strip()
+                            for p in override["players"])
+                    and len(set(override["players"])) == 3
+                    and isinstance(override.get("basis"), str)
+                    and bool(override["basis"].strip())
+                    and isinstance(override.get("evidence_refs"), list)
+                    and bool(override["evidence_refs"])
+                    and all(isinstance(e, str) and e.strip()
+                            for e in override["evidence_refs"])):
+                players = list(override["players"])
+                group_selected_from_live = True
+            else:
+                invalid_group_override = True
     available = (isinstance(readiness.get("available_drills"), list)
                  and drill["drill"] in readiness["available_drills"]) if ready_source else False
     eligible = (isinstance(readiness.get("ready_players"), list)
@@ -158,6 +180,8 @@ def _train_candidate(drill: dict, cheer: str, state: dict[str, Any],
         "checkpoint_player": fourth_player if skill_aim else None,
     }
     required = []
+    if invalid_group_override:
+        required.append("LIVE_PARTICIPANT_GROUP_OVERRIDE_NOT_VERIFIED")
     if not ready_source:
         required.append("CURRENT_TRAINING_READINESS_SOURCE_MISSING_OR_STALE")
     elif not available:
@@ -183,7 +207,12 @@ def _train_candidate(drill: dict, cheer: str, state: dict[str, Any],
         "drill": drill["drill"],
         "cheer": cheer,
         "participants": players,
-        "participants_are_historical_candidates": True,
+        "participants_are_historical_candidates": not group_selected_from_live,
+        "participant_selection_basis": (
+            override["basis"] if group_selected_from_live
+            else drill["group_basis"]),
+        "participant_selection_evidence_refs": (
+            list(override["evidence_refs"]) if group_selected_from_live else []),
         "historical_fit": drill["group_basis"],
         "cost": cost,
         "cost_source": cost_source,
