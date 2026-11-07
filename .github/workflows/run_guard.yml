@@ -2,7 +2,7 @@ name: Run Guard
 
 on:
   push:
-    branches: [main, "fix/**", "feature/formation-screenshot-reader-v1"]
+    branches: [main, "fix/**", "feature/**"]
     paths:
       - "CURRENT_RUN_LEDGER.yaml"
       - "RUN_GUARD_POLICY.yaml"
@@ -18,6 +18,9 @@ on:
       - "live_state_engine.py"
       - "knowledge_engine.py"
       - "text_fast.py"
+      - "navigator_step.py"
+      - "NAV_TACTICS.json"
+      - "docs/NAVIGATOR_STEP_PROTOCOL.md"
       - "EVIDENCE_EVENTS.jsonl"
       - "EVIDENCE_BACKUP_CHECKPOINTS.jsonl"
       - "backup_verifier.py"
@@ -84,6 +87,12 @@ jobs:
           python3 knowledge_engine.py validate | tee "${RUNNER_TEMP}/KNOWLEDGE_RESULT.json"
           cat "${RUNNER_TEMP}/KNOWLEDGE_RESULT.json" >> "${GITHUB_STEP_SUMMARY}"
 
+      - name: Verify navigator P3 current snapshot gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 navigator_step.py "スキル獲得に向けて何をすべき？" --boot-verified --expected-event-seq 10 > "${RUNNER_TEMP}/NAVIGATOR_RESULT.json"
+          python3 -c 'import json,sys;p=json.load(open(sys.argv[1])); assert p["status"]=="BLOCKED_UNVERIFIED_TIMELINE"; assert p["action_authorized"] is False; assert "SKILL-4TH-PATTERN" in p["knowledge_refs"]' "${RUNNER_TEMP}/NAVIGATOR_RESULT.json"
       - name: Install screenshot reader image library
         shell: bash
         run: python3 -m pip install --disable-pip-version-check "Pillow==11.3.0"
