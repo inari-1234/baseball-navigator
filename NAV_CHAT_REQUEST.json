@@ -1,7 +1,7 @@
 {
   "schema_version": "1.0",
-  "request_id": "p4-smoke-20261107-01",
+  "request_id": "p4-smoke-20261107-02",
   "intent": "SKILL",
-  "expected_main_sha": "547f945ba09aa5b78f0f87a28c14335339b47fee",
+  "expected_main_sha": "8a90823b96901781f015451ebc6ea0b0e4a47d84",
   "expected_event_seq": 10
 }
