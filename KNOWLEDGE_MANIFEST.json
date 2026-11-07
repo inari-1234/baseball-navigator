@@ -38,5 +38,16 @@
   "required_claim_statuses": {
     "SKILL-4TH-PATTERN": "OBSERVED_PATTERN",
     "SKILL-ACCEPTED-HISTORICAL": "USER_REPORTED_HISTORICAL_ACCEPTANCE"
-  }
+  },
+  "backup_checkpoint_mode": "HISTORICAL_READBACK_AT_TIME",
+  "required_backup_checkpoint_ids": [
+    "CHK-BK-EV-SKILL-IMG-1",
+    "CHK-BK-EV-SKILL-IMG-2",
+    "CHK-BK-EV-SKILL-IMG-3",
+    "CHK-BK-EV-SKILL-IMG-4",
+    "CHK-BK-EV-SKILL-IMG-5",
+    "CHK-BK-EV-SKILL-IMG-6"
+  ],
+  "backup_batch_id": "BK-SKILL-20261107-01",
+  "backup_checkpoint_limitations": "CI only validates immutable public attestation consistency; live private Library reachability requires separate raw-file re-materialization and SHA-256."
 }
