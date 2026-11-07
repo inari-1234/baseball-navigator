@@ -79,6 +79,19 @@ def _load_catalog(root: Path) -> dict[str, Any]:
         amount = entry.get("cheer_on_cost")
         if amount is not None and (type(amount) is not int or amount < 0):
             raise ValueError("NAV_TACTICS_INVALID_CHEER_COST")
+    try:
+        manifest = json.loads((root / "KNOWLEDGE_MANIFEST.json").read_text(encoding="utf-8"))
+        expected = manifest["required_navigation_tactics"]
+    except (OSError, ValueError, KeyError, TypeError) as exc:
+        raise ValueError("NAV_TACTICS_MANIFEST_MISSING") from exc
+    if not isinstance(expected, dict) or not expected:
+        raise ValueError("NAV_TACTICS_MANIFEST_INVALID")
+    catalog_by_id = {entry["id"]: entry for entry in result["drills"]}
+    for drill_id, required_fields in expected.items():
+        entry = catalog_by_id.get(drill_id)
+        if (not isinstance(entry, dict) or not isinstance(required_fields, dict)
+                or any(entry.get(field) != value for field, value in required_fields.items())):
+            raise ValueError("NAV_TACTICS_SOURCE_INTEGRITY_MISMATCH:" + drill_id)
     return result
 
 
@@ -179,6 +192,16 @@ def _train_candidate(drill: dict, cheer: str, state: dict[str, Any],
         "target_skill_at_this_drill_not_guaranteed": True,
         "skill_popup_evidence": (drill["supports_skill_popup_with_cheer_on"]
                                  if cheer == "ON" else "UNKNOWN"),
+        "accept_reload_plan": {
+            "accept_if": ("TARGET_OR_HIGH_VALUE_SKILL_ACQUIRED"
+                          if skill_aim else "ABILITY_GAIN_MEETS_DEVELOPMENT_GOAL"),
+            "reload_if": (
+                "OPTIONAL_TARGETED_FOURTH_REROLL_WHEN_SAVE_AND_BUDGET_VERIFIED"
+                if skill_aim and fourth_player
+                else "DO_NOT_FARM_FIRST_THREE_BASED_ON_HISTORICAL_NEGATIVES"
+                if skill_aim else "NO_SKILL_REROLL_TARGET"),
+            "not_a_guaranteed_reward": True,
+        },
         "training_observed_counts": info,
         "knowledge_refs": [FOURTH, ACCEPTED],
         "rule_ids": rules,
