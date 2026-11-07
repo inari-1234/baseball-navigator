@@ -3,6 +3,11 @@
 Last updated: 2026-11-07
 State: ACTIVE_Y1_JUNE_POST_ROLLBACK_CAPTURE — SAVEPOINT_UNKNOWN
 
+## P5 candidate QA and measurement checkpoint (2026-11-07)
+- Candidate verification: GitHub Actions run `42382942102` SUCCESS, **294 Python tests PASS**, Run Guard/decision/knowledge/P3/P4/P5 benchmark/replay checks all passed. The explicit P5 synthetic local benchmark of 9 repeats reported cold first inspection **53.448 ms**, warm median **0.033 ms**, warm p95 **0.114 ms**, with one actual pixel decode for repeated identical bytes. These values measure **one GitHub runner with synthetic image only**; they do not prove faster new iPhone images or ChatGPT response latency.
+- The P5 entrypoint is intentionally non-mutating: new screenshots require human source validation before an event draft; even reviewed drafts stay uncommitted until a separate canonical transaction. There has been **no new actual iPhone screenshot this turn** for independent pixel-accuracy or time-on-device acceptance.
+- The P5 handoff / agent-gate reference is regression tested; do not revert its use to an unverified idea or claim the new image reader itself establishes accepted game skill acquisitions.
+
 ## P5 fast screenshot inspection and safe state-draft preview (2026-11-07)
 - Local engine: `quick_image_pipeline.py`, integrated into `navigator_step.py --image` and optional `--image-review`. Full protocol: `docs/P5_QUICK_IMAGE_PROTOCOL.md`; tests: `tests/test_quick_image_pipeline.py`. Actual source SHA256 drives a bounded in-process decoded observation cache. Identical image bytes are not re-decoded, changed bytes re-decode, and source filenames are corrected; no raw game images are committed to GitHub.
 - Supported image facts remain explicitly scoped: formation visual HP gauges are not numeric player HP; item-menu selected stock does not prove full inventory or usage; batting pages cannot be silently promoted to completed results; unsupported HUD OCR and player Japanese names remain human-reviewed.
