@@ -458,6 +458,12 @@ def main() -> None:
     p.add_argument("--state", default="CURRENT_LIVE_STATE.json")
     p.add_argument("--contract", default="DECISION_CONTRACT.json")
     p.add_argument("--context", type=Path, help="Optional current-source verified context JSON")
+    p.add_argument("--image", type=Path,
+                   help="P5 local image path; inspect once without game mutation")
+    p.add_argument("--image-review", type=Path,
+                   help="Optional independently reviewed image-event draft JSON (never committed)")
+    p.add_argument("--events", type=Path, default=Path("LIVE_EVENTS.jsonl"),
+                   help="P5 canonical append-only events for review dry-run")
     p.add_argument("--expected-event-seq", type=int)
     p.add_argument("--boot-verified", action="store_true",
                    help="Set only after ordered AGENTS.md BOOT was actually checked")
@@ -466,10 +472,43 @@ def main() -> None:
         state = json.loads((args.root / args.state).read_text(encoding="utf-8"))
         contract = json.loads((args.root / args.contract).read_text(encoding="utf-8"))
         context = json.loads(args.context.read_text(encoding="utf-8")) if args.context else {}
-        out = navigator_step(args.message, state=state, contract=contract,
-                             boot_verified=args.boot_verified,
-                             expected_event_seq=args.expected_event_seq,
-                             context=context, root=args.root)
+        if args.image_review is not None and args.image is None:
+            raise ValueError("P5_REVIEW_REQUIRES_IMAGE")
+        if args.image is not None:
+            # P5 image-first path; no GitHub or network calls and no event writes.
+            from quick_image_pipeline import QuickImageSession
+            from live_state_engine import read_events
+            session = QuickImageSession()
+            picture = session.inspect(args.image)
+            out = {
+                "schema_version": "1.0",
+                "component": "navigator_step+p5_image",
+                "status": "IMAGE_OBSERVATION_READY",
+                "source_event_seq": state.get("last_event_seq"),
+                "source_sha256": picture["source_sha256"],
+                "screenshot_observation": picture,
+                "action_authorized": False, "side_effects": False,
+                "candidate_event_committed": False,
+                "next_step": "REVIEW_ONLY_IF_NEW_STATE_FACTS_ARE_VISIBLE",
+            }
+            if args.image_review is not None:
+                if not args.boot_verified:
+                    raise ValueError("P5_BOOT_REQUIRED_FOR_EVENT_PREVIEW")
+                if args.expected_event_seq != state.get("last_event_seq"):
+                    raise ValueError("P5_EXACT_EXPECTED_EVENT_SEQ_REQUIRED")
+                review=json.loads(args.image_review.read_text(encoding="utf-8"))
+                preview=session.draft(args.image, review=review, state=state,
+                                      events=read_events(args.events))
+                out["status"]="UNCOMMITTED_IMAGE_EVENT_PREVIEW"
+                out["event_preview"]=preview
+                out["next_step"]="REVIEW_BEFORE_CANONICAL_TRANSACTION"
+                out["action_authorized"]=False
+                out["side_effects"]=False
+        else:
+            out = navigator_step(args.message, state=state, contract=contract,
+                                 boot_verified=args.boot_verified,
+                                 expected_event_seq=args.expected_event_seq,
+                                 context=context, root=args.root)
     except (OSError, ValueError) as exc:
         p.exit(1, "NAVIGATOR_INPUT_ERROR: " + str(exc) + "\n")
     print(json.dumps(out, ensure_ascii=False, indent=2))
