@@ -2,7 +2,7 @@
 
 ## What the actual integration is
 
-The **already-connected GitHub connector** is the available ChatGPT-to-code transport. It creates a minimal public request file on a `bridge/**` Git branch. The `.github/workflows/chat_bridge.yml` Actions runner independently checks out **current canonical main**, validates that source commit SHA and `last_event_seq` match the request, calls `chat_bridge.py` and `navigator_step.py`, and emits a delimited machine-readable result in the run's **job logs**. ChatGPT retrieves the logs using the same GitHub connector, checks request/commit/revision identity, and writes an answer incorporating the returned status, candidate, rules and fallback.
+The **already-connected GitHub connector** is the available ChatGPT-to-code transport. It creates a minimal public request file on a `bridge/**` Git branch. The `.github/workflows/chat_bridge.yml` Actions runner independently checks out **current canonical main**, validates that source commit SHA and `last_event_seq` match the request, calls `chat_bridge.py` and `navigator_step.py`, and emits a delimited machine-readable result in the run's **job logs**. ChatGPT retrieves the logs using the same GitHub connector, checks request/commit/revision identity, and writes an answer incorporating the returned status, candidate (only for a validated draft), rules and fallback.
 
 This is a **real tool-mediated ChatGPT ↔ GitHub ↔ Python round trip**, not an automatically installed ChatGPT-native Plugin, not a Vercel public API, not background gameplay execution, and not an iOS automation bridge. It has GitHub Actions queue latency; never hold a live gameplay instruction hostage to a slow bridge when a source-verified, safe quick answer is available.
 
@@ -11,7 +11,7 @@ This is a **real tool-mediated ChatGPT ↔ GitHub ↔ Python round trip**, not a
 `NAV_CHAT_REQUEST.json` on the GitHub branch is **public** because the repository is public. It may contain ONLY:
 - `schema_version` = `1.0`
 - `request_id` = opaque non-personal lowercase ASCII ID (4–64 chars)
-- `intent` = `BOOT`, `SKILL`, `GENERAL`, `MATCH`, `RECOVERY` or `STATUS`
+- `intent` = `BOOT`, `SKILL`, `GENERAL`, `MATCH`, `RECOVERY`, `STATUS` or `TRAINING_COUNTS`
 - `expected_main_sha` = exact 40-character lowercase Git commit
 - `expected_event_seq` = exact current live event revision
 
@@ -19,7 +19,8 @@ Do **not** write conversation text, screenshots, player identities/HP updates, L
 
 The GitHub Actions job uses `permissions: contents: read` and cannot mutate the gameplay repository. The bridge verifies ordered BOOT presence, knowledge continuity and the canonical state revision before returning any result; it always reports `action_authorized=false` and `side_effects=false`. A queued result can go stale after main changes; ChatGPT must match source commit, request ID and event revision **at the moment of using the answer**.
 
-The bridge has no trusted live HP/readiness/extra user context input. Therefore its current canonical answer (Y1 June PM5:20, rollback SAVE anchor unknown) is **conditional only** and will remain blocked for paid actions. Do not manufacture `verified_for_current_state` to get a successful draft.
+The bridge has no trusted live HP/readiness/extra user context input. Therefore its current canonical answer (Y1 June PM5:20, rollback SAVE anchor unknown) remains blocked for paid actions. Under every blocked status, `candidate` and `provisional_target` are null: never reinterpret a historical participant/Cheer/cost combination as an actionable or conditional plan. Do not manufacture `verified_for_current_state` to get a successful draft.
+`TRAINING_COUNTS` is an enum-only read-only request. The result reports exact total UNKNOWN and event-log lower bounds only when provenance permits; missing per-player counters never mean zero.
 
 ## P6 new-chat project BOOT shortcut
 
@@ -39,7 +40,7 @@ Only the strict five allowlisted request fields are published; no free-form text
 4. Query GitHub Actions for the **matching branch and head SHA**, read the job logs, and extract the single JSON line between:
    `NAV_CHAT_BRIDGE_RESULT_START` / `NAV_CHAT_BRIDGE_RESULT_END`.
 5. Reject a failed, incomplete, unrelated or stale run. Check the returned `request_id`, `source_commit_sha`, `state_event_seq`, source status, `action_authorized=false`, `side_effects=false`, and required `SKILL-4TH-PATTERN` when relevant.
-6. Summarize **actual tool-returned** `primary_next_step`, `candidate`, `blocking_reasons`, controlling `rule_ids`, `knowledge_refs`, and `fallback`. Never treat `VALIDATED_DRAFT_REVIEW` as a performed action.
+6. Summarize **actual tool-returned** `primary_next_step`, blockers, controlling `rule_ids`, `knowledge_refs`, and `fallback`. Only discuss `candidate` when a current-validated draft exists; do not reconstruct hidden blocked candidates from historical details. Never treat `VALIDATED_DRAFT_REVIEW` as a performed action.
 7. If current main/state changed, discard the result and recheck; do not silently reply from a stale branch.
 
 For a second intent, update the existing bridge branch's `NAV_CHAT_REQUEST.json` with a new request ID and fresh source SHA/seq. This avoids creating an unlimited number of branches. Do not force-push a branch, delete history, or use `main` as a scratchpad.
@@ -53,7 +54,7 @@ Every bridge result is pinned to an exact main SHA/event seq. It cannot update t
 ## Development acceptance
 
 - Candidate GitHub Actions: all existing Run Guard, knowledge, event replay and P3 tests plus `tests/test_chat_bridge.py` pass.
-- Current canonical skill request returns `BLOCKED_UNVERIFIED_TIMELINE`, `SKILL-4TH-PATTERN`, and a conditional contact group/cost without a current skill grant.
+- Current canonical skill request returns `BLOCKED_UNVERIFIED_TIMELINE`, `SKILL-4TH-PATTERN`, and no blocked candidate/group/Cheer/cost payload or current skill grant.
 - Malformed/extra/private fields, stale main SHA or event revision are rejected.
 - Independently fetch GitHub Actions logs for a **real** request branch created from this conversation; verify request/result round trip and read-only output.
 - Confirm no current game state or original image files were changed by that request.
