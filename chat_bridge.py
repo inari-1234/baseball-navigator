@@ -19,6 +19,7 @@ from typing import Any
 
 from knowledge_engine import validate_knowledge
 from navigator_step import navigator_step
+from project_bootstrap import ResumeError, bootstrap
 
 INTENTS = {
     "SKILL": "スキル獲得に向けて何をすべき？",
@@ -26,6 +27,7 @@ INTENTS = {
     "MATCH": "試合すべき？",
     "RECOVERY": "アイテムを使うべき？",
     "STATUS": "現在の状態を教えて",
+    "BOOT": "野球部ものがたりの続き",
 }
 REQUIRED_FIELDS = {
     "schema_version", "request_id", "intent",
@@ -98,6 +100,33 @@ def bridge_response(request: Any, *, root: str | Path,
     if actual_main_sha != request["expected_main_sha"]:
         raise ChatBridgeError("STALE_MAIN_SHA")
     verify_boot(root)
+    if request["intent"] == "BOOT":
+        # A single connected GitHub action now returns all seven verified
+        # BOOT authorities and mandatory skill evidence in one safe capsule.
+        # This remains a tool-initiated operation, not an automatic ChatGPT hook.
+        try:
+            report = bootstrap(INTENTS["BOOT"], root=root,
+                               expected_main_sha=actual_main_sha,
+                               checked_main_sha=actual_main_sha)
+        except ResumeError as exc:
+            raise ChatBridgeError("PROJECT_BOOT_FAILED:" + str(exc)) from exc
+        if report["state"]["event_seq"] != request["expected_event_seq"]:
+            raise ChatBridgeError("STALE_EVENT_REVISION")
+        return {
+            "schema_version": "1.0",
+            "request_id": request["request_id"],
+            "intent": "BOOT",
+            "source_commit_sha": actual_main_sha,
+            "state_event_seq": report["state"]["event_seq"],
+            "status": report["status"],
+            "rule_ids": report["active_controlling_rules"],
+            "knowledge_refs": report["knowledge"]["required_claim_ids"],
+            "primary_next_step": report["next_safe_step"],
+            "boot_report": report,
+            "action_authorized": False,
+            "side_effects": False,
+            "source_is_current_only_at_this_commit": True,
+        }
     try:
         state = json.loads((root / "CURRENT_LIVE_STATE.json").read_text(encoding="utf-8"))
         contract = json.loads((root / "DECISION_CONTRACT.json").read_text(encoding="utf-8"))
