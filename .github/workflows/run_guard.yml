@@ -19,6 +19,9 @@ on:
       - "knowledge_engine.py"
       - "text_fast.py"
       - "navigator_step.py"
+      - "chat_bridge.py"
+      - "docs/CHAT_BRIDGE_P4.md"
+      - ".github/workflows/chat_bridge.yml"
       - "NAV_TACTICS.json"
       - "docs/NAVIGATOR_STEP_PROTOCOL.md"
       - "EVIDENCE_EVENTS.jsonl"
@@ -93,6 +96,32 @@ jobs:
           set -euo pipefail
           python3 navigator_step.py "スキル獲得に向けて何をすべき？" --boot-verified --expected-event-seq 10 > "${RUNNER_TEMP}/NAVIGATOR_RESULT.json"
           python3 -c 'import json,sys;p=json.load(open(sys.argv[1])); assert p["status"]=="BLOCKED_UNVERIFIED_TIMELINE"; assert p["action_authorized"] is False; assert "SKILL-4TH-PATTERN" in p["knowledge_refs"]' "${RUNNER_TEMP}/NAVIGATOR_RESULT.json"
+      - name: Verify P4 chat bridge pinned CLI
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          import subprocess
+          import tempfile
+          from pathlib import Path
+          import chat_bridge
+          from navigator_step import navigator_step
+          root=Path.cwd()
+          main_sha=subprocess.check_output(["git","rev-parse","HEAD"],text=True).strip()
+          state=json.loads((root/"CURRENT_LIVE_STATE.json").read_text(encoding="utf-8"))
+          req={"schema_version":"1.0","request_id":"p4-ci-readonly",
+               "intent":"SKILL","expected_main_sha":main_sha,
+               "expected_event_seq":state["last_event_seq"]}
+          result=chat_bridge.bridge_response(req,root=root,actual_main_sha=main_sha)
+          assert result["action_authorized"] is False
+          assert result["side_effects"] is False
+          assert "SKILL-4TH-PATTERN" in result["knowledge_refs"]
+          print("P4_CI_BRIDGE_PASS:"+json.dumps(
+              {"sha":main_sha,"event_seq":result["state_event_seq"],
+               "status":result["status"]},ensure_ascii=False))
+          PY
+
       - name: Install screenshot reader image library
         shell: bash
         run: python3 -m pip install --disable-pip-version-check "Pillow==11.3.0"
