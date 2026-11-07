@@ -197,6 +197,22 @@ class QuickImageSession:
         after = review.get("after_event_id")
         _need(isinstance(after, str) and after in {e["event_id"] for e in events},
               "VERIFIED_CHRONOLOGY_ANCHOR_REQUIRED")
+        # The most recent accepted contextual event is the only safe
+        # predecessor in the QUICK path. A correction is audit metadata and
+        # does not create a game-screen context. Other branch manipulations
+        # must be reconciled by the FULL canonical ingestion pipeline.
+        contextual = {"SCREEN", "HP_OBSERVATION", "MATCH_ATTEMPT",
+                      "TRAINING", "ITEM_USE", "ROLLBACK"}
+        latest_context = next((e["event_id"] for e in reversed(events)
+                               if e["kind"] in contextual
+                               and e.get("branch", "ACCEPTED") == "ACCEPTED"),
+                              None)
+        _need(after == latest_context, "CHRONOLOGY_NOT_LATEST_ACCEPTED_CONTEXT")
+        # An identical screenshot is the SAME evidence, even if supplied
+        # under another filename; it must not advance the event sequence.
+        source_locator = "#sha256=" + observed["source_sha256"]
+        _need(not any(source_locator in e.get("source", {}).get("locator", "")
+                      for e in events), "DUPLICATE_IMAGE_EVIDENCE")
         event_id = review.get("event_id")
         _need(isinstance(event_id, str) and
               event_id.startswith("P5-") and len(event_id) <= 100 and
