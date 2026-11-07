@@ -348,6 +348,15 @@ class QuickImageSuite(unittest.TestCase):
         self.assertFalse(out["action_authorized"])
         self.assertFalse(out["candidate_event_committed"])
 
+    def test_p5_handoff_and_agent_gate_are_preserved(self):
+        handoff=(ROOT/"CURRENT_HANDOFF.md").read_text(encoding="utf-8")
+        agents=(ROOT/"AGENTS.md").read_text(encoding="utf-8")
+        self.assertIn("quick_image_pipeline.py",handoff)
+        self.assertIn("quick_image_pipeline.py",agents)
+        self.assertIn("docs/P5_QUICK_IMAGE_PROTOCOL.md",handoff)
+        self.assertIn("docs/P5_QUICK_IMAGE_PROTOCOL.md",agents)
+        self.assertTrue((ROOT/"docs/P5_QUICK_IMAGE_PROTOCOL.md").is_file())
+
     def test_screenshot_menu_does_not_claim_inventory_or_item_use(self):
         result=_compact({
             "screen_type":"ITEM_USE_MENU",
