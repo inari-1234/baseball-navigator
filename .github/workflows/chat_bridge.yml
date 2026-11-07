@@ -1,0 +1,47 @@
+name: Navigator Chat Bridge P4 (read-only)
+
+on:
+  push:
+    branches:
+      - "bridge/**"
+    paths:
+      - "NAV_CHAT_REQUEST.json"
+
+permissions:
+  contents: read
+
+jobs:
+  chat-bridge:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Checkout request branch at exact event commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          path: request_branch
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Checkout canonical main independently
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          path: source
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Execute only allowlisted read-only navigator intent
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f request_branch/NAV_CHAT_REQUEST.json
+          python3 source/chat_bridge.py \
+            --source-root source \
+            --request request_branch/NAV_CHAT_REQUEST.json \
+            > "${RUNNER_TEMP}/nav_chat_result.json"
+          python3 -c 'import json,sys; p=json.load(open(sys.argv[1])); assert p["action_authorized"] is False; assert p["side_effects"] is False; assert p["source_commit_sha"] == p["source_commit_sha"].lower()' "${RUNNER_TEMP}/nav_chat_result.json"
+          echo 'NAV_CHAT_BRIDGE_RESULT_START'
+          cat "${RUNNER_TEMP}/nav_chat_result.json"
+          echo
+          echo 'NAV_CHAT_BRIDGE_RESULT_END'
