@@ -289,6 +289,8 @@ def _recovery_candidate(state: dict[str, Any], context: dict[str, Any],
         reasons.append("RECOVERY_TARGET_AND_ITEM_NOT_SOURCE_VERIFIED")
     if verified and recover.get("needed") is not True:
         reasons.append("RECOVERY_NEED_NOT_VERIFIED")
+    if verified and recover.get("verified_recovery_effect") is not True:
+        reasons.append("ITEM_RECOVERY_EFFECT_NOT_SOURCE_VERIFIED")
     obs = state.get("hp_by_player", {}).get(player, {}) if isinstance(player, str) else {}
     if not obs or obs.get("fresh") is not True:
         reasons.append("CURRENT_TARGET_HP_UNVERIFIED")
@@ -393,15 +395,25 @@ def navigator_step(message: str, *, state: dict, contract: dict,
     for pos, c in enumerate(ranked):
         c["rank_group"] = "FAILURE_MODE_MATCH" if c["id"] in preferred else "ALTERNATIVE"
         c["ordinal_position_is_heuristic_not_expected_runs"] = pos + 1
+    controlling = list(RULE_BASE)
+    if mode in {"CONTACT", "CONVERSION"}:
+        controlling += list(RULE_TRAIN)
+        controlling.append("DC-OFF-001" if mode == "CONTACT" else "DC-OFF-002")
+    elif mode == "ADEQUATE":
+        controlling += list(RULE_MATCH)
+    elif mode == "RECOVERY_REQUIRED":
+        controlling += list(RULE_HP)
+    else:
+        controlling += ["DC-UNKNOWN-001"]
+    if state.get("timeline_status") != "TRUSTED":
+        controlling += ["DC-STATE-001", "DC-UNKNOWN-001"]
     result = {
         **base, "failure_mode": mode,
         "failure_assessment_current": mode_trusted,
         "failure_evidence_refs": mode_refs,
         "knowledge_refs": [FOURTH, ACCEPTED],
         "candidate_count": len(ranked), "candidates": ranked,
-        "rule_ids": sorted(active.intersection(
-            set(RULE_BASE + RULE_TRAIN + RULE_MATCH + RULE_HP +
-                ("DC-OFF-001", "DC-OFF-002", "DC-UNKNOWN-001")))),
+        "rule_ids": sorted(active.intersection(set(controlling))),
         "ranking_is_expected_value_estimate": False,
         "ranking_basis": "EVIDENCE_SCOPED_FAILURE_MODE_PRIORITY_NO_INVENTED_UTILITY",
     }
