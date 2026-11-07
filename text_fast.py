@@ -36,6 +36,7 @@ _DEVELOP = re.compile(
 )
 _ACTION_QUERY = re.compile(
     r"(?:どちら.{0,10}(?:優先|いい)|どっち.{0,10}(?:優先|いい)|"
+    r"(?:応援|cheer).{0,18}(?:on|off|オン|オフ|使う|全部|全て|すべて|いい|必要|節約)|"
     r"優先(?:すべき|した方|順位)|使うべき|使った方|"
     r"特訓すべき|試合すべき|おすすめ|何をすべき|"
     r"次(?:は|に).{0,10}(?:すべき|何する|どうする)|"
@@ -79,6 +80,22 @@ class TextRoute:
     requires_full: bool = False
 
 
+def _asserted_event_report(text: str) -> bool:
+    """Only declarative clauses count as actual reports, not questions.
+
+    Example: "特訓した？4回目スキル狙っていい？" is not a TRAINING delta.
+    "特訓した。次は何をすべき？" does require a sourced ingest.
+    Ambiguous combined clauses conservatively do not auto-ingest.
+    """
+    for clause in re.split(r"(?<=[。!?])", text):
+        if (_EVENT_REPORT.search(clause)
+                and "?" not in clause and "？" not in clause
+                and not _HYPOTHETICAL.search(clause)
+                and not _QUESTION.search(clause)):
+            return True
+    return False
+
+
 def classify_text(message: str) -> TextRoute:
     """Classify *intent*, not the truth or source authority of a report."""
     if not isinstance(message, str) or not message.strip():
@@ -91,8 +108,8 @@ def classify_text(message: str) -> TextRoute:
                          requires_full=True)
     # An actual report with an appended advice request must be ingested first.
     # Conditional and interrogative descriptions do not create new events.
-    report = bool(_EVENT_REPORT.search(text)) and not bool(_HYPOTHETICAL.search(text))
-    if report and (not _QUESTION.search(text) or _ACTION_QUERY.search(text)):
+    report = _asserted_event_report(text)
+    if report:
         material = bool(_MATERIAL.search(text))
         return TextRoute("STATE_REPORT", "FULL" if material else "DELTA",
                          "MATERIAL_STATE_CHANGE" if material else "LIVE_DELTA",
@@ -111,7 +128,12 @@ def _read_only_projection(message: str, state: dict[str, Any]) -> dict[str, Any]
     promotes an unverified branch history or item counter to current stock.
     """
     text = _normalize(message)
-    topic = ("RESOURCES" if any(word in text for word in
+    training_count_question = bool(re.search(
+        r"(?:特訓|練習).{0,10}(?:何回|回数|[0-9一二三四五六七八九十]+回)"
+        r"|(?:何回|[0-9一二三四五六七八九十]+回).{0,10}(?:特訓|練習)"
+        r"|特訓履歴|練習履歴", text))
+    topic = ("TRAINING_COUNTS" if training_count_question
+             else "RESOURCES" if any(word in text for word in
              ("所持金", "スポーツ", "研究", "応援", "資源", "ポイント", "お金"))
              else "ITEMS" if any(word in text for word in
              ("アイテム", "所持数", "チョコレート", "コーヒー", "鉄アレイ", "メガホン"))
@@ -127,6 +149,22 @@ def _read_only_projection(message: str, state: dict[str, Any]) -> dict[str, Any]
         "branch_trusted": branch_trusted,
         "derived_not_independently_verified": True,
     }
+    if topic == "TRAINING_COUNTS":
+        # TRUSTED chronology does not prove a complete run-start training baseline.
+        # Recorded accepted sessions are at most a lower bound.
+        logged = state.get("training_counts_by_player_drill", {})
+        return {
+            **base,
+            "exact_total_status": "UNKNOWN",
+            "event_ledger_counts_lower_bound": (
+                deepcopy(logged) if branch_trusted and isinstance(logged, dict)
+                else None),
+            "count_scope": ("RECORDED_ACCEPTED_EVENTS_ONLY"
+                            if branch_trusted else "UNVERIFIED_AFTER_ROLLBACK"),
+            "ledger_complete_from_run_start": False,
+            "missing_player_drill_count_means_zero": False,
+            "fourth_checkpoint_verified": False,
+        }
     if topic == "RESOURCES":
         resource = state.get("resources", {})
         return {**base, "resource_fresh": resource.get("fresh") is True,
