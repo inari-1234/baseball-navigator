@@ -3,10 +3,16 @@
 Last updated: 2026-11-08
 State: ACTIVE_Y1_JUNE_POST_ROLLBACK_CAPTURE — SAVEPOINT_UNKNOWN
 
-## Response boundary correction — candidate P7-A (2026-11-08)
+## Reply classification and count-safety correction — P7-B candidate (2026-11-08)
+- Independent review regression: interrogative 「たきは3回特訓した？4回目スキル狙っていい？」 must not become a confirmed TRAINING event; 「応援はすべてONでいい？」 must use ACTION_EVALUATION and obey rollback hard stop. A declarative report followed by a question still requires ingest.
+- Cause owner: `text_fast.py` clause-level report classifier, targeted Cheer-mode action routing, and a read-only `TRAINING_COUNTS` projection. A missing or incomplete per-player counter is UNKNOWN, never 0 or 3, and a logged count is a lower bound without a verified run-start baseline. The P4 enum-only bridge exposes safe count status without copying private chat text to public GitHub.
+- Updated `tests/test_text_fast.py`, `tests/test_chat_bridge.py`, `docs/TEXT_FAST_PROTOCOL.md`, `docs/CHAT_BRIDGE_P4.md`. No changes to `LIVE_EVENTS.jsonl`, `CURRENT_LIVE_STATE.json`, historical skill research, or the action validator. Follow-up distinct cause: existing 4th-checkpoint eligibility still needs explicit complete-run baseline provenance before it can be certified on a future TRUSTED timeline.
+- Acceptance requires Run Guard regression PASS, candidate→main no-force fast-forward, source SHA readback, and a real P4 `TRAINING_COUNTS` request pinned to the new main/event seq. This still cannot guarantee ChatGPT invokes the connector for every answer.
+
+## Response boundary correction — P7-A PASS (2026-11-08)
 - Independent review identified a real output-boundary defect: P3 intentionally retains historical conditional training candidates while the P4 `SKILL` response exposed blocked candidate players, Cheer and costs. ChatGPT subsequently presented these historical candidates as an apparent next training plan and asserted unsupported current-run counts. The underlying P3 counter validation was not defective.
 - Candidate scope: clarify `AGENTS.md` and `docs/NAVIGATOR_STEP_PROTOCOL.md`; suppress P4 candidate and provisional target fields when status is not `VALIDATED_DRAFT_REVIEW`; invert the affected bridge regression. Do not change live events, current SAVE branch, training counters or historical experiments.
-- Acceptance: Run Guard regression PASS; blocked P4 response has no player/Cheer/cost plan, preserved blockers/source SHA/event seq, and known P6/knowledge invariants. This does not guarantee control of any unconstrained ChatGPT reply or tool invocation. Follow-up separate owner: precise question classification and complete-versus-lower-bound training counts.
+- Acceptance: GitHub Actions 42426308920 PASS (311/311), promoted to main acbf682a55ab78a120575a2f8471bb8897d0697e by no-force fast-forward and readback. Blocked P4 now emits no player/Cheer/cost plan; P6/knowledge invariants remain. This does not guarantee control of unconstrained ChatGPT output or tool invocation.
 
 ## P6 actual ChatGPT-to-GitHub BOOT roundtrip verified (2026-11-08)
 - **E2E PASS:** connected ChatGPT created `bridge/p6-boot-proof-20261108-01` with strict `NAV_CHAT_REQUEST.json` (`intent=BOOT`), which ran GitHub Actions `42393501184` (SUCCESS; job `128465829395`). The actual job-log JSON was parsed and cross-checked in this conversation.
