@@ -3,6 +3,13 @@
 Last updated: 2026-11-07
 State: ACTIVE_Y1_JUNE_POST_ROLLBACK_CAPTURE — SAVEPOINT_UNKNOWN
 
+## P4 connected ChatGPT ↔ GitHub Actions bridge (2026-11-07)
+- Entrypoint: `chat_bridge.py`; request-triggering workflow: `.github/workflows/chat_bridge.yml`; documented protocol: `docs/CHAT_BRIDGE_P4.md`. Use the **already-connected GitHub tools** for the bridge, not a claimed newly installed ChatGPT-native Plugin. Public request branch `bridge/**` carries ONLY intent enum, opaque ID, expected main commit SHA and exact event revision. No free-form chat text, screenshots, player HP or private Library files are accepted.
+- Actions check out request branch and **canonical main separately**, then the source-pinned engine performs ordered BOOT, evidence continuity and `navigator_step` under `action_authorized=false`. A delimited JSON result is retrieved using GitHub job-log tools; the answering assistant must match request ID + commit + revision and cite actual rules/fallbacks. Stale sources fail closed.
+- Current canonical SAVE state and historical skill knowledge are unchanged (last_event_seq 10, `ROLLBACK_CONFIRMED_SAVEPOINT_UNKNOWN`; fourth-session skill pattern retained). Integration cannot authorize paid training or a match on this snapshot.
+- P4 is a slower audited GitHub Actions path, not a guarantee of automatic per-turn execution or iOS control. Ordinary QUICK gameplay keeps the low-latency source-based path.
+- First real cross-tool smoke must be executed and confirmed before declaring the chat round-trip fully tested. No game mutations or user private image uploads are part of P4.
+
 ## Navigator Step P3 integration (2026-11-07)
 - Next-action engine: NAVIGATOR:navigator_step.py, grounded historical tactics NAV_TACTICS.json, protocol docs/NAVIGATOR_STEP_PROTOCOL.md; candidate choices compare batting contact, slugging/power, scheduled matches, and item-based recovery with the same current-snapshot revision and ACTIVE rule gate.
 - Knowledge source: KNOWLEDGE:SKILL-4TH-PATTERN. The fourth-session historical popup pattern and negative 1–3 reset evidence are used for skill targeting; **accepted branch only** supplies current skill/count progress, and ability/skill results are never copied from discarded experiments.
