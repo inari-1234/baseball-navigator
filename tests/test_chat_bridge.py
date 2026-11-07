@@ -91,6 +91,18 @@ class ChatBridgeTests(unittest.TestCase):
                     self.assertIsNone(r.get("provisional_target"))
                 self.assertTrue(r["rule_ids"])
 
+    def test_training_counts_intent_never_claims_exact_current_sessions(self):
+        r = bridge_response(request(intent="TRAINING_COUNTS"),
+                            root=ROOT, actual_main_sha=FAKE_SHA)
+        self.assertEqual(r["status"], "READ_ONLY_READY")
+        self.assertIsNone(r["candidate"])
+        obs = r["observation"]
+        self.assertEqual(obs["topic"], "TRAINING_COUNTS")
+        self.assertEqual(obs["exact_total_status"], "UNKNOWN")
+        self.assertIsNone(obs["event_ledger_counts_lower_bound"])
+        self.assertFalse(obs["ledger_complete_from_run_start"])
+        self.assertFalse(obs["missing_player_drill_count_means_zero"])
+
     def test_status_response_is_readonly_projection(self):
         r=bridge_response(request(intent="STATUS"),root=ROOT,actual_main_sha=FAKE_SHA)
         self.assertEqual(r["status"], "READ_ONLY_READY")
