@@ -1,0 +1,40 @@
+{
+  "schema_version": "1.0",
+  "project_id": "kairosoft-baseball-story-sapporo-sprint",
+  "repository": "inari-1234/baseball-navigator",
+  "visibility": "PUBLIC_REPOSITORY",
+  "entrypoint": "project_bootstrap.py",
+  "boot_authority": "AGENTS.md",
+  "bootstrap_intent": "BOOT",
+  "required_knowledge_ids": [
+    "SKILL-4TH-PATTERN",
+    "SKILL-ACCEPTED-HISTORICAL"
+  ],
+  "primary_goal_id": "GOAL-Y1-SAPPOKO",
+  "recognition": {
+    "normalized_substrings": [
+      "野球部ものがたり",
+      "baseball-navigator",
+      "baseballstory",
+      "さっぽこ高校"
+    ],
+    "all_of_terms": [
+      [
+        "カイロソフト",
+        "野球"
+      ],
+      [
+        "野球部",
+        "攻略",
+        "続き"
+      ]
+    ],
+    "ambiguous_bare_terms": [
+      "野球部",
+      "野球",
+      "攻略"
+    ]
+  },
+  "self_identification_limits": "This repository can identify and resume its own known project when invoked; it cannot force ChatGPT to discover or execute the GitHub connector for every new conversation.",
+  "content_policy": "No private image Library identifiers or user-provided screenshot bytes in this public index."
+}
