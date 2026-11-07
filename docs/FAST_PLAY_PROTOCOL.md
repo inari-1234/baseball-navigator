@@ -3,6 +3,11 @@
 ## Purpose
 Reduce time to first **source-grounded gameplay observation**. Do not run full GitHub research or change code while a player is waiting for a simple image reading. Separate the QUICK, DELTA and FULL paths.
 
+## P5 executable image-first path (2026-11-07)
+When actual screenshot bytes are available in the local runtime, prefer `quick_image_pipeline.QuickImageSession.inspect(path)` or `navigator_step.py --image path`. It reuses the existing screen-specific anchors; a bounded source-SHA256 cache avoids *re-decoding* unchanged images in the same process, but hashes bytes again on every reuse. Do not claim speedup for a new screenshot or ChatGPT response time from this cache alone. `--benchmark` measures Python-local elapsed time (cold, warm median, warm p95); GitHub Actions uses synthetic images, not a real iPhone latency experiment.
+
+`--image-review` permits an independently human-reviewed event **draft** using the exact screenshot SHA, current accepted branch, period, time and latest contextual event ID. The script replays the resulting hypothetical event with `LIVE_EVENTS.jsonl` in memory, without writing the authoritative log, mutating the phone, trusting a previously unknown SAVE anchor or treating a screenshot as a skill acquisition. Formal event persistence still uses the existing approved ingest path. Duplicate screenshots, stale event revisions, unsupported fields and missed chronology fail closed. Complete contract: `docs/P5_QUICK_IMAGE_PROTOCOL.md`.
+
 ## QUICK — default for screenshot interpretation
 1. Load the exact image once, keep SHA256. If its hash was already observed in the uninterrupted chat, reuse the prior image interpretation unless reconsideration is requested.
 2. Route with cheap native image anchors before costly image scanning. `screen_reader.read_image` checks item-use layout, roster page and result-panel signatures before the nine-position formation/HP search. Unknown formats still use formation fallback and fail closed.
