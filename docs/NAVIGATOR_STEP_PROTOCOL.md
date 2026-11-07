@@ -21,7 +21,9 @@ Ordered AGENTS.md BOOT must be complete. Source of truth:
 | Match | A scheduled opponent | Current match period and explicit match-day, player and opponent readiness |
 | Recovery | Explicit current item and player | Current HP, verified inventory, sourced need and branch |
 
-Historical group affinity is evidence for testing, not proof of present roster optimality. Failure-mode preference is ordinal, not a claim of expected runs:
+Historical group affinity is evidence for testing, not proof of present roster optimality. When training_readiness includes a source-attested preferred_participant_groups entry for the specific drill, the current verified three-player selection overrides the historical group. Every override must include exactly three distinct named players, a basis, and source evidence references; unsubstantiated overrides block the training recommendation instead of silently falling back to the old group. An override is still only a supplied, independently reviewed tactical choice, not a proven numerical optimum.
+
+Failure-mode preference is ordinal, not a claim of expected runs:
 - CONTACT: poor contact -> contact training.
 - CONVERSION: hits but 0–1 run -> power/high-impact skills.
 - ADEQUATE: only if a current-period match is genuinely ready.
@@ -58,7 +60,14 @@ Example source-attested context structure (replace placeholders with actually va
         "branch": "ACCEPTED",
         "evidence_refs": ["SOURCE_ID_FROM_VERIFIED_CURRENT_MENU_AND_HP"],
         "available_drills": ["素振り"],
-        "ready_players": ["岡治", "今井", "たき"]
+        "ready_players": ["岡治", "今井", "たき"],
+        "preferred_participant_groups": {
+          "素振り": {
+            "players": ["岡治", "今井", "たき"],
+            "basis": "CURRENT_VERIFIED_OCTOBER_LINEUP_NEED",
+            "evidence_refs": ["SOURCE_ID_FOR_CURRENT_LINEUP"]
+          }
+        }
       }
     }
 
