@@ -1,7 +1,15 @@
 # CURRENT_HANDOFF
 
-Last updated: 2026-11-07
+Last updated: 2026-11-08
 State: ACTIVE_Y1_JUNE_POST_ROLLBACK_CAPTURE — SAVEPOINT_UNKNOWN
+
+## P6 one-phrase verified project resume (2026-11-08)
+- Canonical discovery: `PROJECT_ENTRYPOINT.json` identifies `inari-1234/baseball-navigator` for specific short phrases such as 「野球部ものがたりの続き」. Generic 「野球部」/「続き」 alone must NOT select this project.
+- Actual BOOT engine: `project_bootstrap.py` (protocol `docs/PROJECT_RESUME_P6.md`). It reads `AGENTS.md` first, all seven BOOT authorities in prescribed order, checks source SHA/revision, exactly replays `LIVE_EVENTS.jsonl` to `CURRENT_LIVE_STATE.json`, validates goal, latest decision and required ACTIVE rules, and runs `knowledge_engine.validate_knowledge`. Missing or inconsistent authority fails closed. Output includes file hashes, source commit, event 10, known resources and scheduled July matches, knowledge claim IDs and the next safe step; no state writes or game operation.
+- Connected GitHub P4 bridge: new strict public request intent `BOOT` returns this read-only verified capsule via an actual Actions log result, without posting a long handoff text or private screenshots. It still requires the assistant to invoke GitHub tools; **there is no guaranteed ChatGPT-native automatic new-chat hook**.
+- Required preserved facts: 4th-session skill popup observational evidence with ~40 earlier negative rerolls; historical accepted 石渡コントロールアップ and 入江ミート力アップ once are *not* proof of current post-rollback skills. Six private-Library backup checks remain time-point attestations, not guaranteed present access.
+- State remains Y1 June PM5:20, source event seq 10, `ROLLBACK_CONFIRMED_SAVEPOINT_UNKNOWN` and July matches SCHEDULED. The P6 result must be `BOOT_VERIFIED_ACTIONS_BLOCKED` until the actual restored SAVE anchor is reconciled; P6 never authorizes a paid action.
+- Run Guard CI includes P6/bridge regression, and release requires a genuine connector-mediated BOOT request checked against the final source SHA.
 
 ## P5 candidate QA and measurement checkpoint (2026-11-07)
 - Candidate verification: GitHub Actions run `42382942102` SUCCESS, **294 Python tests PASS**, Run Guard/decision/knowledge/P3/P4/P5 benchmark/replay checks all passed. The explicit P5 synthetic local benchmark of 9 repeats reported cold first inspection **53.448 ms**, warm median **0.033 ms**, warm p95 **0.114 ms**, with one actual pixel decode for repeated identical bytes. These values measure **one GitHub runner with synthetic image only**; they do not prove faster new iPhone images or ChatGPT response latency.
