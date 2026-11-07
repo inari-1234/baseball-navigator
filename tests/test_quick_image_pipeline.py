@@ -178,6 +178,24 @@ class QuickImageSuite(unittest.TestCase):
                                     "VERIFIED_CHRONOLOGY_ANCHOR_REQUIRED"):
             self._screen_draft(self._review(after_event_id="does-not-exist"))
 
+    def test_past_screen_anchor_is_rejected_even_if_the_old_event_exists(self):
+        prior = next(e["event_id"] for e in self.events
+                     if e["kind"] == "SCREEN" and e["event_id"] != self.screen_id)
+        with self.assertRaisesRegex(QuickImageError,
+                                    "CHRONOLOGY_NOT_LATEST_ACCEPTED_CONTEXT"):
+            self._screen_draft(self._review(after_event_id=prior))
+
+    def test_same_image_cannot_be_reingested_under_new_event_id(self):
+        events=copy.deepcopy(self.events)
+        original=next(e for e in events if e["event_id"] == self.screen_id)
+        original["source"]["locator"] += " #sha256="+self.digest
+        with patch("quick_image_pipeline.read_image",
+                   return_value=self._fake_reader()):
+            with self.assertRaisesRegex(QuickImageError,
+                                        "DUPLICATE_IMAGE_EVIDENCE"):
+                QuickImageSession().draft(self.path, review=self._review(),
+                                          state=self.state, events=events)
+
     def test_new_screen_with_older_game_clock_is_not_allowed(self):
         with self.assertRaisesRegex(QuickImageError,
                                     "SCREENSHOT_DRAFT_DISCARDED_AS_STALE"):
@@ -239,7 +257,7 @@ class QuickImageSuite(unittest.TestCase):
         # The wrong after-event anchor is an existing event but is NOT the
         # current accepted screenshot context for HP.
         with self.assertRaisesRegex(QuickImageError,
-                                    "SCREENSHOT_DRAFT_DISCARDED_AS_STALE"):
+                                    "CHRONOLOGY_NOT_LATEST_ACCEPTED_CONTEXT"):
             QuickImageSession().draft(self.path, review=review,
                                       state=self.state, events=self.events)
 
