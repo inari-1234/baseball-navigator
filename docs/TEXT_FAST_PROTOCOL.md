@@ -16,6 +16,9 @@ The `AGENTS.md` ordered BOOT remains required at first turn or after context los
 | `試合で勝った` | STATE_REPORT | FULL | INGEST_BEFORE_ADVICE; outcome/branch may trigger full checkpoint |
 | `ロールバックした` | STATE_REPORT | FULL | INGEST_BEFORE_ADVICE; savepoint not invented |
 | `アイテムを使うべき？` | ACTION_EVALUATION | QUICK | gate state, revision, inventory and candidate |
+| `応援はすべてONでいい？` | ACTION_EVALUATION | QUICK | Cheer-mode decisions are not resource-balance queries |
+| `たきは3回特訓した？4回目スキル狙っていい？` | ACTION_EVALUATION | QUICK | Interrogative training history is not a completed TRAINING event |
+| `たきはすでに3回特訓してたっけ？` | READ_ONLY | QUICK | TRAINING_COUNTS: exact current total UNKNOWN unless complete baseline proved |
 | `コードとテストしてみよう` | DEVELOPMENT | FULL | FULL_REQUIRED; candidate→tests→main CI |
 | `進めて` (without task context) | NEEDS_CONTEXT | REVIEW | No guessed action |
 
@@ -65,5 +68,8 @@ For READ_ONLY questions, `TextFastEngine.plan` now adds `observation` derived on
 - `ITEMS`: source-linked visible slot labels and the separately verified bottom-stock values; `0/2` remains a slot denominator, not 2 units of confirmed inventory.
 - `RESOURCES`: only snapshot fields with `resources.fresh=true` and source event ID; missing money/HP values are not invented.
 - `STATUS`: current period, game clock, timeline status and provenance, with unknown branch plainly marked.
+- `TRAINING_COUNTS`: only a recorded event-log lower bound on a trusted timeline; otherwise no accepted counts are asserted. Even a trusted event log with three accepted sessions does not prove the complete run-start total until a baseline is verified. Missing keys never imply zero; `fourth_checkpoint_verified` is false in this read-only projection.
+
+A question containing past tense, such as "特訓した？", is not a confirmed game event. A declarative clause followed by a question ("特訓した。次は…？") still requires ingestion. This conservative clause split is not a complete Japanese semantic parser.
 
 All projections are read-only and deep-copy nested source fields to prevent accidental mutation. Source limitations still apply: no independent OCR, no cache of a historical state, and no hidden-item extrapolation. A quick projection is **not** a complete gameplay decision.
