@@ -11,7 +11,7 @@ This is a **real tool-mediated ChatGPT ↔ GitHub ↔ Python round trip**, not a
 `NAV_CHAT_REQUEST.json` on the GitHub branch is **public** because the repository is public. It may contain ONLY:
 - `schema_version` = `1.0`
 - `request_id` = opaque non-personal lowercase ASCII ID (4–64 chars)
-- `intent` = `SKILL`, `GENERAL`, `MATCH`, `RECOVERY` or `STATUS`
+- `intent` = `BOOT`, `SKILL`, `GENERAL`, `MATCH`, `RECOVERY` or `STATUS`
 - `expected_main_sha` = exact 40-character lowercase Git commit
 - `expected_event_seq` = exact current live event revision
 
@@ -20,6 +20,12 @@ Do **not** write conversation text, screenshots, player identities/HP updates, L
 The GitHub Actions job uses `permissions: contents: read` and cannot mutate the gameplay repository. The bridge verifies ordered BOOT presence, knowledge continuity and the canonical state revision before returning any result; it always reports `action_authorized=false` and `side_effects=false`. A queued result can go stale after main changes; ChatGPT must match source commit, request ID and event revision **at the moment of using the answer**.
 
 The bridge has no trusted live HP/readiness/extra user context input. Therefore its current canonical answer (Y1 June PM5:20, rollback SAVE anchor unknown) is **conditional only** and will remain blocked for paid actions. Do not manufacture `verified_for_current_state` to get a successful draft.
+
+## P6 new-chat project BOOT shortcut
+
+For a new chat that clearly says 「野球部ものがたりの続き」, use `intent: BOOT`. This returns the source-verified `project_bootstrap.py` capsule with the seven ordered BOOT reads, live replay and fourth-training evidence, rather than the limited P4 next-action snapshot. Read `AGENTS.md` before starting. Inspect and honor the returned `status` and `action_authorized=false`. A blocked savepoint means gameplay paid actions remain blocked.
+
+Only the strict five allowlisted request fields are published; no free-form text is transferred. This is a **connector-initiated** action, not a guaranteed automatic new-chat hook. Details: `docs/PROJECT_RESUME_P6.md`.
 
 ## Real ChatGPT GitHub tool sequence
 
