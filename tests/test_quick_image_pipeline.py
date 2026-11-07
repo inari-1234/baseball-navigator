@@ -286,6 +286,68 @@ class QuickImageSuite(unittest.TestCase):
             QuickImageSession().draft(self.path,review=r,
                                       state=self.state,events=self.events)
 
+    def test_navigator_cli_image_first_path_never_writes_game_events(self):
+        import subprocess
+        import sys
+        old=(ROOT/"LIVE_EVENTS.jsonl").read_bytes()
+        result=subprocess.run([
+            sys.executable,str(ROOT/"navigator_step.py"),"画像を確認して",
+            "--image",str(self.path),"--expected-event-seq","10"],
+            cwd=ROOT,capture_output=True,text=True,check=True)
+        out=json.loads(result.stdout)
+        self.assertEqual(out["status"],"IMAGE_OBSERVATION_READY")
+        self.assertEqual(out["component"],"navigator_step+p5_image")
+        self.assertEqual(out["source_sha256"],self.digest)
+        self.assertFalse(out["candidate_event_committed"])
+        self.assertFalse(out["side_effects"])
+        self.assertEqual((ROOT/"LIVE_EVENTS.jsonl").read_bytes(),old)
+
+    def test_navigator_cli_image_review_requires_explicit_boot_and_revision(self):
+        import subprocess
+        import sys
+        review=self.root/"review.json"
+        review.write_text(json.dumps(self._review()),encoding="utf-8")
+        result=subprocess.run([
+            sys.executable,str(ROOT/"navigator_step.py"),"画像を確認して",
+            "--image",str(self.path),"--image-review",str(review)],
+            cwd=ROOT,capture_output=True,text=True)
+        self.assertNotEqual(result.returncode,0)
+        self.assertIn("P5_BOOT_REQUIRED_FOR_EVENT_PREVIEW",result.stderr)
+        result=subprocess.run([
+            sys.executable,str(ROOT/"navigator_step.py"),"画像を確認して",
+            "--image",str(self.path),"--image-review",str(review),
+            "--boot-verified"],
+            cwd=ROOT,capture_output=True,text=True)
+        self.assertNotEqual(result.returncode,0)
+        self.assertIn("P5_EXACT_EXPECTED_EVENT_SEQ_REQUIRED",result.stderr)
+
+    def test_navigator_cli_proposed_screen_stays_uncommitted_after_human_review(self):
+        import subprocess
+        import sys
+        from PIL import Image
+        # Synthetic test layout: only a WORLD_UI class signature, not real
+        # HUD OCR or proof that displayed numbers match the review.
+        native=self.root/"world.png"
+        frame=Image.new("RGB",(2622,1206),(10,20,30))
+        frame.putpixel((100,80),(10,150,240))
+        frame.save(native)
+        digest=hashlib.sha256(native.read_bytes()).hexdigest()
+        r=self._review(reviewed_image_sha256=digest)
+        review=self.root/"review.json"
+        review.write_text(json.dumps(r),encoding="utf-8")
+        result=subprocess.run([
+            sys.executable,str(ROOT/"navigator_step.py"),"画像を確認して",
+            "--image",str(native),"--image-review",str(review),
+            "--boot-verified","--expected-event-seq","10"],
+            cwd=ROOT,capture_output=True,text=True,check=True)
+        out=json.loads(result.stdout)
+        self.assertEqual(out["status"],"UNCOMMITTED_IMAGE_EVENT_PREVIEW")
+        self.assertEqual(out["event_preview"]["preview_event_seq"],11)
+        self.assertEqual(out["event_preview"]["preview_timeline_status"],
+                         "ROLLBACK_CONFIRMED_SAVEPOINT_UNKNOWN")
+        self.assertFalse(out["action_authorized"])
+        self.assertFalse(out["candidate_event_committed"])
+
     def test_screenshot_menu_does_not_claim_inventory_or_item_use(self):
         result=_compact({
             "screen_type":"ITEM_USE_MENU",
