@@ -20,7 +20,8 @@ from typing import Any
 from knowledge_engine import validate_knowledge
 from navigator_step import navigator_step
 from project_bootstrap import ResumeError, bootstrap
-from check_reply import ReplyGateError, render_guarded_reply, check_reply
+from check_reply import (ReplyGateError, render_guarded_reply,
+                         check_reply, canonical_state_sha256)
 
 INTENTS = {
     "SKILL": "スキル獲得に向けて何をすべき？",
@@ -180,6 +181,7 @@ def bridge_response(request: Any, *, root: str | Path,
         "source_commit_sha": actual_main_sha,
         "state_event_seq": state["last_event_seq"],
         "state_sha256": _sha256_file(root / "CURRENT_LIVE_STATE.json"),
+        "state_structured_sha256": canonical_state_sha256(state),
         "knowledge_claims_sha256": _sha256_file(root / "KNOWLEDGE_CLAIMS.json"),
         "timeline_status": state.get("timeline_status"),
         "status": result["status"],

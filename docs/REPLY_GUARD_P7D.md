@@ -4,7 +4,7 @@
 
 The repository previously blocked a paid training candidate but allowed ChatGPT to independently describe historical participants and prices as a plan, or claim a current player's three accepted sessions without evidence. The P7-D reply guard deliberately certifies only exact source-pinned Japanese output templates for the canonical unknown-restored-SAVE SKILL and TRAINING_COUNTS responses.
 
-check_reply.py implements render_guarded_reply(bridge_result, state) and check_reply(text, bridge, state, expected_main_sha, expected_event_seq). Any text different from the exact rendered template is REJECTED, including plausible extra explanation, invented counts, a conditional action, or an added numerical Cheer/Sports cost. An unsupported state returns NOT_CERTIFIED and cannot be silently converted into a safe reply. This is not a general Japanese-language truth detector.
+check_reply.py implements render_guarded_reply(bridge_result, state) and check_reply(text, bridge, state, expected_main_sha, expected_event_seq). Any text different from the exact rendered template is REJECTED, including plausible extra explanation, invented counts, a conditional action, or an added numerical Cheer/Sports cost. A deterministic SHA-256 of the structured current state is bound into the bridge result, so even a matching event number with changed state contents fails. An unsupported state returns NOT_CERTIFIED and cannot be silently converted into a safe reply. This is not a general Japanese-language truth detector.
 
 ## Integration
 

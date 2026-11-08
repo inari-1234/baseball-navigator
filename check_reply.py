@@ -18,6 +18,12 @@ class ReplyGateError(ValueError):
     pass
 
 
+def canonical_state_sha256(state: dict[str, Any]) -> str:
+    """Hash structured state independent of source JSON formatting."""
+    return sha256(json.dumps(state, ensure_ascii=False, sort_keys=True,
+                            separators=(",", ":")).encode("utf-8")).hexdigest()
+
+
 def _require(condition: bool, code: str) -> None:
     if not condition:
         raise ReplyGateError(code)
@@ -43,6 +49,8 @@ def render_guarded_reply(bridge: dict[str, Any],
              "STALE_EVENT_REVISION")
     _require(bridge.get("timeline_status") == state.get("timeline_status"),
              "TIMELINE_MISMATCH")
+    _require(bridge.get("state_structured_sha256") ==
+             canonical_state_sha256(state), "STATE_CONTENT_MISMATCH")
     _require(bridge.get("action_authorized") is False
              and bridge.get("side_effects") is False,
              "EXECUTION_BOUNDARY_VIOLATED")
@@ -146,6 +154,12 @@ def main() -> None:
         state = json.loads(args.state.read_text(encoding="utf-8"))
         if args.render:
             result = render_guarded_reply(bridge, state)
+            gate = check_reply(result, bridge=bridge, state=state,
+                               expected_main_sha=args.expected_main_sha,
+                               expected_event_seq=args.expected_event_seq)
+            if gate["status"] != "PASS":
+                parser.exit(2, "REPLY_GUARD_FAIL:" +
+                            ",".join(gate["error_codes"]) + "\n")
             print(result)
             return
         draft = args.reply.read_text(encoding="utf-8")

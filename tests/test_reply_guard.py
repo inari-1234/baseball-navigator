@@ -74,6 +74,15 @@ class GuardedReplyRegression(unittest.TestCase):
         x=copy.deepcopy(self.skill);x["timeline_status"]="TRUSTED"
         self.assertEqual(self.verdict(text,x)["status"],"REJECTED")
 
+    def test_state_content_mismatch_rejected_even_with_same_revision(self):
+        changed=copy.deepcopy(self.state)
+        changed["training_counts_by_player_drill"]={"たき|素振り":3}
+        observed=check_reply(self.skill["safe_reply"],bridge=self.skill,
+                             state=changed,expected_main_sha=SHA,
+                             expected_event_seq=10)
+        self.assertEqual(observed["status"],"REJECTED")
+        self.assertIn("STATE_CONTENT_MISMATCH",observed["error_codes"])
+
     def test_blocked_candidate_data_cannot_be_certified(self):
         x=copy.deepcopy(self.skill)
         x["candidate"]={"cost":{"sports":6,"cheer":20},
