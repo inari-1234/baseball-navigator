@@ -1,0 +1,7 @@
+{
+  "schema_version": "1.0",
+  "request_id": "p7c-training-counts-final-20261108-01",
+  "intent": "TRAINING_COUNTS",
+  "expected_main_sha": "f61bbc786c39e44c2241d192dcdac90a1f34a592",
+  "expected_event_seq": 10
+}
