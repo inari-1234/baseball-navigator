@@ -154,6 +154,26 @@ class TextFastSafetyRegression(unittest.TestCase):
                            boot_verified=True)
         self.assertEqual(r["status"],"CONTRACT_REQUIRED")
 
+    def test_source_certified_exact_count_is_not_conflated_with_partial_log(self):
+        s=state(trusted=True)
+        s["training_counts_by_player_drill"]={"たき|素振り":2,
+                                               "今井|素振り":3}
+        s["training_counts_exact_by_player_drill"]={"たき|素振り":3}
+        s["training_count_certifications"]={"たき|素振り":{
+            "event_id":"TEST-EXACT-TAKI","source_kind":"USER_REPORT",
+            "scope":"EXACT_CURRENT_ACCEPTED_SAVE"}}
+        r=self.route("たきの特訓回数は？",s=s)
+        self.assertEqual(r["status"],"READ_ONLY_READY")
+        obs=r["observation"]
+        self.assertEqual(obs["exact_total_status"],"PARTIALLY_VERIFIED")
+        self.assertEqual(obs["exact_current_counts_by_player_drill"],
+                         {"たき|素振り":3})
+        self.assertEqual(obs["exact_count_source_event_ids"],
+                         {"たき|素振り":"TEST-EXACT-TAKI"})
+        self.assertEqual(obs["event_ledger_counts_lower_bound"]["今井|素振り"],3)
+        self.assertFalse(obs["missing_player_drill_count_means_zero"])
+        self.assertFalse(obs["fourth_checkpoint_verified"])
+
     def test_training_count_query_does_not_claim_exact_total(self):
         s = state(trusted=True)
         s["training_counts_by_player_drill"] = {"たき|素振り": 3}
