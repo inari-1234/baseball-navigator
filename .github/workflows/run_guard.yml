@@ -25,6 +25,7 @@ on:
       - "chat_bridge.py"
       - "check_reply.py"
       - "docs/REPLY_GUARD_P7D.md"
+      - "docs/REPLY_GUARD_P7E.md"
       - "project_bootstrap.py"
       - "PROJECT_ENTRYPOINT.json"
       - "docs/PROJECT_RESUME_P6.md"

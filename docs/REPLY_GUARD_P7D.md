@@ -14,6 +14,10 @@ Do not upload private free-text replies to public GitHub workflows. A local chec
 
 This repository cannot intercept or enforce verification of all normal ChatGPT replies. It does not add an always-on ChatGPT runtime hook, cannot guarantee a connector call, and must not claim that it can.
 
+## P7-E extension
+
+The P7-D exact-rendering rule is retained. The P7-E extension in `docs/REPLY_GUARD_P7E.md` adds TRUSTED counts (exact and logged lower bounds separately), locally source-validated training drafts with explicit participants/Cheer/costs/accept-reload conditions, and fail-closed public bridge delivery whenever the reply is not certified. It does not add a ChatGPT-native pre-display hook or make the public enum-only request a vehicle for private readiness/HP.
+
 ## Open issues from the independent review
 
 1. The P7-C TRAINING_COUNT_BASELINE accepts an explicit direct current-save user report. The engine cannot independently tell whether the user's recollection is hedged or mistaken. For a material baseline acceptance, require a clearly unqualified confirmation, scoped provenance, and a DECISION_LOG entry recording the evidence judgment. Tentative statements remain UNKNOWN. This is an operational requirement rather than machine-verified certainty.
