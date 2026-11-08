@@ -12,7 +12,7 @@ import unittest
 
 from chat_bridge import (
     BOOT_FILES, ChatBridgeError, INTENTS, bridge_response,
-    git_head, validate_request, verify_boot,
+    git_head, validate_request, verify_boot, finalize_reply_delivery,
 )
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -99,6 +99,55 @@ class ChatBridgeTests(unittest.TestCase):
                     self.assertIsNone(r.get("candidate"))
                     self.assertIsNone(r.get("provisional_target"))
                 self.assertTrue(r["rule_ids"])
+
+    def test_future_trusted_candidate_without_private_context_is_suppressed(self):
+        state=json.loads((ROOT/"CURRENT_LIVE_STATE.json").read_text(encoding="utf-8"))
+        state["timeline_status"]="TRUSTED"
+        contract=json.loads((ROOT/"DECISION_CONTRACT.json").read_text(encoding="utf-8"))
+        from check_reply import canonical_state_sha256
+        packet=bridge_response(request(intent="SKILL"),root=ROOT,
+                               actual_main_sha=FAKE_SHA)
+        packet["timeline_status"]="TRUSTED"
+        packet["state_structured_sha256"]=canonical_state_sha256(state)
+        packet["status"]="VALIDATED_DRAFT_REVIEW"
+        packet["candidate"]={
+            "id":"TRAIN_CONTACT_ON", "participants":["岡治","今井","たき"],
+            "drill":"素振り","cheer":"ON",
+            "cost":{"sports":6,"cheer":20}}
+        packet["selected_candidate"]="TRAIN_CONTACT_ON"
+        packet["primary_next_step"]="TRAIN_CONTACT_ON"
+        packet["provisional_target"]="TRAIN_CONTACT_ON"
+        packet["requires_manual_acceptance"]=True
+        packet.pop("safe_reply",None)
+        packet.pop("safe_reply_check",None)
+        result={"status":"VALIDATED_DRAFT_REVIEW"}
+        final=finalize_reply_delivery(
+            packet,result=result,state=state,contract=contract,
+            root=ROOT,main_sha=FAKE_SHA)
+        self.assertEqual(final["status"],"REPLY_NOT_CERTIFIED")
+        self.assertEqual(final["navigator_status"],"VALIDATED_DRAFT_REVIEW")
+        self.assertEqual(final["reply_delivery_status"],"STOP_UNCERTIFIED")
+        self.assertIsNone(final["safe_reply"])
+        self.assertEqual(final["safe_reply_check"]["status"],"NOT_CERTIFIED")
+        self.assertIsNone(final["candidate"])
+        self.assertIsNone(final["selected_candidate"])
+        self.assertIsNone(final["provisional_target"])
+        self.assertFalse(final["requires_manual_acceptance"])
+        self.assertEqual(final["primary_next_step"],
+                         "VERIFY_REPLY_SUPPORT_BEFORE_ACTION")
+        self.assertNotIn('"cost"',json.dumps(final,ensure_ascii=False))
+        self.assertNotIn('"cheer"',json.dumps(final,ensure_ascii=False))
+
+    def test_uncertified_public_action_intents_never_export_a_draft(self):
+        for intent in ("GENERAL","MATCH","RECOVERY"):
+            with self.subTest(intent=intent):
+                reply=bridge_response(request(intent=intent),root=ROOT,
+                                      actual_main_sha=FAKE_SHA)
+                self.assertEqual(reply["status"],"REPLY_NOT_CERTIFIED")
+                self.assertEqual(reply["reply_delivery_status"],"STOP_UNCERTIFIED")
+                self.assertIsNone(reply["candidate"])
+                self.assertIsNone(reply["selected_candidate"])
+                self.assertIsNone(reply["provisional_target"])
 
     def test_training_counts_intent_never_claims_exact_current_sessions(self):
         r = bridge_response(request(intent="TRAINING_COUNTS"),
