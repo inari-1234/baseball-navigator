@@ -9,7 +9,8 @@ from pathlib import Path
 from typing import Any
 
 KINDS={"SCREEN","MATCH_SCHEDULE","MATCH_ATTEMPT","MATCHES_COMPLETED","TRAINING",
-       "ITEM_USE","CORRECTION","SAVE_CHECKPOINT","ROLLBACK","HP_OBSERVATION"}
+       "TRAINING_COUNT_BASELINE","ITEM_USE","CORRECTION","SAVE_CHECKPOINT",
+       "ROLLBACK","HP_OBSERVATION"}
 SOURCES={"RAW_SCREEN","USER_REPORT","USER_CORRECTION"}
 BRANCHES={"ACCEPTED","REJECTED"}
 COUNTERS=("study","sports","play","nature","cheer")
@@ -366,6 +367,35 @@ def replay(events):
             if not historical:
                 invalidate();state["current_exact_time"]="UNKNOWN";last_mutation_id=eid;last_context_event_id=eid
                 floor=max(floor,p) if floor else p
+        elif kind=="TRAINING_COUNT_BASELINE":
+            # This is a DIRECT, explicit current-save total attestation, not
+            # an inference from a partial training log or historical screenshots.
+            # It cannot itself reconcile an unverified rollback/save branch.
+            counts=e.get("counts")
+            if (e["source"]["kind"]!="USER_REPORT" or e.get("branch")!="ACCEPTED"
+                    or e.get("confirmed_current_save") is not True
+                    or e.get("count_scope")!="EXACT_CURRENT_ACCEPTED_SAVE"
+                    or not isinstance(counts,dict) or not counts
+                    or state["timeline_status"]!="TRUSTED" or historical
+                    or floor is None or p!=floor
+                    or last_context_event_id is None
+                    or e.get("after_event_id")!=last_context_event_id):
+                raise ObservationError(f"{eid}: missing active-save exact-count attestation")
+            exact=state.setdefault("training_counts_exact_by_player_drill",{})
+            proofs=state.setdefault("training_count_certifications",{})
+            for key,n in counts.items():
+                if (not isinstance(key,str) or key.count("|")!=1
+                        or any(not part.strip() for part in key.split("|"))
+                        or type(n) is not int or n<0):
+                    raise ObservationError(f"{eid}: invalid exact training count key/value")
+                recorded=state["training_counts_by_player_drill"].get(key,0)
+                if n<recorded or (key in exact and exact[key]!=n):
+                    raise ObservationError(f"{eid}: exact count conflicts with current active history")
+                exact[key]=n
+                proofs[key]={"event_id":eid,"source_kind":"USER_REPORT",
+                             "scope":"EXACT_CURRENT_ACCEPTED_SAVE",
+                             "recorded_at_baseline":recorded}
+            last_context_event_id=eid
         elif kind=="TRAINING":
             if e.get("branch")!="ACCEPTED":continue
             players=e.get("participants");drill=e.get("drill")
@@ -380,6 +410,8 @@ def replay(events):
             for player in players:
                 k=f"{player}|{drill}"
                 state["training_counts_by_player_drill"][k]=state["training_counts_by_player_drill"].get(k,0)+1
+                if k in state.get("training_counts_exact_by_player_drill",{}):
+                    state["training_counts_exact_by_player_drill"][k]+=1
                 per=state["training_counts_observed"].setdefault(player,{})
                 per[drill]=per.get(drill,0)+1
             state["training_history"].append({"event_id":eid,"drill":drill,"participants":list(players),
@@ -416,6 +448,33 @@ def replay(events):
     state["completed_match_periods"]=sorted(closed)
     state["matches"]=dict(sorted(matches.items()))
     return state
+
+def training_count_status(state,player,drill):
+    """Separate logged lower bounds from a source-certified active-save total.
+
+    This helper never upgrades a partial log to an exact fourth session.
+    Certification metadata is emitted only by replay(TRAINING_COUNT_BASELINE).
+    """
+    key=player+"|"+drill
+    trusted=state.get("timeline_status")=="TRUSTED"
+    logged=state.get("training_counts_by_player_drill",{}).get(key)
+    lower=logged if trusted and type(logged) is int and logged>=0 else None
+    exact=state.get("training_counts_exact_by_player_drill",{}).get(key)
+    proof=state.get("training_count_certifications",{}).get(key)
+    certified=(trusted and type(exact) is int and exact>=0
+               and (lower is None or exact>=lower)
+               and isinstance(proof,dict)
+               and isinstance(proof.get("event_id"),str)
+               and bool(proof.get("event_id"))
+               and proof.get("source_kind")=="USER_REPORT"
+               and proof.get("scope")=="EXACT_CURRENT_ACCEPTED_SAVE")
+    return {
+        "count_certainty": ("EXACT_CURRENT_SAVE" if certified else
+                            "RECORDED_LOWER_BOUND" if lower is not None else "UNKNOWN"),
+        "recorded_lower_bound":lower,
+        "exact_committed_count":exact if certified else None,
+        "certification_event_id":proof["event_id"] if certified else None,
+    }
 
 def validate_recommendation(rec,state,contract):
     errors=[]
