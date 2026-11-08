@@ -13,7 +13,7 @@ import re
 from pathlib import Path
 from typing import Any
 
-from live_state_engine import validate_recommendation
+from live_state_engine import validate_recommendation, training_count_status
 
 FOURTH = "SKILL-4TH-PATTERN"
 ACCEPTED = "SKILL-ACCEPTED-HISTORICAL"
@@ -300,12 +300,14 @@ def skill_guidance(state: dict[str, Any], *, root: str | Path = ".",
         _require(isinstance(player, str) and bool(player) and
                  isinstance(drill, str) and bool(drill),
                  "PLAYER_AND_DRILL_REQUIRED_TOGETHER")
-        key = player + "|" + drill
-        count = state.get("training_counts_by_player_drill", {}).get(key)
-        trusted = state.get("timeline_status") == "TRUSTED"
-        known = trusted and type(count) is int and count >= 0
+        status = training_count_status(state, player, drill)
+        count = status["exact_committed_count"]
+        known = status["count_certainty"] == "EXACT_CURRENT_SAVE"
         result["player"] = player
         result["drill"] = drill
+        result["count_certainty"] = status["count_certainty"]
+        result["recorded_lower_bound"] = status["recorded_lower_bound"]
+        result["certification_event_id"] = status["certification_event_id"]
         result["committed_count_known"] = bool(known)
         result["committed_count"] = count if known else None
         result["next_ordinal"] = count + 1 if known else None
@@ -314,6 +316,8 @@ def skill_guidance(state: dict[str, Any], *, root: str | Path = ".",
             result["next_step"] = "FOURTH_SESSION_CANDIDATE_VALIDATE_ACTION"
         elif known:
             result["next_step"] = "PROGRESS_TOWARD_FOURTH_WITHOUT_GUARANTEE"
+        else:
+            result["next_step"] = "VERIFY_EXACT_COUNT_IN_CURRENT_SAVE"
     return result
 
 
@@ -322,9 +326,9 @@ def validate_skill_recommendation(rec: dict[str, Any], state: dict[str, Any],
                                   *, root: str | Path = ".") -> list[str]:
     """Combine existing action gate with proof that skill advice used knowledge.
 
-    Only explicit `claimed_fourth_checkpoint` claims require a known count of
-    three completed training sessions in the CURRENT accepted branch. This
-    prevents treating screenshot count or rejected rerolls as sessions.
+    Only an explicit current-save exact count attestation, preserved in the
+    active replay lineage, can certify a fourth-session claim. Three recorded
+    events alone are a lower bound, not proof of the exact total.
     """
     errors = validate_recommendation(rec, state, contract)
     try:
