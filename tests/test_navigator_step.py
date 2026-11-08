@@ -267,9 +267,27 @@ class NavigatorStepRegression(unittest.TestCase):
         self.assertIn("CURRENT_PLAYER_HP_OR_ELIGIBILITY_UNVERIFIED",
                       out["blocking_reasons"])
 
+    def test_three_logged_sessions_without_exact_baseline_are_not_fourth(self):
+        state = self.trusted()
+        state["training_counts_by_player_drill"] = {"今井|素振り": 3}
+        out = self.navigate(state=state, context=context_for(state))
+        self.assertEqual(out["status"], "VALIDATED_DRAFT_REVIEW")
+        self.assertFalse(out["action_draft"]["claimed_fourth_checkpoint"])
+        candidate = next(x for x in out["candidates"] if x["id"] == "TRAIN_CONTACT_ON")
+        info = candidate["training_observed_counts"]["今井"]
+        self.assertEqual(info["recorded_lower_bound"], 3)
+        self.assertEqual(info["count_certainty"], "RECORDED_LOWER_BOUND")
+        self.assertIsNone(info["committed_count"])
+        self.assertFalse(info["fourth_checkpoint"])
+
     def test_exact_three_committed_sessions_marks_fourth_but_no_guarantee(self):
         state = self.trusted()
         state["training_counts_by_player_drill"] = {"今井|素振り": 3}
+        state["training_counts_exact_by_player_drill"] = {"今井|素振り": 3}
+        state["training_count_certifications"] = {
+            "今井|素振り": {"event_id":"TEST-EXACT-IMAI",
+                           "source_kind":"USER_REPORT",
+                           "scope":"EXACT_CURRENT_ACCEPTED_SAVE"}}
         out = self.navigate(state=state, context=context_for(state))
         self.assertEqual(out["status"], "VALIDATED_DRAFT_REVIEW")
         rec = out["action_draft"]
