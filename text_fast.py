@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from live_state_engine import validate_recommendation
+from live_state_engine import validate_recommendation, training_count_status
 from knowledge_engine import KnowledgeError, skill_guidance, validate_skill_recommendation
 
 
@@ -153,14 +153,28 @@ def _read_only_projection(message: str, state: dict[str, Any]) -> dict[str, Any]
         # TRUSTED chronology does not prove a complete run-start training baseline.
         # Recorded accepted sessions are at most a lower bound.
         logged = state.get("training_counts_by_player_drill", {})
+        exact = {}
+        exact_evidence = {}
+        if branch_trusted:
+            for key in state.get("training_counts_exact_by_player_drill", {}):
+                if not isinstance(key, str) or key.count("|") != 1:
+                    continue
+                player, drill = key.split("|")
+                status = training_count_status(state, player, drill)
+                if status["count_certainty"] == "EXACT_CURRENT_SAVE":
+                    exact[key] = status["exact_committed_count"]
+                    exact_evidence[key] = status["certification_event_id"]
         return {
             **base,
-            "exact_total_status": "UNKNOWN",
+            "exact_total_status": "PARTIALLY_VERIFIED" if exact else "UNKNOWN",
+            "exact_current_counts_by_player_drill": exact,
+            "exact_count_source_event_ids": exact_evidence,
             "event_ledger_counts_lower_bound": (
                 deepcopy(logged) if branch_trusted and isinstance(logged, dict)
                 else None),
-            "count_scope": ("RECORDED_ACCEPTED_EVENTS_ONLY"
-                            if branch_trusted else "UNVERIFIED_AFTER_ROLLBACK"),
+            "count_scope": ("EXACT_FOR_SOURCE_CERTIFIED_KEYS_ONLY" if exact else
+                            "RECORDED_ACCEPTED_EVENTS_ONLY" if branch_trusted else
+                            "UNVERIFIED_AFTER_ROLLBACK"),
             "ledger_complete_from_run_start": False,
             "missing_player_drill_count_means_zero": False,
             "fourth_checkpoint_verified": False,
