@@ -68,7 +68,7 @@ For READ_ONLY questions, `TextFastEngine.plan` now adds `observation` derived on
 - `ITEMS`: source-linked visible slot labels and the separately verified bottom-stock values; `0/2` remains a slot denominator, not 2 units of confirmed inventory.
 - `RESOURCES`: only snapshot fields with `resources.fresh=true` and source event ID; missing money/HP values are not invented.
 - `STATUS`: current period, game clock, timeline status and provenance, with unknown branch plainly marked.
-- `TRAINING_COUNTS`: only a recorded event-log lower bound on a trusted timeline; otherwise no accepted counts are asserted. Even a trusted event log with three accepted sessions does not prove the complete run-start total until a baseline is verified. Missing keys never imply zero; `fourth_checkpoint_verified` is false in this read-only projection.
+- `TRAINING_COUNTS`: recorded event-log counts remain lower bounds on a trusted timeline; otherwise no accepted count is asserted. Only keys with a replay-verified direct current-save `TRAINING_COUNT_BASELINE` become exact current-save totals and carry certifying event IDs in a separate field. Three logged sessions do not prove a fourth checkpoint without that baseline. Missing keys never mean zero; `fourth_checkpoint_verified` remains false in this read-only projection.
 
 A question containing past tense, such as "特訓した？", is not a confirmed game event. A declarative clause followed by a question ("特訓した。次は…？") still requires ingestion. This conservative clause split is not a complete Japanese semantic parser.
 

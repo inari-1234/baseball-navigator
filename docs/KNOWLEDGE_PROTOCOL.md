@@ -29,9 +29,9 @@ The user's May and June screenshots show ミート力アップ and コントロ�
 For skill advice:
 1. Read the validated evidence knowledge (`SKILL-4TH-PATTERN`).
 2. Prefer training toward the fourth committed repetition over endless 1–3 reroll experiments.
-3. Read current committed counts from the live state (`player|drill` only if actually source-recorded).
+3. Read `training_count_status` for the player/drill. A count in `training_counts_by_player_drill` is a recorded lower bound only. An exact total requires a direct, explicit `TRAINING_COUNT_BASELINE` user attestation tied to the current accepted save. A user's question about earlier trainings is not an attestation.
 4. When the counter is absent, mark **UNKNOWN**, never 0; when the current branch is untrusted, stop paid actions.
-5. Claim an actionable fourth checkpoint for a particular player/drill only after the current accepted branch has exactly three recorded committed sessions, and after running `live_state_engine.validate_recommendation` for resources/HP/inventory/timeline/rule IDs.
+5. Claim a specifically fourth committed session only when `training_count_status` reports `EXACT_CURRENT_SAVE` with exactly 3 sessions for that player and drill. Three logged sessions without a certified baseline are a lower bound and must fail closed. Run the standard action validator for resources/HP/inventory/timeline/rule IDs. Even a certified fourth session does not guarantee a skill reward.
 6. Reevaluate scoring and roster opportunity cost; the 4th roll is not a guaranteed reward and is not automatically optimal.
 
 ## Validation entrypoints

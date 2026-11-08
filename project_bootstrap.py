@@ -233,8 +233,11 @@ def bootstrap(message, *, root=".", expected_main_sha=None,
             "current_skills": (state.get("skills") if trusted else
                                "UNVERIFIED_AFTER_ROLLBACK"),
             "current_training_counts": (
-                state.get("training_counts_by_player_drill") if trusted else
+                (state.get("training_counts_exact_by_player_drill") or
+                 "UNKNOWN_WITHOUT_EXACT_BASELINE") if trusted else
                 "UNVERIFIED_AFTER_ROLLBACK"),
+            "recorded_training_lower_bounds": (
+                state.get("training_counts_by_player_drill", {}) if trusted else None),
             "scheduled_matches": matches,
         },
         "knowledge": {

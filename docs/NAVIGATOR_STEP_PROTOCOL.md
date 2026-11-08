@@ -30,7 +30,7 @@ Failure-mode preference is ordinal, not a claim of expected runs:
 - RECOVERY_REQUIRED: only with proven player need, stocked item, fresh player HP and verified actual recovery effect of that item.
 - UNKNOWN: ask for the minimal current match failure signal; keep conditional comparisons instead of prescribing a paid action.
 
-Skill training checks the experimental fourth-session pattern (about 40 negative rerolls at 1–3, positive popup on four). The exact game-internal counter unit and guaranteed reward are UNKNOWN. A specifically claimed next-fourth session requires *three accepted sessions for that player and drill on a TRUSTED active branch*. Retired screenshots never add current skills. For Cheer ON, return ACCEPT/RELOAD criteria; do not recommend exhaustive reloads at steps 1–3.
+Skill training checks the experimental fourth-session pattern (about 40 negative rerolls at 1–3, positive popup on four). The exact game-internal counter unit and guaranteed reward are UNKNOWN. A specifically claimed next-fourth session requires *exactly three source-certified current-save sessions for that player and drill*, via the `TRAINING_COUNT_BASELINE` plus subsequently accepted trainings, on a TRUSTED active branch. Three logged events alone are only a lower bound. Retired screenshots never add current skills. For Cheer ON, return ACCEPT/RELOAD criteria; do not recommend exhaustive reloads at steps 1–3.
 
 ## Context trust boundary
 Optional caller-reviewed context JSON is divided into failure_assessment, training_readiness, match_readiness, and recovery. Each active part requires:

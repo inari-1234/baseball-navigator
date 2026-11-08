@@ -3,6 +3,12 @@
 Last updated: 2026-11-08
 State: ACTIVE_Y1_JUNE_POST_ROLLBACK_CAPTURE — SAVEPOINT_UNKNOWN
 
+## P7-C exact training-count provenance — candidate (2026-11-08)
+- Cause: trusted timeline plus three accepted TRAINING events previously qualified as the fourth session even when logging started after run initialization. This violates the distinction between logged lower bounds and complete counts.
+- Fix: replay accepts an explicit current-save, direct USER_REPORT `TRAINING_COUNT_BASELINE` on a trusted active chronology, anchored to the latest event; it maintains separately certified exact counts, advances them only through accepted training and drops discarded baselines on rollback. Without a certificate the fourth-checkpoint claim must fail closed. Do not invent a baseline for the current Y1 June rollback-unknown run.
+- Cause owners: `live_state_engine.py`, `knowledge_engine.py`, `navigator_step.py`; readonly `text_fast.py` and P6 bootstrap reflect source-backed count certainty. Tests cover missing/fake/rollback baselines and positive acceptance. Experimental fourth-popup evidence remains historical and non-guaranteed.
+- Acceptance pending candidate Run Guard CI, then no-force main promotion and readback. No current gameplay, current run events or historical skill evidence were mutated.
+
 ## Reply classification and count-safety correction — P7-B PASS (2026-11-08)
 - Independent review regression: interrogative 「たきは3回特訓した？4回目スキル狙っていい？」 must not become a confirmed TRAINING event; 「応援はすべてONでいい？」 must use ACTION_EVALUATION and obey rollback hard stop. A declarative report followed by a question still requires ingest.
 - Cause owner: `text_fast.py` clause-level report classifier, targeted Cheer-mode action routing, and a read-only `TRAINING_COUNTS` projection. A missing or incomplete per-player counter is UNKNOWN, never 0 or 3, and a logged count is a lower bound without a verified run-start baseline. The P4 enum-only bridge exposes safe count status without copying private chat text to public GitHub.

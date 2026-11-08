@@ -20,7 +20,7 @@ Do **not** write conversation text, screenshots, player identities/HP updates, L
 The GitHub Actions job uses `permissions: contents: read` and cannot mutate the gameplay repository. The bridge verifies ordered BOOT presence, knowledge continuity and the canonical state revision before returning any result; it always reports `action_authorized=false` and `side_effects=false`. A queued result can go stale after main changes; ChatGPT must match source commit, request ID and event revision **at the moment of using the answer**.
 
 The bridge has no trusted live HP/readiness/extra user context input. Therefore its current canonical answer (Y1 June PM5:20, rollback SAVE anchor unknown) remains blocked for paid actions. Under every blocked status, `candidate` and `provisional_target` are null: never reinterpret a historical participant/Cheer/cost combination as an actionable or conditional plan. Do not manufacture `verified_for_current_state` to get a successful draft.
-`TRAINING_COUNTS` is an enum-only read-only request. The result reports exact total UNKNOWN and event-log lower bounds only when provenance permits; missing per-player counters never mean zero.
+`TRAINING_COUNTS` is an enum-only read-only request. The present unknown-save snapshot reports exact total UNKNOWN and no active-count lower bounds. A future TRUSTED lineage can report individually user-attested exact current-save keys and source event IDs separately from partial lower bounds. Missing keys never mean zero. The public request still contains no free-text user report.
 
 ## P6 new-chat project BOOT shortcut
 
