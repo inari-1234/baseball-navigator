@@ -215,6 +215,8 @@ def _train_candidate(drill: dict, cheer: str, state: dict[str, Any],
             else drill["group_basis"]),
         "participant_selection_evidence_refs": (
             list(override["evidence_refs"]) if group_selected_from_live else []),
+        "training_readiness_evidence_refs": (
+            list(readiness["evidence_refs"]) if ready_source else []),
         "historical_fit": drill["group_basis"],
         "cost": cost,
         "cost_source": cost_source,
