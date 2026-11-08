@@ -206,11 +206,24 @@ def bridge_response(request: Any, *, root: str | Path,
         raise ChatBridgeError("REQUIRED_SKILL_KNOWLEDGE_NOT_APPLIED")
     if not summary["rule_ids"]:
         raise ChatBridgeError("MISSING_ACTIVE_RULE_IDS")
-    # P7-D: a bounded deterministic response is certified at this exact
-    # source revision. This does not constrain free-form ChatGPT messages.
-    if request["intent"] in {"SKILL", "TRAINING_COUNTS"}:
+    return finalize_reply_delivery(
+        summary, result=result, state=state, contract=contract,
+        root=root, main_sha=actual_main_sha)
+
+
+def finalize_reply_delivery(summary: dict[str, Any], *,
+                            result: dict[str, Any], state: dict[str, Any],
+                            contract: dict[str, Any], root: Path,
+                            main_sha: str) -> dict[str, Any]:
+    """Public P4 never exports actions when a response is uncertified.
+
+    Actionable verified drafts require a separate local current-context path,
+    which the enum-only public request intentionally does not provide.
+    """
+    if summary["intent"] in {"SKILL", "TRAINING_COUNTS"}:
         try:
-            rendered = render_guarded_reply(summary, state)
+            rendered = render_guarded_reply(
+                summary, state, contract=contract, root=root)
         except ReplyGateError as exc:
             summary["safe_reply"] = None
             summary["safe_reply_check"] = {
@@ -221,14 +234,13 @@ def bridge_response(request: Any, *, root: str | Path,
         else:
             verdict = check_reply(
                 rendered, bridge=summary, state=state,
-                expected_main_sha=actual_main_sha,
-                expected_event_seq=state["last_event_seq"])
+                expected_main_sha=main_sha,
+                expected_event_seq=state["last_event_seq"],
+                contract=contract, root=root)
             if verdict["status"] != "PASS":
                 raise ChatBridgeError("REPLY_GUARD_FAILED")
             summary["safe_reply"] = rendered
             summary["safe_reply_check"] = verdict
-    # A non-certified tool response must not expose an actionable draft,
-    # even when navigator_step has a candidate on a future TRUSTED timeline.
     if summary.get("safe_reply_check", {}).get("status") == "PASS":
         summary["reply_delivery_status"] = "CERTIFIED_TEMPLATE_ONLY"
     else:
@@ -237,7 +249,9 @@ def bridge_response(request: Any, *, root: str | Path,
         summary["provisional_target"] = None
         summary["requires_manual_acceptance"] = False
         summary["reply_delivery_status"] = "STOP_UNCERTIFIED"
-        if result.get("status") == "VALIDATED_DRAFT_REVIEW":
+        if summary["intent"] in {"SKILL", "GENERAL", "MATCH", "RECOVERY"}:
+            summary["navigator_status"] = summary["status"]
+            summary["status"] = "REPLY_NOT_CERTIFIED"
             summary["primary_next_step"] = "VERIFY_REPLY_SUPPORT_BEFORE_ACTION"
             summary["fallback"] = "NO_ACTION_WITHOUT_CERTIFIED_REPLY"
     return summary
