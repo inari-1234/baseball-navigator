@@ -3,11 +3,11 @@
 Last updated: 2026-11-08
 State: ACTIVE_Y1_JUNE_POST_ROLLBACK_CAPTURE — SAVEPOINT_UNKNOWN
 
-## P7-D guarded reply boundary — candidate (2026-11-08)
+## P7-D guarded reply boundary — candidate CI PASS (2026-11-08)
 - Independent review follow-up: P7-C prevents unverified fourth-session eligibility but does not test the assistant's final natural-language reply. P7-D adds `check_reply.py` with deterministic, source-pinned Japanese `safe_reply` templates for canonical blocked SKILL and unknown TRAINING_COUNTS. A proposed private draft is certified only on exact text match; unsupported states and additional claims fail closed.
 - Bridge retains strict public enum-only requests, never receives user conversation text, and includes `safe_reply_check` only for supported source states. New regression rejects fabricated three sessions, fourth-session permissions, named historical drill combinations, Cheer ON and cost recommendations. Existing `candidate` and `provisional_target` suppression remains.
 - Scope limit: Python only checks replies deliberately routed through it. Ordinary ChatGPT free-form answers and missing connector invocation cannot be intercepted by these repository files. Exact-count source attestation confidence and game hidden repetition unit remain separate unknowns; no live gameplay event was added.
-- Acceptance pending candidate Run Guard CI, no-force main promotion, main CI/readback and a real P4 bridge inspection.
+- Acceptance: candidate Run Guard 42440298113 passed 336 tests including synthetic unsafe replies. Source-digest strengthened candidate Run Guard 42440403704 passed 337/337 tests. Pending main no-force fast-forward, main CI/readback and real source-pinned P4 SKILL/TRAINING_COUNTS bridge inspection. No existing savepoint, item, training or skill state altered.
 
 ## P7-C exact training-count provenance — source and regression PASS (2026-11-08)
 - Cause: trusted timeline plus three accepted TRAINING events previously qualified as the fourth session even when logging started after run initialization. This violates the distinction between logged lower bounds and complete counts.
