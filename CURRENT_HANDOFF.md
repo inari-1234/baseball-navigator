@@ -3,12 +3,12 @@
 Last updated: 2026-11-08
 State: ACTIVE_Y1_JUNE_POST_ROLLBACK_CAPTURE — SAVEPOINT_UNKNOWN
 
-## P7-E TRUSTED reply safety — candidate (2026-11-09)
+## P7-E TRUSTED reply safety — candidate regression PASS (2026-11-09)
 - Independent review: P7-D covered only `ROLLBACK_CONFIRMED_SAVEPOINT_UNKNOWN` SKILL/TRAINING_COUNTS, leaving future TRUSTED states without a certified reply. This is a high-risk gap because action candidates become feasible after real SAVE/readiness evidence exists.
 - New `check_reply.py`: trusted count projection strictly recomputed from state and split exact current-save totals (with certificate IDs) vs partial lower bounds vs missing UNKNOWN; TRUSTED skill without verified current readiness emits only no-action text. A locally source-validated P3 TRAINING draft can be converted to an exact checked template with 3 participants, Cheer, catalog-verified spend, accept/reload and manual acceptance criteria. Source revision, structured-state hash and standard action + skill gates remain mandatory.
 - Public P4 bridge still receives only allowlisted enum/sha/seq, NEVER user screenshots/readiness or private draft text. `finalize_reply_delivery` clears actionable candidate, selected/provisional target and manual-acceptance flag, and emits `STOP_UNCERTIFIED`/`REPLY_NOT_CERTIFIED` for action intents without an exact PASS certificate, even when the internal P3 draft is VALIDATED. No live-run events, skills or counters changed.
 - Limitations: exact count source attestation quality and game hidden fourth-popup counting unit remain open; local decision context still relies on source review, and this code cannot intercept unconstrained ChatGPT replies.
-- Acceptance pending final candidate Run Guard, source-pinned P4 `SKILL` and `TRAINING_COUNTS` checks, fast-forward main/readback and main CI.
+- Candidate Run Guard 42533317098 PASS (343 tests) and final documentation-included Run Guard 42533547284 PASS (343 tests). Pending source-pinned public P4 `SKILL`/`TRAINING_COUNTS` checks at final promoted SHA, main no-force fast-forward and main CI/readback. No game event, state, skill or resource mutations.
 
 ## P7-D guarded reply boundary — main and real bridge PASS (2026-11-08)
 - Independent review follow-up: P7-C prevents unverified fourth-session eligibility but does not test the assistant's final natural-language reply. P7-D adds `check_reply.py` with deterministic, source-pinned Japanese `safe_reply` templates for canonical blocked SKILL and unknown TRAINING_COUNTS. A proposed private draft is certified only on exact text match; unsupported states and additional claims fail closed.
