@@ -39,6 +39,17 @@ def draft(*, count_player="入江", claimed_fourth=True):
             "checkpoint_player":count_player}
 
 
+def certify_synthetic_count(state, player, drill, count):
+    # Positive validator fixtures model fields emitted by sourced baseline replay.
+    # tests/test_live_state_engine.py separately proves the replay requirements.
+    key = player + "|" + drill
+    state["training_counts_exact_by_player_drill"] = {key: count}
+    state["training_count_certifications"] = {
+        key: {"event_id": "TEST-SOURCE-EXACT", "source_kind": "USER_REPORT",
+              "scope": "EXACT_CURRENT_ACCEPTED_SAVE"}}
+    return state
+
+
 class KnowledgeFixtures(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
@@ -252,11 +263,26 @@ class NavigationGate(unittest.TestCase):
         self.assertIsNone(out["next_ordinal"])
         self.assertFalse(out["is_fourth_checkpoint"])
 
+    def test_trusted_three_recorded_without_baseline_does_not_certify_fourth(self):
+        s=copy.deepcopy(self.state)
+        s["timeline_status"]="TRUSTED"
+        s["training_counts_by_player_drill"]={"入江|素振り":3}
+        out=skill_guidance(s,root=ROOT,player="入江",drill="素振り")
+        self.assertEqual(out["count_certainty"],"RECORDED_LOWER_BOUND")
+        self.assertEqual(out["recorded_lower_bound"],3)
+        self.assertIsNone(out["committed_count"])
+        self.assertFalse(out["is_fourth_checkpoint"])
+        errors=validate_skill_recommendation(draft(),s,self.contract,root=ROOT)
+        self.assertIn("CURRENT_COMMITTED_COUNT_UNKNOWN",errors)
+
     def test_observed_three_accepted_trainings_qualifies_fourth_draft(self):
         s = copy.deepcopy(self.state)
         s["timeline_status"]="TRUSTED"
         s["training_counts_by_player_drill"]={"入江|素振り":3}
+        certify_synthetic_count(s,"入江","素振り",3)
         out = skill_guidance(s,root=ROOT,player="入江",drill="素振り")
+        self.assertEqual(out["count_certainty"],"EXACT_CURRENT_SAVE")
+        self.assertEqual(out["certification_event_id"],"TEST-SOURCE-EXACT")
         self.assertTrue(out["is_fourth_checkpoint"])
         self.assertEqual(out["next_ordinal"],4)
         self.assertEqual(validate_skill_recommendation(
@@ -268,6 +294,7 @@ class NavigationGate(unittest.TestCase):
                 s=copy.deepcopy(self.state)
                 s["timeline_status"]="TRUSTED"
                 s["training_counts_by_player_drill"]={"入江|素振り":count}
+                certify_synthetic_count(s,"入江","素振り",count)
                 errors=validate_skill_recommendation(draft(),s,self.contract,root=ROOT)
                 self.assertIn("NOT_FOURTH_COMMITTED_SESSION",errors)
 
@@ -275,6 +302,7 @@ class NavigationGate(unittest.TestCase):
         s = copy.deepcopy(self.state)
         s["timeline_status"]="TRUSTED"
         s["training_counts_by_player_drill"]={"入江|素振り":3}
+        certify_synthetic_count(s,"入江","素振り",3)
         rec=draft()
         rec["knowledge_refs"]=[]
         errors=validate_skill_recommendation(rec,s,self.contract,root=ROOT)
@@ -284,6 +312,7 @@ class NavigationGate(unittest.TestCase):
         s=copy.deepcopy(self.state)
         s["timeline_status"]="TRUSTED"
         s["training_counts_by_player_drill"]={"入江|素振り":3}
+        certify_synthetic_count(s,"入江","素振り",3)
         s["resources"]["values"]["sports"]=1
         errors=validate_skill_recommendation(draft(),s,self.contract,root=ROOT)
         self.assertIn("INSUFFICIENT_OR_UNKNOWN_RESOURCE:sports",errors)
