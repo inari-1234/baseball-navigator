@@ -227,6 +227,19 @@ def bridge_response(request: Any, *, root: str | Path,
                 raise ChatBridgeError("REPLY_GUARD_FAILED")
             summary["safe_reply"] = rendered
             summary["safe_reply_check"] = verdict
+    # A non-certified tool response must not expose an actionable draft,
+    # even when navigator_step has a candidate on a future TRUSTED timeline.
+    if summary.get("safe_reply_check", {}).get("status") == "PASS":
+        summary["reply_delivery_status"] = "CERTIFIED_TEMPLATE_ONLY"
+    else:
+        summary["candidate"] = None
+        summary["selected_candidate"] = None
+        summary["provisional_target"] = None
+        summary["requires_manual_acceptance"] = False
+        summary["reply_delivery_status"] = "STOP_UNCERTIFIED"
+        if result.get("status") == "VALIDATED_DRAFT_REVIEW":
+            summary["primary_next_step"] = "VERIFY_REPLY_SUPPORT_BEFORE_ACTION"
+            summary["fallback"] = "NO_ACTION_WITHOUT_CERTIFIED_REPLY"
     return summary
 
 
