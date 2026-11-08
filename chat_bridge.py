@@ -20,6 +20,7 @@ from typing import Any
 from knowledge_engine import validate_knowledge
 from navigator_step import navigator_step
 from project_bootstrap import ResumeError, bootstrap
+from check_reply import ReplyGateError, render_guarded_reply, check_reply
 
 INTENTS = {
     "SKILL": "スキル獲得に向けて何をすべき？",
@@ -184,7 +185,7 @@ def bridge_response(request: Any, *, root: str | Path,
         "status": result["status"],
         "primary_next_step": result.get("primary_next_step"),
         "provisional_target": None if blocked_for_user else result.get("provisional_target"),
-        "selected_candidate": result.get("selected_candidate"),
+        "selected_candidate": None if blocked_for_user else result.get("selected_candidate"),
         "candidate": result_candidate,
         "blocked_candidate_suppressed": blocked_for_user,
         "failure_mode": result.get("failure_mode"),
@@ -203,6 +204,27 @@ def bridge_response(request: Any, *, root: str | Path,
         raise ChatBridgeError("REQUIRED_SKILL_KNOWLEDGE_NOT_APPLIED")
     if not summary["rule_ids"]:
         raise ChatBridgeError("MISSING_ACTIVE_RULE_IDS")
+    # P7-D: a bounded deterministic response is certified at this exact
+    # source revision. This does not constrain free-form ChatGPT messages.
+    if request["intent"] in {"SKILL", "TRAINING_COUNTS"}:
+        try:
+            rendered = render_guarded_reply(summary, state)
+        except ReplyGateError as exc:
+            summary["safe_reply"] = None
+            summary["safe_reply_check"] = {
+                "status": "NOT_CERTIFIED",
+                "reason": str(exc),
+                "chat_runtime_hook_guaranteed": False,
+            }
+        else:
+            verdict = check_reply(
+                rendered, bridge=summary, state=state,
+                expected_main_sha=actual_main_sha,
+                expected_event_seq=state["last_event_seq"])
+            if verdict["status"] != "PASS":
+                raise ChatBridgeError("REPLY_GUARD_FAILED")
+            summary["safe_reply"] = rendered
+            summary["safe_reply_check"] = verdict
     return summary
 
 

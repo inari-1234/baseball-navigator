@@ -110,7 +110,7 @@ Public/legacy evidence never silently overrides live Ver1.42.
 ## Recommendation output
 Lead with the next action.
 Always include a `Rule:` line naming the controlling ACTIVE `rule_id`(s), and a `Fallback:` line naming the trigger that changes/stops the action.
-Only for a current-state validated draft under explicit manual acceptance, specify all three participants, Cheer ON/OFF, target skill when relevant, and ACCEPT/RELOAD criteria. Under any BLOCKED status, never supply an actionable combination of participants, Cheer and cost or claim that a player's unknown count is 0 or 3; report UNKNOWN and the exact recovery gate.
+Only for a current-state validated draft under explicit manual acceptance, specify all three participants, Cheer ON/OFF, target skill when relevant, and ACCEPT/RELOAD criteria. Under any BLOCKED status, never supply an actionable combination of participants, Cheer and cost or claim that a player's unknown count is 0 or 3; report UNKNOWN and the exact recovery gate. For source-pinned P4 SKILL and TRAINING_COUNTS replies, prefer the deterministic `safe_reply` only when `safe_reply_check.status=PASS`. The separate local `check_reply.py` can reject an arbitrary private draft unless it matches that certified rendering exactly; no repository rule can install a guaranteed pre-display hook into ordinary ChatGPT answers. Never claim a free-form reply was checked unless the exact text was actually passed through the guard.
 When the same strategy reaches its contract-defined failure trigger, apply the alternative rule rather than brute-force repetition.
 
 ## Repository write discipline

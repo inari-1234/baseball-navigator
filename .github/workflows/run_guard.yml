@@ -23,6 +23,8 @@ on:
       - "docs/P5_QUICK_IMAGE_PROTOCOL.md"
       - "docs/FAST_PLAY_PROTOCOL.md"
       - "chat_bridge.py"
+      - "check_reply.py"
+      - "docs/REPLY_GUARD_P7D.md"
       - "project_bootstrap.py"
       - "PROJECT_ENTRYPOINT.json"
       - "docs/PROJECT_RESUME_P6.md"

@@ -41,7 +41,8 @@ Only the strict five allowlisted request fields are published; no free-form text
    `NAV_CHAT_BRIDGE_RESULT_START` / `NAV_CHAT_BRIDGE_RESULT_END`.
 5. Reject a failed, incomplete, unrelated or stale run. Check the returned `request_id`, `source_commit_sha`, `state_event_seq`, source status, `action_authorized=false`, `side_effects=false`, and required `SKILL-4TH-PATTERN` when relevant.
 6. Summarize **actual tool-returned** `primary_next_step`, blockers, controlling `rule_ids`, `knowledge_refs`, and `fallback`. Only discuss `candidate` when a current-validated draft exists; do not reconstruct hidden blocked candidates from historical details. Never treat `VALIDATED_DRAFT_REVIEW` as a performed action.
-7. If current main/state changed, discard the result and recheck; do not silently reply from a stale branch.
+7. When the current blocked skill or unknown count scenario returns `safe_reply_check.status=PASS`, use `safe_reply` verbatim for a certified, deterministic answer. Any paraphrase/addition is **not** certified unless that exact draft was checked privately through `check_reply.py` and PASS returned. For other intents, statuses or source revisions, no certified safe_reply exists unless explicitly implemented and tested.
+8. If current main/state changed, discard the result and recheck; do not silently reply from a stale branch.
 
 For a second intent, update the existing bridge branch's `NAV_CHAT_REQUEST.json` with a new request ID and fresh source SHA/seq. This avoids creating an unlimited number of branches. Do not force-push a branch, delete history, or use `main` as a scratchpad.
 
@@ -58,3 +59,4 @@ Every bridge result is pinned to an exact main SHA/event seq. It cannot update t
 - Malformed/extra/private fields, stale main SHA or event revision are rejected.
 - Independently fetch GitHub Actions logs for a **real** request branch created from this conversation; verify request/result round trip and read-only output.
 - Confirm no current game state or original image files were changed by that request.
+- For blocked skill/count queries, confirm `safe_reply` is exact, source-pinned and `safe_reply_check.status=PASS`, no blocked `cost` or `cheer` keys reach the response, and every fabricated/modified private draft fails strict `check_reply.py`. This guard is not automatically hooked into normal ChatGPT output.

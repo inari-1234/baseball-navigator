@@ -52,6 +52,15 @@ class ChatBridgeTests(unittest.TestCase):
         self.assertNotIn("岡治", json.dumps(r, ensure_ascii=False))
         self.assertNotIn("たき", json.dumps(r, ensure_ascii=False))
         self.assertNotIn("TRAIN_CONTACT_ON", json.dumps(r, ensure_ascii=False))
+        # Blocked internal costs/cheer must never be exported as answer data.
+        serialized=json.dumps(r, ensure_ascii=False)
+        self.assertNotIn('"cost"', serialized)
+        self.assertNotIn('"cheer"', serialized)
+        self.assertNotIn("スポーツ6", serialized)
+        self.assertNotIn("応援20", serialized)
+        self.assertEqual(r["safe_reply_check"]["status"], "PASS")
+        self.assertIn("未確定", r["safe_reply"])
+        self.assertFalse(r["safe_reply_check"]["chat_runtime_hook_guaranteed"])
         self.assertEqual(r["context_source"], "NO_USER_CONTEXT_PUBLIC_REQUEST")
         self.assertTrue(r["source_is_current_only_at_this_commit"])
 
@@ -102,6 +111,8 @@ class ChatBridgeTests(unittest.TestCase):
         self.assertIsNone(obs["event_ledger_counts_lower_bound"])
         self.assertFalse(obs["ledger_complete_from_run_start"])
         self.assertFalse(obs["missing_player_drill_count_means_zero"])
+        self.assertEqual(r["safe_reply_check"]["status"], "PASS")
+        self.assertIn("未確定", r["safe_reply"])
 
     def test_status_response_is_readonly_projection(self):
         r=bridge_response(request(intent="STATUS"),root=ROOT,actual_main_sha=FAKE_SHA)
