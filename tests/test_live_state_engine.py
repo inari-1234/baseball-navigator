@@ -48,6 +48,32 @@ class LiveStateRegression(unittest.TestCase):
         self.assertEqual(status["count_certainty"],"UNKNOWN")
         self.assertIsNone(status["exact_committed_count"])
 
+    def test_baseline_retained_when_rollback_restores_later_checkpoint(self):
+        state=replay([
+            screen(1),
+            e(2,"TRAINING_COUNT_BASELINE",branch="ACCEPTED",
+              confirmed_current_save=True,count_scope="EXACT_CURRENT_ACCEPTED_SAVE",
+              after_event_id="E1",counts={"たき|素振り":2}),
+            e(3,"SAVE_CHECKPOINT"),
+            e(4,"TRAINING",drill="素振り",participants=["たき","今井","岡治"],
+              branch="ACCEPTED",cheer="OFF",drill_level=1),
+            e(5,"ROLLBACK",restore_to_event_id="E3")])
+        result=training_count_status(state,"たき","素振り")
+        self.assertEqual(result["exact_committed_count"],2)
+        self.assertEqual(result["certification_event_id"],"E2")
+        self.assertNotIn("たき|素振り",state["training_counts_by_player_drill"])
+
+    def test_unknown_rollback_cannot_be_resolved_by_count_attestation(self):
+        with self.assertRaises(ObservationError):
+            replay([
+                screen(1),
+                e(2,"ROLLBACK"),
+                e(3,"SCREEN",branch="ACCEPTED",after_event_id="E2",
+                  resources={"study":4,"sports":28,"play":25,"nature":18,"cheer":100}),
+                e(4,"TRAINING_COUNT_BASELINE",branch="ACCEPTED",
+                  confirmed_current_save=True,count_scope="EXACT_CURRENT_ACCEPTED_SAVE",
+                  after_event_id="E3",counts={"たき|素振り":3})])
+
     def test_baseline_is_rejected_without_direct_current_user_attestation(self):
         good={"branch":"ACCEPTED","confirmed_current_save":True,
               "count_scope":"EXACT_CURRENT_ACCEPTED_SAVE","after_event_id":"E1",
