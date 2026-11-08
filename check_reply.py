@@ -92,6 +92,7 @@ def _verified_draft_reply(bridge: dict[str, Any],
                           root: str | Path) -> str:
     from live_state_engine import validate_recommendation, training_count_status
     from knowledge_engine import validate_skill_recommendation
+    from navigator_step import _load_catalog
     _require(bridge.get("context_source") == "VERIFIED_CURRENT_RUN_CONTEXT"
              and bridge.get("status") == "VALIDATED_DRAFT_REVIEW"
              and bridge.get("requires_manual_acceptance") is True
@@ -127,6 +128,21 @@ def _verified_draft_reply(bridge: dict[str, Any],
                   or cheer == "ON" and type(cost.get("cheer")) is int
                   and cost["cheer"] > 0),
              "TRAINING_DRAFT_FIELDS_INVALID")
+    _require(candidate.get("cost_fully_known") is True,
+             "EXACT_TRAINING_COST_NOT_VERIFIED")
+    catalog = _load_catalog(root)
+    spec = next((d for d in catalog["drills"]
+                 if d["id"] + "_" + cheer == candidate.get("id")
+                 and d["drill"] == drill), None)
+    _require(spec is not None and cost["sports"] == spec["sports_cost"],
+             "CATALOG_TRAINING_COST_MISMATCH")
+    if cheer == "ON":
+        measured = spec.get("cheer_on_cost")
+        _require((type(measured) is int and cost["cheer"] == measured)
+                 or (measured is None
+                     and candidate.get("cost_source") ==
+                     "CURRENT_SOURCE_ATTESTED_PLUS_HISTORICAL_SPORTS"),
+                 "CHEER_COST_SOURCE_MISMATCH")
     _require(draft.get("action_type") == "TRAIN"
              and draft.get("participants") == participants
              and draft.get("drill") == drill
@@ -304,6 +320,8 @@ def make_local_verified_draft_packet(
             "participants": source["participants"], "cost": source["cost"],
             "accept_reload_plan": source["accept_reload_plan"],
             "skills_not_guaranteed": source["target_skill_at_this_drill_not_guaranteed"],
+            "cost_fully_known": source["cost_fully_known"],
+            "cost_source": source["cost_source"],
             "readiness_evidence_refs": source.get("training_readiness_evidence_refs", []),
         },
     }
