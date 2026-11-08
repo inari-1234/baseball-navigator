@@ -19,7 +19,7 @@ from knowledge_engine import (
     ACCEPTED, FOURTH, KnowledgeError, validate_knowledge,
     validate_skill_recommendation,
 )
-from live_state_engine import validate_recommendation
+from live_state_engine import validate_recommendation, training_count_status
 from text_fast import TextFastEngine
 
 FAILURE_MODES = {"CONTACT", "CONVERSION", "ADEQUATE", "RECOVERY_REQUIRED", "UNKNOWN"}
@@ -106,13 +106,15 @@ def _mode_and_provenance(context: dict[str, Any], state: dict[str, Any]):
 
 
 def _skills_for(player: str, drill: str, state: dict[str, Any]):
-    # Absent counter is UNKNOWN, never 0. This is a player|drill observed count,
-    # not necessarily the game's hidden scope of skill unlock progress.
-    count = state.get("training_counts_by_player_drill", {}).get(player + "|" + drill)
-    if state.get("timeline_status") != "TRUSTED" or type(count) is not int or count < 0:
-        return {"committed_count": None, "next_ordinal": None, "fourth_checkpoint": False}
-    return {"committed_count": count, "next_ordinal": count + 1,
-            "fourth_checkpoint": count == 3}
+    # A partial logged count is a lower bound, not a verified fourth checkpoint.
+    info = training_count_status(state, player, drill)
+    exact = info["exact_committed_count"]
+    return {"committed_count": exact,
+            "recorded_lower_bound": info["recorded_lower_bound"],
+            "count_certainty": info["count_certainty"],
+            "certification_event_id": info["certification_event_id"],
+            "next_ordinal": exact + 1 if exact is not None else None,
+            "fourth_checkpoint": exact == 3 if exact is not None else False}
 
 
 def _train_candidate(drill: dict, cheer: str, state: dict[str, Any],
