@@ -1,5 +1,5 @@
 import unittest
-from live_state_engine import replay, validate_recommendation, ObservationError
+from live_state_engine import replay, validate_recommendation, training_count_status, ObservationError
 
 def e(n,kind,month=6,**fields):
     return {"seq":n,"event_id":f"E{n}","kind":kind,
@@ -9,6 +9,71 @@ def screen(n,month=6):
     return e(n,"SCREEN",month,branch="ACCEPTED",resources={"study":4,"sports":28,"play":25,"nature":18,"cheer":100})
 
 class LiveStateRegression(unittest.TestCase):
+    def test_three_logged_trainings_are_only_lower_bound_without_baseline(self):
+        events=[screen(1)]+[
+            e(i,"TRAINING",drill="素振り",participants=["たき","今井","岡治"],
+              branch="ACCEPTED",cheer="OFF",drill_level=1)
+            for i in range(2,5)]
+        state=replay(events)
+        self.assertEqual(state["training_counts_by_player_drill"]["たき|素振り"],3)
+        status=training_count_status(state,"たき","素振り")
+        self.assertEqual(status["count_certainty"],"RECORDED_LOWER_BOUND")
+        self.assertEqual(status["recorded_lower_bound"],3)
+        self.assertIsNone(status["exact_committed_count"])
+
+    def test_exact_user_attested_baseline_plus_committed_sessions(self):
+        events=[screen(1),
+                e(2,"TRAINING_COUNT_BASELINE",branch="ACCEPTED",
+                  confirmed_current_save=True,count_scope="EXACT_CURRENT_ACCEPTED_SAVE",
+                  after_event_id="E1",counts={"たき|素振り":0})]
+        events += [e(i,"TRAINING",drill="素振り",
+                     participants=["たき","今井","岡治"],branch="ACCEPTED",
+                     cheer="OFF",drill_level=1) for i in range(3,6)]
+        state=replay(events)
+        self.assertEqual(state["training_counts_by_player_drill"]["たき|素振り"],3)
+        status=training_count_status(state,"たき","素振り")
+        self.assertEqual(status["count_certainty"],"EXACT_CURRENT_SAVE")
+        self.assertEqual(status["exact_committed_count"],3)
+        self.assertEqual(status["certification_event_id"],"E2")
+        self.assertEqual(training_count_status(state,"今井","素振り")["count_certainty"],
+                         "RECORDED_LOWER_BOUND")
+
+    def test_exact_baseline_disappears_after_rollback_before_it(self):
+        state=replay([dict(screen(1),is_savepoint=True),
+            e(2,"TRAINING_COUNT_BASELINE",branch="ACCEPTED",
+              confirmed_current_save=True,count_scope="EXACT_CURRENT_ACCEPTED_SAVE",
+              after_event_id="E1",counts={"たき|素振り":3}),
+            e(3,"ROLLBACK",restore_to_event_id="E1")])
+        status=training_count_status(state,"たき","素振り")
+        self.assertEqual(status["count_certainty"],"UNKNOWN")
+        self.assertIsNone(status["exact_committed_count"])
+
+    def test_baseline_is_rejected_without_direct_current_user_attestation(self):
+        good={"branch":"ACCEPTED","confirmed_current_save":True,
+              "count_scope":"EXACT_CURRENT_ACCEPTED_SAVE","after_event_id":"E1",
+              "counts":{"たき|素振り":3}}
+        for mutation in [
+            {"confirmed_current_save":False},
+            {"after_event_id":"UNKNOWN"},
+            {"count_scope":"RECORDED_LOWER_BOUND"},
+            {"counts":{"たき|素振り":-1}},
+            {"counts":{}},
+            {"source":{"kind":"RAW_SCREEN","locator":"not a direct exact report"}},
+        ]:
+            with self.subTest(mutation=mutation):
+                with self.assertRaises(ObservationError):
+                    replay([screen(1),e(2,"TRAINING_COUNT_BASELINE",**dict(good,**mutation))])
+
+    def test_exact_baseline_cannot_contradict_already_logged_committed_trainings(self):
+        events=[screen(1),e(2,"TRAINING",drill="素振り",
+                     participants=["たき","今井","岡治"],branch="ACCEPTED",
+                     cheer="OFF",drill_level=1)]
+        bad=e(3,"TRAINING_COUNT_BASELINE",branch="ACCEPTED",
+              confirmed_current_save=True,count_scope="EXACT_CURRENT_ACCEPTED_SAVE",
+              after_event_id="E2",counts={"たき|素振り":0})
+        with self.assertRaises(ObservationError):
+            replay(events+[bad])
+
     def test_registration_is_not_result(self):
         s=replay([e(1,"MATCH_SCHEDULE",7,entries=[{"match_id":"J1","opponent":"まんるい"}])])
         self.assertEqual(s["matches"]["J1"]["status"],"SCHEDULED")
