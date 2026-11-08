@@ -1,7 +1,7 @@
 {
   "schema_version": "1.0",
-  "request_id": "p7e-skill-20261109-01",
-  "intent": "SKILL",
+  "request_id": "p7e-counts-20261109-02",
+  "intent": "TRAINING_COUNTS",
   "expected_main_sha": "01804d23ade76501bab08dea17438fd85b03448a",
   "expected_event_seq": 10
 }
