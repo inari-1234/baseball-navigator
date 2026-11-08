@@ -5,7 +5,11 @@ import json
 from pathlib import Path
 import unittest
 from chat_bridge import bridge_response
-from check_reply import check_reply, render_guarded_reply, ReplyGateError
+from check_reply import (check_reply, render_guarded_reply, ReplyGateError,
+                         make_local_verified_draft_packet, canonical_state_sha256)
+from navigator_step import navigator_step
+from live_state_engine import replay
+from text_fast import _read_only_projection
 
 ROOT=Path(__file__).resolve().parents[1]
 SHA="a"*40
@@ -106,6 +110,134 @@ class GuardedReplyRegression(unittest.TestCase):
         x=copy.deepcopy(self.skill);x["status"]="VALIDATED_DRAFT_REVIEW"
         with self.assertRaises(ReplyGateError):
             render_guarded_reply(x,self.state)
+
+    def test_trusted_readonly_count_reports_exact_and_lower_bounds(self):
+        source={"kind":"USER_REPORT","locator":"synthetic-test-only"}
+        def event(n,kind,**fields):
+            return {"seq":n,"event_id":f"E{n}","kind":kind,"source":source,
+                    "period":{"year":1,"month":6},**fields}
+        state=replay([
+            event(1,"SCREEN",branch="ACCEPTED",
+                  resources={"study":4,"sports":28,"play":25,"nature":18,"cheer":100}),
+            event(2,"TRAINING_COUNT_BASELINE",branch="ACCEPTED",
+                  confirmed_current_save=True,
+                  count_scope="EXACT_CURRENT_ACCEPTED_SAVE",
+                  after_event_id="E1",counts={"たき|素振り":3}),
+            event(3,"TRAINING",branch="ACCEPTED",cheer="OFF",
+                  drill="ダンベル",drill_level=1,
+                  participants=["今井","岡治","たき"]),
+        ])
+        self.assertEqual(state["timeline_status"],"TRUSTED")
+        p=copy.deepcopy(self.counts)
+        p["state_event_seq"]=3
+        p["timeline_status"]="TRUSTED"
+        p["state_structured_sha256"]=canonical_state_sha256(state)
+        p["observation"]=_read_only_projection(
+            "現在の本線の特訓回数の記録を確認して",state)
+        content=render_guarded_reply(p,state)
+        self.assertIn("たき・素振り：3回（現セーブで確定、根拠 E2）",content)
+        self.assertIn("今井・ダンベル：記録上少なくとも1回",content)
+        self.assertNotIn("必ずスキル",content)
+        out=check_reply(content,bridge=p,state=state,
+                        expected_main_sha=SHA,expected_event_seq=3)
+        self.assertEqual(out["status"],"PASS")
+        bad=copy.deepcopy(p)
+        bad["observation"]["exact_current_counts_by_player_drill"]["たき|素振り"]=4
+        self.assertIn("COUNT_OBSERVATION_MISMATCH",
+                      check_reply(content,bridge=bad,state=state,
+                          expected_main_sha=SHA,expected_event_seq=3)["error_codes"])
+
+    def test_trusted_skill_without_current_context_uses_stop_template(self):
+        state=copy.deepcopy(self.state)
+        state["timeline_status"]="TRUSTED"
+        p=copy.deepcopy(self.skill)
+        p["timeline_status"]="TRUSTED"
+        p["state_structured_sha256"]=canonical_state_sha256(state)
+        p["status"]="NEEDS_GROUNDED_FAILURE_ASSESSMENT"
+        p["blocking_reasons"]=[]
+        text=render_guarded_reply(p,state)
+        self.assertIn("特訓条件はまだ検証済みではありません",text)
+        self.assertNotIn("応援ON",text)
+        self.assertEqual(check_reply(text,bridge=p,state=state,
+            expected_main_sha=SHA,expected_event_seq=10)["status"],"PASS")
+        p["candidate"]={"participants":["たき","今井","岡治"],
+                        "cost":{"sports":6,"cheer":20}}
+        with self.assertRaisesRegex(ReplyGateError,"BLOCKED_CANDIDATE_LEAK"):
+            render_guarded_reply(p,state)
+
+    def test_local_current_verified_draft_has_costs_and_manual_acceptance(self):
+        state=copy.deepcopy(self.state)
+        state["timeline_status"]="TRUSTED"
+        contract=json.loads((ROOT/"DECISION_CONTRACT.json").read_text(encoding="utf-8"))
+        source=state["resources"]["last_observed"]
+        def attested(**fields):
+            return {"verified_for_current_state":True,
+                    "source_event_seq":state["last_event_seq"],
+                    "period":state["period_floor"],
+                    "branch":"ACCEPTED",
+                    "evidence_refs":[source],**fields}
+        context={
+            "failure_assessment":attested(mode="CONTACT"),
+            "training_readiness":attested(
+                available_drills=["素振り","ダンベル"],
+                ready_players=["岡治","今井","たき","芦田","入江"]),
+        }
+        decision=navigator_step(
+            "スキル獲得に向けて何をすべき？",state=state,
+            contract=contract,boot_verified=True,
+            expected_event_seq=10,context=context,root=ROOT)
+        self.assertEqual(decision["status"],"VALIDATED_DRAFT_REVIEW")
+        packet=make_local_verified_draft_packet(
+            decision,state,source_commit_sha=SHA,contract=contract,root=ROOT)
+        self.assertEqual(packet["safe_reply_check"]["status"],"PASS")
+        self.assertIn("岡治・今井・たき",packet["safe_reply"])
+        self.assertIn("素振り／応援ON／消費予定：スポーツ6、応援20",
+                      packet["safe_reply"])
+        self.assertIn("4回目の根拠は未確認",packet["safe_reply"])
+        self.assertIn("採用基準：",packet["safe_reply"])
+        self.assertIn("再試行基準：",packet["safe_reply"])
+        self.assertIn("手動承認前",packet["safe_reply"])
+        altered=copy.deepcopy(packet)
+        altered["candidate"]["cost"]["sports"]=1
+        altered["verified_action_draft"]["spend"]["sports"]=1
+        self.assertIn("CATALOG_TRAINING_COST_MISMATCH",
+                      check_reply(packet["safe_reply"],bridge=altered,state=state,
+                          expected_main_sha=SHA,expected_event_seq=10,
+                          contract=contract,root=ROOT)["error_codes"])
+        altered=copy.deepcopy(packet)
+        altered["candidate"]["readiness_evidence_refs"]=[]
+        self.assertIn("CURRENT_VERIFIED_CANDIDATE_REQUIRED",
+                      check_reply(packet["safe_reply"],bridge=altered,state=state,
+                          expected_main_sha=SHA,expected_event_seq=10,
+                          contract=contract,root=ROOT)["error_codes"])
+
+    def test_local_fourth_session_label_requires_exact_source_certification(self):
+        state=copy.deepcopy(self.state)
+        state["timeline_status"]="TRUSTED"
+        state["training_counts_by_player_drill"]={"今井|素振り":3}
+        state["training_counts_exact_by_player_drill"]={"今井|素振り":3}
+        state["training_count_certifications"]={"今井|素振り":{
+            "event_id":"TEST-EXACT-IMAI","source_kind":"USER_REPORT",
+            "scope":"EXACT_CURRENT_ACCEPTED_SAVE"}}
+        contract=json.loads((ROOT/"DECISION_CONTRACT.json").read_text(encoding="utf-8"))
+        source=state["resources"]["last_observed"]
+        context={"failure_assessment":{
+                     "verified_for_current_state":True,"source_event_seq":10,
+                     "period":state["period_floor"],"branch":"ACCEPTED",
+                     "evidence_refs":[source],"mode":"CONTACT"},
+                 "training_readiness":{
+                     "verified_for_current_state":True,"source_event_seq":10,
+                     "period":state["period_floor"],"branch":"ACCEPTED",
+                     "evidence_refs":[source],"available_drills":["素振り"],
+                     "ready_players":["岡治","今井","たき"]}}
+        result=navigator_step("スキル獲得に向けて何をすべき？",
+                              state=state,contract=contract,boot_verified=True,
+                              expected_event_seq=10,context=context,root=ROOT)
+        self.assertEqual(result["status"],"VALIDATED_DRAFT_REVIEW")
+        packet=make_local_verified_draft_packet(result,state,
+            source_commit_sha=SHA,contract=contract,root=ROOT)
+        self.assertIn("今井の次回が記録上4回目の候補",packet["safe_reply"])
+        self.assertIn("習得保証なし",packet["safe_reply"])
 
     def test_read_only_no_chat_runtime_enforcement_claim(self):
         import hashlib
