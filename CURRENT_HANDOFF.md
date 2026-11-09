@@ -3,11 +3,11 @@
 Last updated: 2026-11-09
 State: ACTIVE_Y1_JUNE_POST_ROLLBACK_CAPTURE — SAVEPOINT_UNKNOWN
 
-## New observational origin preflight — candidate (2026-11-09)
+## New observational origin preflight — main verified (2026-11-09)
 - Source: directly user-confirmed Y1 June PM5:20 immediate post-LOAD screenshot IMG_8971, recorded as user-attested source in Ledger v14 / DECISION_LOG #14, with zero intervening game operations. It is NOT evidence of the restored prior SAVE checkpoint, lifetime player-training totals or retained skill/match events.
 - Read-only `save_baseline_preflight.py` validates replay==snapshot, SHA-256 source correspondence, direct user report, no post-LOAD mutation, and unknown rollback gate. A PASS returns `POSTLOAD_CAPTURE_VERIFIED_HISTORY_UNKNOWN`; `rebaseline_ready=false`, `action_authorized=false`, `side_effects=false`. No live game event, inventory, player skill or count changed.
 - Next non-resource screen: **選手**, showing current names, HP/condition and visible skills. Never fill missing counts with 0, never copy earlier run skills/4th-session status. This does not authorize TRAIN/ITEM/MATCH.
-- Candidate and main Run Guard, SHA readback and no-force promotion remain pending.
+- Acceptance: candidate 42609647477 PASS (353 tests; preflight PASS) and checked no-force main fast-forward to `7c721b6b5e804a543333b1e5d1d0534056608106`; main SHA readback and Run Guard 42609853959 PASS (353 tests; preflight PASS). This evidence establishes only the post-LOAD observational origin. The live snapshot remains seq 10 with `ROLLBACK_CONFIRMED_SAVEPOINT_UNKNOWN`, ledger v14 and no accepted new training. An exact SAVE checkpoint, retained past training/skills, current named HP/condition and full inventory remain unverified. The next user-facing request is current **選手** screen(s) only. Handoff-only change requires candidate and main final CI.
 
 ## Immediate post-LOAD capture confirmed (2026-11-09; evidence recorded, SAVE anchor still UNKNOWN)
 - Direct user confirmation: the existing Y1 June PM5:20 image was taken immediately after a SAVE load, without any gameplay actions between loading and that screen. The current uploaded IMG_8971 image SHA256 is `de88e4b7fe160910ee10b543bc547f45239635fc120136bcddab3844bf6fc197`, matching the preexisting IMG_8971 source. No duplicate gameplay SCREEN or accepted TRAINING event was created.
