@@ -88,10 +88,33 @@ class Boot(unittest.TestCase):
         self.assertEqual(len(result["knowledge"]["historical_accepted_at_reporting"]),2)
         self.assertEqual(result["knowledge"]["historical_private_backup_checkpoints"],6)
         self.assertFalse(result["knowledge"]["private_library_reachability_checked_now"])
-        self.assertEqual(result["latest_decision"]["seq"],13)
+        ledger=json.loads((self.root/"CURRENT_RUN_LEDGER.yaml").read_text(encoding="utf-8"))
+        recorded=[json.loads(x) for x in
+                  (self.root/"DECISION_LOG.jsonl").read_text(encoding="utf-8").splitlines()
+                  if x.strip()]
+        self.assertEqual(result["latest_decision"]["seq"],len(recorded))
+        self.assertEqual(result["latest_decision"]["seq"],ledger["ledger_version"])
+        self.assertEqual(result["latest_decision"]["event"],recorded[-1]["event"])
         self.assertFalse(result["action_authorized"])
         self.assertFalse(result["writes_performed"])
         self.assertFalse(result["automatic_new_chat_invocation_guaranteed"])
+
+    def test_postload_user_attestation_does_not_infer_restore_checkpoint(self):
+        ledger=json.loads((self.root/"CURRENT_RUN_LEDGER.yaml").read_text(encoding="utf-8"))
+        fact=next(f for f in ledger["facts"]
+                  if f["fact_id"]=="FACT-Y1-JUNE-520-IMMEDIATE-POSTLOAD")
+        self.assertTrue(fact["value"]["post_load_immediate"])
+        self.assertFalse(fact["value"]["intervening_game_actions"])
+        self.assertEqual(fact["value"]["restored_save_checkpoint"],"UNKNOWN")
+        unknown=next(u for u in ledger["unknowns"]
+                     if u["unknown_id"]=="UNK-ROLLBACK-SAVEPOINT-20261106")
+        self.assertEqual(unknown["status"],"OPEN")
+        self.assertEqual(ledger["current_gate"]["status"],"BLOCKED_UNKNOWN")
+        boot=self.boot()
+        self.assertEqual(boot["status"],"BOOT_VERIFIED_ACTIONS_BLOCKED")
+        self.assertEqual(boot["state"]["event_seq"],10)
+        self.assertEqual(boot["state"]["current_training_counts"],
+                         "UNVERIFIED_AFTER_ROLLBACK")
 
     def test_cli_actual_git_revision_no_mutation(self):
         sha=git_sha(ROOT)
