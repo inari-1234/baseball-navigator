@@ -3,6 +3,12 @@
 Last updated: 2026-11-09
 State: ACTIVE_Y1_JUNE_POST_ROLLBACK_CAPTURE — SAVEPOINT_UNKNOWN
 
+## Immediate post-LOAD capture confirmed (2026-11-09; evidence recorded, SAVE anchor still UNKNOWN)
+- Direct user confirmation: the existing Y1 June PM5:20 image was taken immediately after a SAVE load, without any gameplay actions between loading and that screen. The current uploaded IMG_8971 image SHA256 is `de88e4b7fe160910ee10b543bc547f45239635fc120136bcddab3844bf6fc197`, matching the preexisting IMG_8971 source. No duplicate gameplay SCREEN or accepted TRAINING event was created.
+- This verifies capture timing and the displayed post-load resources, **not** which earlier SAVE checkpoint was loaded or whether earlier skills, trainings and match results survived. `UNK-ROLLBACK-SAVEPOINT-20261106` stays OPEN, `current_gate.status=BLOCKED_UNKNOWN`, the current replay remains event seq 10 and `ROLLBACK_CONFIRMED_SAVEPOINT_UNKNOWN`. It is forbidden to set TRUSTED or claim a player's three completed sessions from this report.
+- Ledger 14 / DECISION_LOG 14 record `EV-USER-20261109-IMMEDIATE-POSTLOAD-NO-ACTIONS`. Next evidence: a direct identity of the restored SAVE/checkpoint **or** a separately reviewed new-run baseline and current player/HP/training facts; keep historical unverified state out of action planning.
+- Acceptance: candidate Run Guard and checked no-force main promotion plus final readback required. No game actions executed and no current resource/skill/event changes were requested.
+
 ## P7-G lineage-aware ledger evidence freshness — main and public bridge PASS (2026-11-09)
 - Independent AI review found P7-F's LIVE_EVENT gate required source event seq == latest state event seq, so harmless SAVE_CHECKPOINT made every earlier match result / readiness source unusable; two separate current-branch ledger events could never simultaneously support the two claims.
 - Fixed `check_reply.py`: source event may predate current revision if it is still active after `apply_corrections` + `resolve_active_lineage`, is ACCEPTED with same current period, and its original canonical SHA-256 matches. Claim and evidence records still attested at latest event seq. Failure assessment tolerates later accepted SCREEN/HP_OBSERVATION and safe SAVE_CHECKPOINT/MATCH_SCHEDULE/TRAINING_COUNT_BASELINE; training readiness permits only those metadata events. Mutations, rollback, later corrections, new readiness screens or discarded source branches fail closed. Private receipts include original source_record_seq and current review seq separately.

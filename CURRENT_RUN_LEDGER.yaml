@@ -1,12 +1,12 @@
 {
   "schema_version": "1.0",
-  "ledger_version": 13,
+  "ledger_version": 14,
   "run_id": "SAPPORO_SPRINT_RESTART_20261103",
-  "expected_parent_sha": "3b2b49099733f90f5b027a8a957eb0f7b6a1bfc4",
+  "expected_parent_sha": "f166658b30426222d7eb3e4e8e3900078b72b28b",
   "run_status": {
     "previous_run": "ABANDONED_FOR_REDESIGN",
     "new_run": "ACTIVE_Y1_JUNE_AFTER_USER_CONFIRMED_ROLLBACK_SAVEPOINT_UNKNOWN",
-    "reason": "The user confirms they rolled the game back because the assistant's investigation took too long, explaining current June PM5:20 after older PM5:40. Exact saved checkpoint and surviving earlier effects were not identified."
+    "reason": "Current Y1 June PM5:20 screenshot is user-attested as immediately after loading a SAVE, with no subsequent gameplay before capture. Earlier PM5:40 belongs to pre-rollback observations. Exactly which SAVE checkpoint was restored and retained historical game effects remain UNKNOWN."
   },
   "goal": {
     "primary": {
@@ -25,7 +25,7 @@
     "month": 6,
     "clock": "PM 5:20",
     "earliest_confirmed_period": "Y1-06",
-    "interpretation": "Current screenshot Y1 June PM5:20 after user-confirmed game rollback during assistant investigation. Earlier PM5:40 comes from prior branch/position, but save checkpoint is UNKNOWN."
+    "interpretation": "Direct user confirmation 2026-11-09: PM5:20 image was taken immediately after SAVE load; no intervening gameplay. The restored SAVE checkpoint identity and retained prior branch effects remain UNKNOWN."
   },
   "current_gate": {
     "id": "ROLLBACK_SAVEPOINT_AUTHORITY_RECONCILE",
@@ -169,6 +169,15 @@
       "kind": "USER_ASSERTION",
       "statement": "The current game image shows Y1 June PM5:20 because the user rolled the game back while the assistant's investigation was taking too long. The reason for the clock regression is confirmed; restored savepoint unspecified.",
       "locator": "User message 2026-11-06: あなたの調査が長引きロールバックしただけ"
+    },
+    {
+      "evidence_id": "EV-USER-20261109-IMMEDIATE-POSTLOAD-NO-ACTIONS",
+      "kind": "USER_ASSERTION",
+      "statement": "The Y1 June PM5:20 screen (IMG_8971 image, SHA256 de88e4b7fe160910ee10b543bc547f45239635fc120136bcddab3844bf6fc197) was captured immediately after the user loaded a SAVE; no gameplay operations were performed between loading and that screen. This identifies the present post-load snapshot, not which earlier SAVE checkpoint or effects were retained.",
+      "locator": "Direct user confirmation in this chat, 2026-11-09; image bytes independently SHA256-verified in this turn.",
+      "source_refs": [
+        "EV-RAW-Y1-JUNE-ITEM-MENUS-8971-8972"
+      ]
     }
   ],
   "facts": [
@@ -476,6 +485,26 @@
         "EV-RAW-Y1-JUNE-ITEM-MENUS-8971-8972"
       ],
       "notes": "Cause of clock regression confirmed by user; exact rollback anchor, lineage and retained prior branch effects are unresolved. Historical June match observations are audit evidence, not proof of current-branch completion."
+    },
+    {
+      "fact_id": "FACT-Y1-JUNE-520-IMMEDIATE-POSTLOAD",
+      "fact_type": "OBSERVED",
+      "path": "new_run.current.image_capture_relation_to_save_load",
+      "value": {
+        "screen_period": "Y1-06",
+        "clock": "PM 5:20",
+        "image_sha256": "de88e4b7fe160910ee10b543bc547f45239635fc120136bcddab3844bf6fc197",
+        "post_load_immediate": true,
+        "intervening_game_actions": false,
+        "restored_save_checkpoint": "UNKNOWN",
+        "retained_historical_training_skill_item_match_effects": "UNKNOWN"
+      },
+      "source_refs": [
+        "EV-USER-20261109-IMMEDIATE-POSTLOAD-NO-ACTIONS",
+        "EV-RAW-Y1-JUNE-ITEM-MENUS-8971-8972"
+      ],
+      "usable_for_decision": false,
+      "notes": "Direct user report supports the present post-load snapshot. It is not evidence of the identity of the loaded checkpoint, pre-save actions, exact training counts, current skills or full inventory."
     }
   ],
   "strategy_policy": {
@@ -660,7 +689,8 @@
       "material_to_next_action": true,
       "material_to_goal": false,
       "default": "Recognize June PM5:20 as the current post-rollback screenshot. Do not assume any effects of matches, training, items or resources from pre-rollback captures survived; deny paid actions until the active SAVE branch and game state are reconciled. An explicit rollback report is not proof of which SAVE was restored.",
-      "resolve_by": "Independently identify the restored save/checkpoint or accept a new source-grounded baseline for the ongoing branch; check retained match/training/skills and current full inventory before acting."
+      "resolve_by": "Independently identify the restored save/checkpoint or accept a new source-grounded baseline for the ongoing branch; check retained match/training/skills and current full inventory before acting.",
+      "notes": "2026-11-09 user confirmed IMG_8971 capture immediately after loading a SAVE and without intervening gameplay. Snapshot continuity at capture is confirmed; identity of restored checkpoint, retained actions/skills/training counts remain unknown. Do not mark TRUSTED from capture timing alone."
     }
   ]
 }
