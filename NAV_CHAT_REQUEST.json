@@ -1,0 +1,7 @@
+{
+  "schema_version": "1.0",
+  "request_id": "p7g-accept-boot-20261109-01",
+  "intent": "BOOT",
+  "expected_main_sha": "f166658b30426222d7eb3e4e8e3900078b72b28b",
+  "expected_event_seq": 10
+}
