@@ -217,6 +217,9 @@ class GuardedReplyRegression(unittest.TestCase):
             context=context,evidence_sources=sources)
         self.assertEqual(len(packet["evidence_receipts_sha256"]),64)
         self.assertEqual(len(packet["reviewed_context_sha256"]),64)
+        ref=state["resources"]["last_observed"]
+        self.assertEqual(packet["evidence_receipts"][
+            "training_readiness:"+ref]["content_sha256"],sources[ref]["sha256"])
         self.assertEqual(packet["safe_reply_check"]["status"],"PASS")
         self.assertIn("岡治・今井・たき",packet["safe_reply"])
         self.assertIn("素振り／応援ON／消費予定：スポーツ6、応援20",
@@ -266,6 +269,14 @@ class GuardedReplyRegression(unittest.TestCase):
             expected_main_sha=SHA,expected_event_seq=10,contract=contract,root=ROOT,
             context=tampered,evidence_sources=sources)
         self.assertIn("EVIDENCE_REF_UNRESOLVED_OR_STALE",verdict["error_codes"])
+
+        tampered=copy.deepcopy(packet)
+        tampered["evidence_receipts"]["training_readiness:"+ref][
+            "content_sha256"]="0"*64
+        verdict=check_reply(packet["safe_reply"],bridge=tampered,state=state,
+            expected_main_sha=SHA,expected_event_seq=10,contract=contract,root=ROOT,
+            context=context,evidence_sources=sources)
+        self.assertIn("EVIDENCE_RECEIPT_MISMATCH",verdict["error_codes"])
 
         tampered=copy.deepcopy(packet)
         tampered["evidence_receipts_sha256"]="0"*64
