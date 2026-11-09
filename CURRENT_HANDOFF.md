@@ -3,6 +3,13 @@
 Last updated: 2026-11-09
 State: ACTIVE_Y1_JUNE_POST_ROLLBACK_CAPTURE — SAVEPOINT_UNKNOWN
 
+## P7-G lineage-aware ledger evidence freshness — candidate (2026-11-09)
+- Independent AI review found P7-F's LIVE_EVENT gate required source event seq == latest state event seq, so harmless SAVE_CHECKPOINT made every earlier match result / readiness source unusable; two separate current-branch ledger events could never simultaneously support the two claims.
+- Fixed `check_reply.py`: source event may predate current revision if it is still active after `apply_corrections` + `resolve_active_lineage`, is ACCEPTED with same current period, and its original canonical SHA-256 matches. Claim and evidence records still attested at latest event seq. Failure assessment tolerates later accepted SCREEN/HP_OBSERVATION and safe SAVE_CHECKPOINT/MATCH_SCHEDULE/TRAINING_COUNT_BASELINE; training readiness permits only those metadata events. Mutations, rollback, later corrections, new readiness screens or discarded source branches fail closed. Private receipts include original source_record_seq and current review seq separately.
+- Synthetic tests: retained match E2 and readiness screen E3 both accepted at current E4 SAVE, metadata-only E5 accepted, mutations/rollback/new screen rejected, restored-away source rejected, match assessment persists across screen while old readiness does not. P7-A…F run regression retained.
+- Source hash/reviewer attestation still only prove inspected bytes + claim binding, not semantic correctness of HP or hidden skill counters. Current real SAVE remains rollback-anchor UNKNOWN; no actual TRUSTED real-save training is certified and no live event was altered.
+- Acceptance pending final candidate CI, checked main no-force fast-forward/readback, main CI and a public P4 no-action read-only regression.
+
 ## P7-F evidence-bound local draft receipts — main and bridge PASS (2026-11-09)
 - Independent AI review of P7-E found two issues: failure/readiness evidence_refs were merely nonempty strings with no existence/content check; a source-certified exact 3-session count was worded as "記録上4回目", potentially confusing it with a logged lower bound.
 - Scope: local-only `check_reply.py` now requires `context` and `evidence_sources`; each failure/readiness ref must resolve to an accessible private LOCAL_FILE or exact current accepted LIVE_EVENT, with matching SHA-256, current event seq, period, accepted branch and claim-specific review hash. Re-validates P3 from the same context. Certified private packet carries source-level `evidence_receipts`, their SHA-256 and a reviewed context digest, all rechecked on future PASS; no paths/raw evidence are placed on public P4.

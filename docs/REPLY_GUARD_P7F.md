@@ -14,11 +14,15 @@ P7-F repairs these as a **local-only source-integrity gate** without changing ga
 
 Supported source kinds:
 - `LOCAL_FILE`: `path` to an accessible **private local file** (image, user report or other reviewed observation), plus the expected SHA-256. The engine reads the real bytes and hashes them on every verification. A missing/changed file fails closed. Original bytes and private paths must never be sent to the public GitHub repo.
-- `LIVE_EVENT`: `event_id` must exactly match a unique accepted event in `LIVE_EVENTS.jsonl` at the currently selected event revision and game period; the canonical JSON event hash must match the expected SHA-256. Older events or discarded branches are not treated as fresh readiness evidence.
+- `LIVE_EVENT`: source ID, game period and canonical JSON hash must match a unique accepted event retained in the current replay-resolved lineage. The reviewed claim and evidence record are still pinned to the latest event revision, but the **source event may be older** if every intervening event preserves that claim's freshness. P7-G defines the distinct safe boundaries for failure assessment and training readiness. Discarded branches and evidence expired by a mutation cannot be reused.
 
 The private packet retains `evidence_receipts` with individual content hashes and reviewed-claim hashes, plus `evidence_receipts_sha256` and `reviewed_context_sha256`. `render_guarded_reply` and `check_reply` require the original private context/source mapping and recompute all receipts; a changed file, replaced ID, altered readiness claim, old revision, edited packet or deleted source is rejected. In a local CLI call, use `--private-context` and `--private-evidence-index` with files stored locally; neither is sent to GitHub Actions.
 
 Bare evidence references, guessed source hashes and unattached historical citations are NOT sufficient. Do not silently invent or retroactively fill these records for the currently unverified save. When proof is missing, `STOP_UNCERTIFIED` still applies: no participant/Cheer/cost plan.
+
+## P7-G lineage-aware freshness
+
+The detailed claim-dependent event validity matrix and positive/negative regressions are specified in `docs/REPLY_GUARD_P7G.md`. P7-F's source hashes and claim-binding receipts remain unchanged, while older retained events can survive metadata-only SAVE/scheduling entries without false expiry.
 
 ## Exact-count wording
 

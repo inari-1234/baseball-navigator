@@ -27,6 +27,7 @@ on:
       - "docs/REPLY_GUARD_P7D.md"
       - "docs/REPLY_GUARD_P7E.md"
       - "docs/REPLY_GUARD_P7F.md"
+      - "docs/REPLY_GUARD_P7G.md"
       - "project_bootstrap.py"
       - "PROJECT_ENTRYPOINT.json"
       - "docs/PROJECT_RESUME_P6.md"
