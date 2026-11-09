@@ -24,6 +24,88 @@ def canonical_state_sha256(state: dict[str, Any]) -> str:
                             separators=(",", ":")).encode("utf-8")).hexdigest()
 
 
+def _verified_evidence_receipts(context, evidence_sources, state, root):
+    """Private local evidence: resolve every ID to bytes or a current ledger event.
+
+    Hashes certify the reviewed bytes and context version; not the semantic
+    accuracy of an image/user recollection. Human review is still necessary.
+    """
+    _require(isinstance(context, dict) and isinstance(evidence_sources, dict),
+             "LOCAL_EVIDENCE_INDEX_REQUIRED")
+    _require(state.get("timeline_status") == "TRUSTED",
+             "EVIDENCE_BRANCH_UNTRUSTED")
+    seq, period = state.get("last_event_seq"), state.get("period_floor")
+    receipts, events = {}, None
+    for claim in ("failure_assessment", "training_readiness"):
+        block = context.get(claim)
+        _require(isinstance(block, dict)
+                 and block.get("verified_for_current_state") is True
+                 and type(block.get("source_event_seq")) is int
+                 and block["source_event_seq"] == seq
+                 and block.get("period") == period
+                 and block.get("branch") == "ACCEPTED",
+                 "CURRENT_CONTEXT_ATTESTATION_REQUIRED")
+        refs = block.get("evidence_refs")
+        _require(isinstance(refs, list) and bool(refs)
+                 and all(isinstance(v, str) and v.strip() for v in refs)
+                 and len(set(refs)) == len(refs),
+                 "CURRENT_CONTEXT_EVIDENCE_REQUIRED")
+        claim_sha = canonical_state_sha256(block)
+        for ref in refs:
+            record = evidence_sources.get(ref)
+            _require(isinstance(record, dict)
+                     and record.get("reviewed_for_current_state") is True
+                     and record.get("source_event_seq") == seq
+                     and record.get("period") == period
+                     and record.get("branch") == "ACCEPTED"
+                     and isinstance(record.get("reviewed_claim_sha256"), dict)
+                     and record["reviewed_claim_sha256"].get(claim) == claim_sha,
+                     "EVIDENCE_REF_UNRESOLVED_OR_STALE")
+            kind = record.get("kind")
+            if kind == "LOCAL_FILE":
+                local = record.get("path")
+                _require(isinstance(local, str) and bool(local.strip()),
+                         "LOCAL_EVIDENCE_FILE_REQUIRED")
+                try:
+                    with Path(local).open("rb") as f:
+                        digest = sha256()
+                        for chunk in iter(lambda: f.read(1048576), b""):
+                            digest.update(chunk)
+                    actual = digest.hexdigest()
+                except OSError as exc:
+                    raise ReplyGateError("LOCAL_EVIDENCE_FILE_NOT_ACCESSIBLE") from exc
+            elif kind == "LIVE_EVENT":
+                _require(record.get("event_id") == ref,
+                         "LEDGER_EVIDENCE_ID_MISMATCH")
+                if events is None:
+                    try:
+                        raw = (Path(root) / "LIVE_EVENTS.jsonl").read_text(encoding="utf-8")
+                        events = [json.loads(v) for v in raw.splitlines() if v.strip()]
+                    except (OSError, ValueError) as exc:
+                        raise ReplyGateError("LIVE_EVENT_LEDGER_UNAVAILABLE") from exc
+                matches = [v for v in events if v.get("event_id") == ref]
+                _require(len(matches) == 1
+                         and matches[0].get("seq") == seq
+                         and matches[0].get("branch") == "ACCEPTED"
+                         and matches[0].get("period") == {
+                             "year": int(period.split("-")[0][1:]),
+                             "month": int(period.split("-")[1])},
+                         "LIVE_EVENT_NOT_CURRENT_ACCEPTED_SOURCE")
+                actual = canonical_state_sha256(matches[0])
+            else:
+                raise ReplyGateError("EVIDENCE_SOURCE_TYPE_UNSUPPORTED")
+            expected = record.get("sha256")
+            _require(isinstance(expected, str) and len(expected) == 64
+                     and all(v in "0123456789abcdef" for v in expected)
+                     and actual == expected,
+                     "EVIDENCE_CONTENT_HASH_MISMATCH")
+            receipts[claim + ":" + ref] = {
+                "source_kind": kind, "content_sha256": actual,
+                "reviewed_claim_sha256": claim_sha,
+                "source_event_seq": seq, "period": period}
+    return receipts
+
+
 def _require(condition: bool, code: str) -> None:
     if not condition:
         raise ReplyGateError(code)
