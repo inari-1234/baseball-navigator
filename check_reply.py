@@ -188,7 +188,8 @@ def _verified_draft_reply(bridge: dict[str, Any],
              "DECISION_CONTRACT_REQUIRED")
     receipts = _verified_evidence_receipts(
         context, evidence_sources, state, root)
-    _require(bridge.get("evidence_receipts_sha256") ==
+    _require(bridge.get("evidence_receipts") == receipts
+             and bridge.get("evidence_receipts_sha256") ==
              canonical_state_sha256(receipts)
              and bridge.get("reviewed_context_sha256") ==
              canonical_state_sha256(context),
@@ -416,6 +417,7 @@ def make_local_verified_draft_packet(
         "timeline_status": state["timeline_status"],
         "state_structured_sha256": canonical_state_sha256(state),
         "reviewed_context_sha256": canonical_state_sha256(context),
+        "evidence_receipts": receipts,
         "evidence_receipts_sha256": canonical_state_sha256(receipts),
         "action_authorized": False, "side_effects": False,
         "requires_manual_acceptance": True,
