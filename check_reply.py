@@ -24,6 +24,61 @@ def canonical_state_sha256(state: dict[str, Any]) -> str:
                             separators=(",", ":")).encode("utf-8")).hexdigest()
 
 
+def _accepted_lineage_evidence(events, ref, claim, latest_seq, period):
+    """Confirm an earlier source survives in this branch without invalidation.
+
+    SAVE_CHECKPOINT and scheduling are metadata-only for this purpose.
+    Failed/rewound chronology or material mutations expire source eligibility;
+    failure-assessment context tolerates newer SCREEN/HP observations whereas
+    player-readiness evidence does not.
+    """
+    from live_state_engine import (apply_corrections, resolve_active_lineage,
+                                   ObservationError)
+    _require(len(events) == latest_seq
+             and [e.get("seq") for e in events] ==
+             list(range(1, latest_seq + 1))
+             and len({e.get("event_id") for e in events}) == len(events),
+             "LIVE_EVENT_LEDGER_REVISION_MISMATCH")
+    try:
+        corrected = apply_corrections(events)
+        active, _, _, _, unknown = resolve_active_lineage(corrected)
+    except (ObservationError, KeyError, TypeError, ValueError) as exc:
+        raise ReplyGateError("LIVE_EVENT_LEDGER_LINEAGE_INVALID") from exc
+    _require(not unknown, "LIVE_EVENT_UNKNOWN_ROLLBACK_LINEAGE")
+    raw_matches = [e for e in events if e.get("event_id") == ref]
+    active_matches = [e for e in active if e.get("event_id") == ref]
+    _require(len(raw_matches) == 1 and len(active_matches) == 1,
+             "LIVE_EVENT_NOT_IN_ACTIVE_LINEAGE")
+    source, active_source = raw_matches[0], active_matches[0]
+    _require(source == active_source, "LIVE_EVENT_CORRECTED_SOURCE_NEEDS_REVIEW")
+    allowed = {"failure_assessment": {"MATCH_ATTEMPT", "SCREEN", "HP_OBSERVATION"},
+               "training_readiness": {"SCREEN", "HP_OBSERVATION"}}
+    _require(source.get("kind") in allowed[claim]
+             and source.get("branch") == "ACCEPTED"
+             and type(source.get("seq")) is int
+             and 1 <= source["seq"] <= latest_seq
+             and source.get("period") == {
+                 "year": int(period.split("-")[0][1:]),
+                 "month": int(period.split("-")[1])},
+             "LIVE_EVENT_NOT_CURRENT_ACCEPTED_SOURCE")
+    # A correction after the source requires a fresh source review, even if
+    # it targets another event. It is not silently treated as harmless.
+    _require(not any(e["kind"] == "CORRECTION" and
+                     e["seq"] > source["seq"] for e in events),
+             "LIVE_EVENT_LATER_CORRECTION_REQUIRES_REVIEW")
+    innocuous = {
+        "failure_assessment": {"SAVE_CHECKPOINT", "MATCH_SCHEDULE",
+                               "SCREEN", "HP_OBSERVATION",
+                               "TRAINING_COUNT_BASELINE"},
+        "training_readiness": {"SAVE_CHECKPOINT", "MATCH_SCHEDULE",
+                               "TRAINING_COUNT_BASELINE"},
+    }[claim]
+    _require(all(e.get("kind") in innocuous
+                 for e in active if e.get("seq", 0) > source["seq"]),
+             "LIVE_EVENT_EVIDENCE_EXPIRED_BY_MUTATION")
+    return source
+
+
 def _verified_evidence_receipts(context, evidence_sources, state, root):
     """Private local evidence: resolve every ID to bytes or a current ledger event.
 
@@ -83,15 +138,9 @@ def _verified_evidence_receipts(context, evidence_sources, state, root):
                         events = [json.loads(v) for v in raw.splitlines() if v.strip()]
                     except (OSError, ValueError) as exc:
                         raise ReplyGateError("LIVE_EVENT_LEDGER_UNAVAILABLE") from exc
-                matches = [v for v in events if v.get("event_id") == ref]
-                _require(len(matches) == 1
-                         and matches[0].get("seq") == seq
-                         and matches[0].get("branch") == "ACCEPTED"
-                         and matches[0].get("period") == {
-                             "year": int(period.split("-")[0][1:]),
-                             "month": int(period.split("-")[1])},
-                         "LIVE_EVENT_NOT_CURRENT_ACCEPTED_SOURCE")
-                actual = canonical_state_sha256(matches[0])
+                source = _accepted_lineage_evidence(
+                    events, ref, claim, seq, period)
+                actual = canonical_state_sha256(source)
             else:
                 raise ReplyGateError("EVIDENCE_SOURCE_TYPE_UNSUPPORTED")
             expected = record.get("sha256")
