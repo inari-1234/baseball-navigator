@@ -271,6 +271,20 @@ class GuardedReplyRegression(unittest.TestCase):
         self.assertIn("EVIDENCE_REF_UNRESOLVED_OR_STALE",verdict["error_codes"])
 
         tampered=copy.deepcopy(packet)
+        tampered["candidate"]["readiness_evidence_refs"]=["FAKE-NONEMPTY-ID"]
+        verdict=check_reply(packet["safe_reply"],bridge=tampered,state=state,
+            expected_main_sha=SHA,expected_event_seq=10,contract=contract,root=ROOT,
+            context=context,evidence_sources=sources)
+        self.assertIn("EVIDENCE_REF_NOT_BOUND_TO_CONTEXT",verdict["error_codes"])
+
+        tampered=copy.deepcopy(packet)
+        tampered["failure_evidence_refs"]=["FAKE-NONEMPTY-ID"]
+        verdict=check_reply(packet["safe_reply"],bridge=tampered,state=state,
+            expected_main_sha=SHA,expected_event_seq=10,contract=contract,root=ROOT,
+            context=context,evidence_sources=sources)
+        self.assertIn("EVIDENCE_REF_NOT_BOUND_TO_CONTEXT",verdict["error_codes"])
+
+        tampered=copy.deepcopy(packet)
         tampered["evidence_receipts"]["training_readiness:"+ref][
             "content_sha256"]="0"*64
         verdict=check_reply(packet["safe_reply"],bridge=tampered,state=state,
