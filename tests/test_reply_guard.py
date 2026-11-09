@@ -354,7 +354,7 @@ class GuardedReplyRegression(unittest.TestCase):
             return {"seq":i,"event_id":f"E{i}","kind":kind,
                     "period":{"year":1,"month":6},"source":source,**fields}
         events=[
-            ev(1,"SCREEN",branch="ACCEPTED",
+            ev(1,"SCREEN",branch="ACCEPTED",is_savepoint=True,
                resources={"study":4,"sports":28,"play":25,"nature":18,"cheer":100}),
             ev(2,"MATCH_ATTEMPT",branch="ACCEPTED",match_id="M",
                opponent="試験校",attempt=1,our_runs=0,their_runs=1),
@@ -399,6 +399,9 @@ class GuardedReplyRegression(unittest.TestCase):
         self.assertIn("training_readiness:E3",out)
         self.assertEqual(out["failure_assessment:E2"]["content_sha256"],
                          canonical_state_sha256(events[1]))
+        self.assertEqual(out["failure_assessment:E2"]["source_record_seq"],2)
+        self.assertEqual(out["failure_assessment:E2"]["source_event_seq"],4)
+        self.assertEqual(out["training_readiness:E3"]["source_record_seq"],3)
         self.assertEqual(out["training_readiness:E3"]["content_sha256"],
                          canonical_state_sha256(events[2]))
 
@@ -429,6 +432,11 @@ class GuardedReplyRegression(unittest.TestCase):
         fresh_metadata_event("ROLLBACK",restore_to_event_id="E4")
         with self.assertRaisesRegex(ReplyGateError,
                                     "LIVE_EVENT_EVIDENCE_EXPIRED_BY_MUTATION"):
+            _verified_evidence_receipts(context,records,state,tmp.name)
+
+        fresh_metadata_event("ROLLBACK",restore_to_event_id="E1")
+        with self.assertRaisesRegex(ReplyGateError,
+                                    "LIVE_EVENT_NOT_IN_ACTIVE_LINEAGE"):
             _verified_evidence_receipts(context,records,state,tmp.name)
 
         fresh_metadata_event("SCREEN",branch="ACCEPTED",
