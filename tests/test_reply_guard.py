@@ -327,20 +327,170 @@ class GuardedReplyRegression(unittest.TestCase):
                 "reviewed_for_current_state":True,
                 "reviewed_claim_sha256":{
                     name:canonical_state_sha256(value) for name,value in context.items()}}
-        receipts=_verified_evidence_receipts(context,{ref:record},state,ROOT)
+        tmp=tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        root9=Path(tmp.name)
+        (root9/"LIVE_EVENTS.jsonl").write_text(
+            "\n".join(json.dumps(e,ensure_ascii=False) for e in events[:9])+"\n",
+            encoding="utf-8")
+        receipts=_verified_evidence_receipts(context,{ref:record},state,root9)
         self.assertIn("failure_assessment:"+ref,receipts)
         wrong=copy.deepcopy(record)
         wrong["event_id"]="NONEXISTENT-EVENT"
         with self.assertRaisesRegex(ReplyGateError,"LEDGER_EVIDENCE_ID_MISMATCH"):
-            _verified_evidence_receipts(context,{ref:wrong},state,ROOT)
+            _verified_evidence_receipts(context,{ref:wrong},state,root9)
         state["last_event_seq"]=10
         record["source_event_seq"]=10
         for name in context:
             context[name]["source_event_seq"]=10
         record["reviewed_claim_sha256"]={
             name:canonical_state_sha256(value) for name,value in context.items()}
-        with self.assertRaisesRegex(ReplyGateError,"LIVE_EVENT_NOT_CURRENT_ACCEPTED_SOURCE"):
+        with self.assertRaisesRegex(ReplyGateError,"LIVE_EVENT_CORRECTED_SOURCE_NEEDS_REVIEW"):
             _verified_evidence_receipts(context,{ref:record},state,ROOT)
+
+    def test_two_earlier_sources_remain_valid_through_screen_and_save(self):
+        source={"kind":"USER_REPORT","locator":"synthetic-current-active-branch"}
+        def ev(i,kind,**fields):
+            return {"seq":i,"event_id":f"E{i}","kind":kind,
+                    "period":{"year":1,"month":6},"source":source,**fields}
+        events=[
+            ev(1,"SCREEN",branch="ACCEPTED",
+               resources={"study":4,"sports":28,"play":25,"nature":18,"cheer":100}),
+            ev(2,"MATCH_ATTEMPT",branch="ACCEPTED",match_id="M",
+               opponent="試験校",attempt=1,our_runs=0,their_runs=1),
+            ev(3,"SCREEN",branch="ACCEPTED",after_event_id="E2",
+               resources={"study":4,"sports":28,"play":25,"nature":18,"cheer":100}),
+            ev(4,"SAVE_CHECKPOINT")
+        ]
+        tmp=tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        path=Path(tmp.name)/"LIVE_EVENTS.jsonl"
+        def install(items):
+            path.write_text(
+                "\n".join(json.dumps(e,ensure_ascii=False) for e in items)+"\n",
+                encoding="utf-8")
+        install(events)
+        state=copy.deepcopy(self.state)
+        state["timeline_status"]="TRUSTED"
+        state["last_event_seq"]=4
+        def claim(ref,**fields):
+            return {"verified_for_current_state":True,
+                    "source_event_seq":state["last_event_seq"],
+                    "period":"Y1-06","branch":"ACCEPTED",
+                    "evidence_refs":[ref],**fields}
+        context={
+            "failure_assessment":claim("E2",mode="CONTACT"),
+            "training_readiness":claim("E3",available_drills=["素振り"],
+                                        ready_players=["岡治","今井","たき"])}
+        def index(ref,which):
+            current=next(e for e in events if e["event_id"]==ref)
+            return {"kind":"LIVE_EVENT","event_id":ref,
+                    "sha256":canonical_state_sha256(current),
+                    "source_event_seq":state["last_event_seq"],
+                    "period":"Y1-06","branch":"ACCEPTED",
+                    "reviewed_for_current_state":True,
+                    "reviewed_claim_sha256":{
+                        which:canonical_state_sha256(context[which])}}
+        records={
+            "E2":index("E2","failure_assessment"),
+            "E3":index("E3","training_readiness")}
+        out=_verified_evidence_receipts(context,records,state,tmp.name)
+        self.assertIn("failure_assessment:E2",out)
+        self.assertIn("training_readiness:E3",out)
+        self.assertEqual(out["failure_assessment:E2"]["content_sha256"],
+                         canonical_state_sha256(events[1]))
+        self.assertEqual(out["training_readiness:E3"]["content_sha256"],
+                         canonical_state_sha256(events[2]))
+
+        def fresh_metadata_event(kind,**fields):
+            extended=events+[ev(5,kind,**fields)]
+            install(extended)
+            state["last_event_seq"]=5
+            for claim_name in context:
+                context[claim_name]["source_event_seq"]=5
+                ref=context[claim_name]["evidence_refs"][0]
+                records[ref]["source_event_seq"]=5
+                records[ref]["reviewed_claim_sha256"][claim_name]=(
+                    canonical_state_sha256(context[claim_name]))
+            return extended
+
+        fresh_metadata_event("MATCH_SCHEDULE",entries=[
+            {"match_id":"M7","opponent":"次回の相手"}])
+        out=_verified_evidence_receipts(context,records,state,tmp.name)
+        self.assertEqual(len(out),2)
+
+        fresh_metadata_event("TRAINING",branch="ACCEPTED",drill="素振り",
+                             drill_level=1,cheer="OFF",
+                             participants=["岡治","今井","たき"])
+        with self.assertRaisesRegex(ReplyGateError,
+                                    "LIVE_EVENT_EVIDENCE_EXPIRED_BY_MUTATION"):
+            _verified_evidence_receipts(context,records,state,tmp.name)
+
+        fresh_metadata_event("ROLLBACK",restore_to_event_id="E4")
+        with self.assertRaisesRegex(ReplyGateError,
+                                    "LIVE_EVENT_EVIDENCE_EXPIRED_BY_MUTATION"):
+            _verified_evidence_receipts(context,records,state,tmp.name)
+
+        fresh_metadata_event("SCREEN",branch="ACCEPTED",
+            resources={"study":4,"sports":28,"play":25,"nature":18,"cheer":100})
+        with self.assertRaisesRegex(ReplyGateError,
+                                    "LIVE_EVENT_EVIDENCE_EXPIRED_BY_MUTATION"):
+            _verified_evidence_receipts(context,records,state,tmp.name)
+
+    def test_failure_source_survives_screen_but_readiness_does_not(self):
+        # The same later screen does not make an old MATCH failure untrue,
+        # but it supersedes an earlier HP/readiness screen.
+        source={"kind":"USER_REPORT","locator":"synthetic"}
+        def ev(i,kind,**kw):
+            return {"seq":i,"event_id":f"E{i}","kind":kind,
+                    "period":{"year":1,"month":6},"source":source,**kw}
+        events=[ev(1,"SCREEN",branch="ACCEPTED",
+                   resources={"study":4,"sports":28,"play":25,"nature":18,"cheer":100}),
+                ev(2,"MATCH_ATTEMPT",branch="ACCEPTED",match_id="M",
+                   opponent="試験校",attempt=1,our_runs=0,their_runs=1),
+                ev(3,"SCREEN",branch="ACCEPTED",after_event_id="E2",
+                   resources={"study":4,"sports":28,"play":25,"nature":18,"cheer":100}),
+                ev(4,"SCREEN",branch="ACCEPTED",after_event_id="E3",
+                   resources={"study":4,"sports":28,"play":25,"nature":18,"cheer":100})]
+        tmp=tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        (Path(tmp.name)/"LIVE_EVENTS.jsonl").write_text(
+            "\n".join(json.dumps(e,ensure_ascii=False) for e in events)+"\n",
+            encoding="utf-8")
+        state=copy.deepcopy(self.state)
+        state["timeline_status"]="TRUSTED"
+        state["last_event_seq"]=4
+        def claim(ref,**fields):
+            return {"verified_for_current_state":True,"source_event_seq":4,
+                    "period":"Y1-06","branch":"ACCEPTED","evidence_refs":[ref],
+                    **fields}
+        context={"failure_assessment":claim("E2",mode="CONTACT"),
+                 "training_readiness":claim("E3",available_drills=["素振り"],
+                                              ready_players=["岡治","今井","たき"])}
+        records={}
+        for name,ref in (("failure_assessment","E2"),("training_readiness","E3")):
+            event=next(e for e in events if e["event_id"]==ref)
+            records[ref]={"kind":"LIVE_EVENT","event_id":ref,
+                          "sha256":canonical_state_sha256(event),
+                          "source_event_seq":4,"period":"Y1-06","branch":"ACCEPTED",
+                          "reviewed_for_current_state":True,
+                          "reviewed_claim_sha256":{
+                              name:canonical_state_sha256(context[name])}}
+        with self.assertRaisesRegex(ReplyGateError,
+                                    "LIVE_EVENT_EVIDENCE_EXPIRED_BY_MUTATION"):
+            _verified_evidence_receipts(context,records,state,tmp.name)
+        # The failure assessment alone remains eligible through later screens.
+        context["training_readiness"]["evidence_refs"]=["E4"]
+        records["E4"]={"kind":"LIVE_EVENT","event_id":"E4",
+                       "sha256":canonical_state_sha256(events[3]),
+                       "source_event_seq":4,"period":"Y1-06","branch":"ACCEPTED",
+                       "reviewed_for_current_state":True,
+                       "reviewed_claim_sha256":{
+                           "training_readiness":
+                               canonical_state_sha256(context["training_readiness"])}}
+        out=_verified_evidence_receipts(context,records,state,tmp.name)
+        self.assertIn("failure_assessment:E2",out)
+        self.assertIn("training_readiness:E4",out)
 
     def test_local_fourth_session_label_requires_exact_source_certification(self):
         state=copy.deepcopy(self.state)
