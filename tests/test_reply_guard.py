@@ -238,7 +238,7 @@ class GuardedReplyRegression(unittest.TestCase):
                           evidence_sources=sources)["error_codes"])
         altered=copy.deepcopy(packet)
         altered["candidate"]["readiness_evidence_refs"]=[]
-        self.assertIn("CURRENT_VERIFIED_CANDIDATE_REQUIRED",
+        self.assertIn("EVIDENCE_REF_NOT_BOUND_TO_CONTEXT",
                       check_reply(packet["safe_reply"],bridge=altered,state=state,
                           expected_main_sha=SHA,expected_event_seq=10,
                           contract=contract,root=ROOT,context=context,
