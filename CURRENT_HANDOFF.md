@@ -3,12 +3,12 @@
 Last updated: 2026-11-09
 State: ACTIVE_Y1_JUNE_POST_ROLLBACK_CAPTURE — SAVEPOINT_UNKNOWN
 
-## P7-G lineage-aware ledger evidence freshness — candidate (2026-11-09)
+## P7-G lineage-aware ledger evidence freshness — main and public bridge PASS (2026-11-09)
 - Independent AI review found P7-F's LIVE_EVENT gate required source event seq == latest state event seq, so harmless SAVE_CHECKPOINT made every earlier match result / readiness source unusable; two separate current-branch ledger events could never simultaneously support the two claims.
 - Fixed `check_reply.py`: source event may predate current revision if it is still active after `apply_corrections` + `resolve_active_lineage`, is ACCEPTED with same current period, and its original canonical SHA-256 matches. Claim and evidence records still attested at latest event seq. Failure assessment tolerates later accepted SCREEN/HP_OBSERVATION and safe SAVE_CHECKPOINT/MATCH_SCHEDULE/TRAINING_COUNT_BASELINE; training readiness permits only those metadata events. Mutations, rollback, later corrections, new readiness screens or discarded source branches fail closed. Private receipts include original source_record_seq and current review seq separately.
 - Synthetic tests: retained match E2 and readiness screen E3 both accepted at current E4 SAVE, metadata-only E5 accepted, mutations/rollback/new screen rejected, restored-away source rejected, match assessment persists across screen while old readiness does not. P7-A…F run regression retained.
 - Source hash/reviewer attestation still only prove inspected bytes + claim binding, not semantic correctness of HP or hidden skill counters. Current real SAVE remains rollback-anchor UNKNOWN; no actual TRUSTED real-save training is certified and no live event was altered.
-- Acceptance pending final candidate CI, checked main no-force fast-forward/readback, main CI and a public P4 no-action read-only regression.
+- Acceptance: candidate 42588559155 and 42588759260 passed 346 tests; final full docs candidate Run Guard 42589061323 PASS (346). Checked no-force main fast-forward to `7ffd5c221c9640c724e79a9f2eff0282a4c64ab9`, commit/Boot reread; main Run Guard 42589188350 PASS (346). Real source-pinned public P4 SKILL request `p7g-skill-20261109-01` run 42589280392 SUCCESS: certified no-action reply, correct SHA/event seq 10, no participant/cheer/cost candidate and no side effects. No real TRUSTED-save evidence has been ingested; first actual TRUSTED local `SKILL` plus `TRAINING_COUNTS` certification remains an OPEN acceptance gate. This handoff-only update requires its own candidate/main Run Guard regression.
 
 ## P7-F evidence-bound local draft receipts — main and bridge PASS (2026-11-09)
 - Independent AI review of P7-E found two issues: failure/readiness evidence_refs were merely nonempty strings with no existence/content check; a source-certified exact 3-session count was worded as "記録上4回目", potentially confusing it with a logged lower bound.
