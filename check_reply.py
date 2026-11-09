@@ -457,7 +457,9 @@ def check_reply(text: str, *, bridge: dict[str, Any],
                 state: dict[str, Any],
                 expected_main_sha: str, expected_event_seq: int,
                 contract: dict[str, Any] | None = None,
-                root: str | Path = ".") -> dict[str, Any]:
+                root: str | Path = ".",
+                context: dict[str, Any] | None = None,
+                evidence_sources: dict[str, Any] | None = None) -> dict[str, Any]:
     """Certify ONLY an exact rendered reply, never arbitrary prose via regex.
 
     Unrecognized text is REJECTED, not marked safe merely because it lacks a
@@ -472,7 +474,8 @@ def check_reply(text: str, *, bridge: dict[str, Any],
         _require(bridge.get("source_commit_sha") == expected_main_sha,
                  "STALE_SOURCE_COMMIT")
         expected = render_guarded_reply(
-            bridge, state, contract=contract, root=root)
+            bridge, state, contract=contract, root=root,
+            context=context, evidence_sources=evidence_sources)
         _require(isinstance(text, str), "REPLY_MUST_BE_TEXT")
         _require(text == expected, "REPLY_NOT_CANONICAL")
     except (ReplyGateError, TypeError, AttributeError, KeyError) as exc:
@@ -495,6 +498,8 @@ def main() -> None:
     parser.add_argument("--state", type=Path, required=True)
     parser.add_argument("--contract", type=Path, default=Path("DECISION_CONTRACT.json"))
     parser.add_argument("--root", type=Path, default=Path("."))
+    parser.add_argument("--private-context", type=Path)
+    parser.add_argument("--private-evidence-index", type=Path)
     parser.add_argument("--reply", type=Path)
     parser.add_argument("--expected-main-sha", required=True)
     parser.add_argument("--expected-event-seq", type=int, required=True)
@@ -507,12 +512,19 @@ def main() -> None:
         bridge = json.loads(args.bridge_result.read_text(encoding="utf-8"))
         state = json.loads(args.state.read_text(encoding="utf-8"))
         contract = json.loads(args.contract.read_text(encoding="utf-8"))
+        context = (json.loads(args.private_context.read_text(encoding="utf-8"))
+                   if args.private_context else None)
+        sources = (json.loads(args.private_evidence_index.read_text(encoding="utf-8"))
+                   if args.private_evidence_index else None)
         if args.render:
-            result = render_guarded_reply(bridge, state, contract=contract, root=args.root)
+            result = render_guarded_reply(
+                bridge, state, contract=contract, root=args.root,
+                context=context, evidence_sources=sources)
             gate = check_reply(result, bridge=bridge, state=state,
                                expected_main_sha=args.expected_main_sha,
                                expected_event_seq=args.expected_event_seq,
-                               contract=contract, root=args.root)
+                               contract=contract, root=args.root,
+                               context=context, evidence_sources=sources)
             if gate["status"] != "PASS":
                 parser.exit(2, "REPLY_GUARD_FAIL:" +
                             ",".join(gate["error_codes"]) + "\n")
@@ -525,7 +537,8 @@ def main() -> None:
             draft, bridge=bridge, state=state,
             expected_main_sha=args.expected_main_sha,
             expected_event_seq=args.expected_event_seq,
-            contract=contract, root=args.root)
+            contract=contract, root=args.root,
+            context=context, evidence_sources=sources)
         print(json.dumps(verdict, ensure_ascii=False, sort_keys=True))
         if verdict["status"] != "PASS":
             parser.exit(2)
