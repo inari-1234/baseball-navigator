@@ -73,9 +73,13 @@ def _accepted_lineage_evidence(events, ref, claim, latest_seq, period):
         "training_readiness": {"SAVE_CHECKPOINT", "MATCH_SCHEDULE",
                                "TRAINING_COUNT_BASELINE"},
     }[claim]
-    _require(all(e.get("kind") in innocuous
-                 for e in active if e.get("seq", 0) > source["seq"]),
-             "LIVE_EVENT_EVIDENCE_EXPIRED_BY_MUTATION")
+    _require(all(
+        e.get("kind") in innocuous
+        and (e.get("kind") not in {"SCREEN","HP_OBSERVATION",
+                                   "TRAINING_COUNT_BASELINE"}
+             or e.get("branch") == "ACCEPTED")
+        for e in active if e.get("seq", 0) > source["seq"]),
+        "LIVE_EVENT_EVIDENCE_EXPIRED_BY_MUTATION")
     return source
 
 
@@ -151,7 +155,9 @@ def _verified_evidence_receipts(context, evidence_sources, state, root):
             receipts[claim + ":" + ref] = {
                 "source_kind": kind, "content_sha256": actual,
                 "reviewed_claim_sha256": claim_sha,
-                "source_event_seq": seq, "period": period}
+                "source_event_seq": seq,
+                "source_record_seq": (source["seq"] if kind == "LIVE_EVENT" else None),
+                "period": period}
     return receipts
 
 
