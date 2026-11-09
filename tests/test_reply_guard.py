@@ -4,9 +4,12 @@ import copy
 import json
 from pathlib import Path
 import unittest
+import hashlib
+import tempfile
 from chat_bridge import bridge_response
 from check_reply import (check_reply, render_guarded_reply, ReplyGateError,
-                         make_local_verified_draft_packet, canonical_state_sha256)
+                         make_local_verified_draft_packet, canonical_state_sha256,
+                         _verified_evidence_receipts)
 from navigator_step import navigator_step
 from live_state_engine import replay
 from text_fast import _read_only_projection
@@ -19,6 +22,27 @@ def request(intent):
             "intent":intent,"expected_main_sha":SHA,"expected_event_seq":10}
 
 class GuardedReplyRegression(unittest.TestCase):
+    def private_evidence_for(self, state, context):
+        # Synthetic fixture proves byte integrity, not game-screen semantics.
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        path = Path(tmp.name) / "private-source.bin"
+        path.write_bytes(b"synthetic reviewed current-save evidence")
+        digest = hashlib.sha256(path.read_bytes()).hexdigest()
+        refs = set(context["failure_assessment"]["evidence_refs"] +
+                   context["training_readiness"]["evidence_refs"])
+        return {ref: {
+            "kind": "LOCAL_FILE", "path": str(path),
+            "sha256": digest, "source_event_seq": state["last_event_seq"],
+            "period": state["period_floor"], "branch": "ACCEPTED",
+            "reviewed_for_current_state": True,
+            "reviewed_claim_sha256": {
+                name: canonical_state_sha256(context[name])
+                for name in ("failure_assessment", "training_readiness")
+                if ref in context[name]["evidence_refs"]
+            },
+        } for ref in refs}
+
     @classmethod
     def setUpClass(cls):
         cls.state=json.loads((ROOT/"CURRENT_LIVE_STATE.json").read_text(encoding="utf-8"))
@@ -187,8 +211,12 @@ class GuardedReplyRegression(unittest.TestCase):
             contract=contract,boot_verified=True,
             expected_event_seq=10,context=context,root=ROOT)
         self.assertEqual(decision["status"],"VALIDATED_DRAFT_REVIEW")
+        sources=self.private_evidence_for(state, context)
         packet=make_local_verified_draft_packet(
-            decision,state,source_commit_sha=SHA,contract=contract,root=ROOT)
+            decision,state,source_commit_sha=SHA,contract=contract,root=ROOT,
+            context=context,evidence_sources=sources)
+        self.assertEqual(len(packet["evidence_receipts_sha256"]),64)
+        self.assertEqual(len(packet["reviewed_context_sha256"]),64)
         self.assertEqual(packet["safe_reply_check"]["status"],"PASS")
         self.assertIn("岡治・今井・たき",packet["safe_reply"])
         self.assertIn("素振り／応援ON／消費予定：スポーツ6、応援20",
@@ -203,13 +231,15 @@ class GuardedReplyRegression(unittest.TestCase):
         self.assertIn("CATALOG_TRAINING_COST_MISMATCH",
                       check_reply(packet["safe_reply"],bridge=altered,state=state,
                           expected_main_sha=SHA,expected_event_seq=10,
-                          contract=contract,root=ROOT)["error_codes"])
+                          contract=contract,root=ROOT,context=context,
+                          evidence_sources=sources)["error_codes"])
         altered=copy.deepcopy(packet)
         altered["candidate"]["readiness_evidence_refs"]=[]
         self.assertIn("CURRENT_VERIFIED_CANDIDATE_REQUIRED",
                       check_reply(packet["safe_reply"],bridge=altered,state=state,
                           expected_main_sha=SHA,expected_event_seq=10,
-                          contract=contract,root=ROOT)["error_codes"])
+                          contract=contract,root=ROOT,context=context,
+                          evidence_sources=sources)["error_codes"])
 
     def test_local_fourth_session_label_requires_exact_source_certification(self):
         state=copy.deepcopy(self.state)
@@ -234,9 +264,13 @@ class GuardedReplyRegression(unittest.TestCase):
                               state=state,contract=contract,boot_verified=True,
                               expected_event_seq=10,context=context,root=ROOT)
         self.assertEqual(result["status"],"VALIDATED_DRAFT_REVIEW")
+        sources=self.private_evidence_for(state, context)
         packet=make_local_verified_draft_packet(result,state,
-            source_commit_sha=SHA,contract=contract,root=ROOT)
-        self.assertIn("今井の次回が記録上4回目の候補",packet["safe_reply"])
+            source_commit_sha=SHA,contract=contract,root=ROOT,
+            context=context,evidence_sources=sources)
+        self.assertIn("今井は現セーブで確定3回のため、次の特訓が4回目の候補",
+                      packet["safe_reply"])
+        self.assertNotIn("記録上4回目", packet["safe_reply"])
         self.assertIn("習得保証なし",packet["safe_reply"])
 
     def test_read_only_no_chat_runtime_enforcement_claim(self):
