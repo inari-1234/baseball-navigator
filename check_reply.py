@@ -171,7 +171,9 @@ def _count_reply(bridge: dict[str, Any], state: dict[str, Any],
 def _verified_draft_reply(bridge: dict[str, Any],
                           state: dict[str, Any], line: str,
                           *, contract: dict[str, Any] | None,
-                          root: str | Path) -> str:
+                          root: str | Path,
+                          context: dict[str, Any] | None,
+                          evidence_sources: dict[str, Any] | None) -> str:
     from live_state_engine import validate_recommendation, training_count_status
     from knowledge_engine import validate_skill_recommendation
     from navigator_step import _load_catalog
@@ -184,6 +186,13 @@ def _verified_draft_reply(bridge: dict[str, Any],
              "CURRENT_RUN_CONTEXT_REQUIRED")
     _require(isinstance(contract, dict),
              "DECISION_CONTRACT_REQUIRED")
+    receipts = _verified_evidence_receipts(
+        context, evidence_sources, state, root)
+    _require(bridge.get("evidence_receipts_sha256") ==
+             canonical_state_sha256(receipts)
+             and bridge.get("reviewed_context_sha256") ==
+             canonical_state_sha256(context),
+             "EVIDENCE_RECEIPT_MISMATCH")
     candidate = bridge.get("candidate")
     draft = bridge.get("verified_action_draft")
     _require(isinstance(candidate, dict) and isinstance(draft, dict)
@@ -248,7 +257,7 @@ def _verified_draft_reply(bridge: dict[str, Any],
         _require(info["count_certainty"] == "EXACT_CURRENT_SAVE"
                  and info["exact_committed_count"] == 3,
                  "EXACT_FOURTH_CHECKPOINT_NOT_VERIFIED")
-        checkpoint = f"{player}の次回が記録上4回目の候補（習得保証なし、根拠 {info['certification_event_id']}）"
+        checkpoint = f"{player}は現セーブで確定3回のため、次の特訓が4回目の候補（習得保証なし、根拠 {info['certification_event_id']}）"
     plan = candidate.get("accept_reload_plan")
     accept = {
         "TARGET_OR_HIGH_VALUE_SKILL_ACQUIRED": "目標または高価値のスキルを確認した場合",
@@ -285,7 +294,9 @@ def _verified_draft_reply(bridge: dict[str, Any],
 def render_guarded_reply(bridge: dict[str, Any],
                          state: dict[str, Any],
                          *, contract: dict[str, Any] | None = None,
-                         root: str | Path = ".") -> str:
+                         root: str | Path = ".",
+                         context: dict[str, Any] | None = None,
+                         evidence_sources: dict[str, Any] | None = None) -> str:
     """Certify only source-backed, explicitly supported answer cases."""
     _require(isinstance(bridge, dict) and isinstance(state, dict),
              "SOURCE_MISSING")
@@ -333,8 +344,9 @@ def render_guarded_reply(bridge: dict[str, Any],
     _require(state["timeline_status"] == "TRUSTED",
              "UNSUPPORTED_TIMELINE_FOR_TEMPLATE")
     if bridge.get("status") == "VALIDATED_DRAFT_REVIEW":
-        return _verified_draft_reply(bridge, state, line,
-                                     contract=contract, root=root)
+        return _verified_draft_reply(
+            bridge, state, line, contract=contract, root=root,
+            context=context, evidence_sources=evidence_sources)
     _no_action_fields(bridge)
     _require(bridge.get("context_source") == "NO_USER_CONTEXT_PUBLIC_REQUEST"
              and bridge.get("status") in {
@@ -352,7 +364,10 @@ def render_guarded_reply(bridge: dict[str, Any],
 def make_local_verified_draft_packet(
         navigator_result: dict[str, Any], state: dict[str, Any],
         *, source_commit_sha: str, contract: dict[str, Any],
-        root: str | Path = ".") -> dict[str, Any]:
+        root: str | Path = ".",
+        context: dict[str, Any] | None = None,
+        evidence_sources: dict[str, Any] | None = None,
+        decision_message: str = "スキル獲得に向けて何をすべき？") -> dict[str, Any]:
     """Local-only adapter; NEVER use this to bypass public P4 input allowlists.
 
     The input MUST be a sourced, already validated navigator_step result.
@@ -365,6 +380,20 @@ def make_local_verified_draft_packet(
              and state.get("timeline_status") == "TRUSTED"
              and navigator_result.get("source_event_seq") ==
              state.get("last_event_seq"), "LOCAL_DRAFT_NOT_VALIDATED")
+    from navigator_step import navigator_step
+    fresh = navigator_step(
+        decision_message, state=state, contract=contract,
+        boot_verified=True, expected_event_seq=state["last_event_seq"],
+        context=context, root=root)
+    _require(fresh.get("status") == "VALIDATED_DRAFT_REVIEW"
+             and fresh.get("selected_candidate") ==
+             navigator_result.get("selected_candidate")
+             and fresh.get("action_draft") == navigator_result.get("action_draft")
+             and fresh.get("failure_evidence_refs") ==
+             navigator_result.get("failure_evidence_refs"),
+             "NAVIGATOR_REVALIDATION_MISMATCH")
+    receipts = _verified_evidence_receipts(
+        context, evidence_sources, state, root)
     cid = navigator_result.get("selected_candidate")
     matches = [item for item in navigator_result.get("candidates", [])
                if isinstance(item, dict) and item.get("id") == cid]
@@ -386,6 +415,8 @@ def make_local_verified_draft_packet(
         "state_event_seq": state["last_event_seq"],
         "timeline_status": state["timeline_status"],
         "state_structured_sha256": canonical_state_sha256(state),
+        "reviewed_context_sha256": canonical_state_sha256(context),
+        "evidence_receipts_sha256": canonical_state_sha256(receipts),
         "action_authorized": False, "side_effects": False,
         "requires_manual_acceptance": True,
         "rule_ids": navigator_result.get("rule_ids"),
@@ -407,12 +438,15 @@ def make_local_verified_draft_packet(
             "readiness_evidence_refs": source.get("training_readiness_evidence_refs", []),
         },
     }
-    reply = render_guarded_reply(packet, state, contract=contract, root=root)
+    reply = render_guarded_reply(
+        packet, state, contract=contract, root=root,
+        context=context, evidence_sources=evidence_sources)
     verdict = check_reply(
         reply, bridge=packet, state=state,
         expected_main_sha=source_commit_sha,
         expected_event_seq=state["last_event_seq"],
-        contract=contract, root=root)
+        contract=contract, root=root,
+        context=context, evidence_sources=evidence_sources)
     _require(verdict["status"] == "PASS", "LOCAL_DRAFT_REPLY_NOT_CERTIFIED")
     packet["safe_reply"] = reply
     packet["safe_reply_check"] = verdict
