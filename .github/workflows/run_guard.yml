@@ -29,6 +29,8 @@ on:
       - "docs/REPLY_GUARD_P7F.md"
       - "docs/REPLY_GUARD_P7G.md"
       - "project_bootstrap.py"
+      - "save_baseline_preflight.py"
+      - "docs/SAVE_BASELINE_PREFLIGHT.md"
       - "PROJECT_ENTRYPOINT.json"
       - "docs/PROJECT_RESUME_P6.md"
       - "docs/CHAT_BRIDGE_P4.md"
@@ -185,6 +187,25 @@ jobs:
           assert result["chat_latency_measured"] is False
           print("P5_SYNTHETIC_LOCAL_BENCHMARK:"+json.dumps(
               result,ensure_ascii=False))
+          PY
+
+      - name: Verify immediate post-LOAD capture preflight
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 save_baseline_preflight.py --root . > "${RUNNER_TEMP}/SAVE_BASELINE_PREFLIGHT.json"
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          report=json.loads((Path(os.environ["RUNNER_TEMP"])/"SAVE_BASELINE_PREFLIGHT.json").read_text(encoding="utf-8"))
+          state=json.loads(Path("CURRENT_LIVE_STATE.json").read_text(encoding="utf-8"))
+          assert report["status"] == "POSTLOAD_CAPTURE_VERIFIED_HISTORY_UNKNOWN"
+          assert report["source_event_seq"] == state["last_event_seq"]
+          assert report["captured"]["clock"] == "PM 5:20"
+          assert not report["rebaseline_ready"] and not report["trusted_timeline"]
+          assert not report["action_authorized"] and not report["side_effects"]
+          assert report["next_evidence"]["type"] == "CURRENT_PLAYER_SCREEN"
+          print("SAVE_BASELINE_PREFLIGHT_PASS")
           PY
 
       - name: Test live state ingestion and replay
