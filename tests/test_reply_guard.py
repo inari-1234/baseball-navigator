@@ -241,6 +241,82 @@ class GuardedReplyRegression(unittest.TestCase):
                           contract=contract,root=ROOT,context=context,
                           evidence_sources=sources)["error_codes"])
 
+        ref=state["resources"]["last_observed"]
+        with self.assertRaisesRegex(ReplyGateError, "EVIDENCE_REF_UNRESOLVED_OR_STALE"):
+            make_local_verified_draft_packet(
+                decision,state,source_commit_sha=SHA,contract=contract,root=ROOT,
+                context=context,evidence_sources={})
+        stale=copy.deepcopy(sources)
+        stale[ref]["source_event_seq"]=9
+        verdict=check_reply(packet["safe_reply"],bridge=packet,state=state,
+            expected_main_sha=SHA,expected_event_seq=10,contract=contract,root=ROOT,
+            context=context,evidence_sources=stale)
+        self.assertIn("EVIDENCE_REF_UNRESOLVED_OR_STALE",verdict["error_codes"])
+
+        tampered=copy.deepcopy(sources)
+        tampered[ref]["sha256"]="0"*64
+        verdict=check_reply(packet["safe_reply"],bridge=packet,state=state,
+            expected_main_sha=SHA,expected_event_seq=10,contract=contract,root=ROOT,
+            context=context,evidence_sources=tampered)
+        self.assertIn("EVIDENCE_CONTENT_HASH_MISMATCH",verdict["error_codes"])
+
+        tampered=copy.deepcopy(context)
+        tampered["training_readiness"]["ready_players"]=["今井"]
+        verdict=check_reply(packet["safe_reply"],bridge=packet,state=state,
+            expected_main_sha=SHA,expected_event_seq=10,contract=contract,root=ROOT,
+            context=tampered,evidence_sources=sources)
+        self.assertIn("EVIDENCE_REF_UNRESOLVED_OR_STALE",verdict["error_codes"])
+
+        tampered=copy.deepcopy(packet)
+        tampered["evidence_receipts_sha256"]="0"*64
+        verdict=check_reply(packet["safe_reply"],bridge=tampered,state=state,
+            expected_main_sha=SHA,expected_event_seq=10,contract=contract,root=ROOT,
+            context=context,evidence_sources=sources)
+        self.assertIn("EVIDENCE_RECEIPT_MISMATCH",verdict["error_codes"])
+
+        Path(sources[ref]["path"]).unlink()
+        verdict=check_reply(packet["safe_reply"],bridge=packet,state=state,
+            expected_main_sha=SHA,expected_event_seq=10,contract=contract,root=ROOT,
+            context=context,evidence_sources=sources)
+        self.assertIn("LOCAL_EVIDENCE_FILE_NOT_ACCESSIBLE",verdict["error_codes"])
+
+    def test_ledger_source_id_must_exist_in_current_accepted_event(self):
+        state=copy.deepcopy(self.state)
+        state["timeline_status"]="TRUSTED"
+        state["last_event_seq"]=9
+        ref="LIVE-Y1-JUN-CURRENT-IMG8971-8972-20261106"
+        def claim(**fields):
+            return {"verified_for_current_state":True,
+                    "source_event_seq":9,"period":"Y1-06","branch":"ACCEPTED",
+                    "evidence_refs":[ref],**fields}
+        context={"failure_assessment":claim(mode="CONTACT"),
+                 "training_readiness":claim(
+                     available_drills=["素振り"],
+                     ready_players=["岡治","今井","たき"])}
+        events=[json.loads(line) for line in (ROOT/"LIVE_EVENTS.jsonl").read_text(
+            encoding="utf-8").splitlines() if line.strip()]
+        event=next(e for e in events if e["event_id"]==ref)
+        record={"kind":"LIVE_EVENT","event_id":ref,
+                "sha256":canonical_state_sha256(event),
+                "source_event_seq":9,"period":"Y1-06","branch":"ACCEPTED",
+                "reviewed_for_current_state":True,
+                "reviewed_claim_sha256":{
+                    name:canonical_state_sha256(value) for name,value in context.items()}}
+        receipts=_verified_evidence_receipts(context,{ref:record},state,ROOT)
+        self.assertIn("failure_assessment:"+ref,receipts)
+        wrong=copy.deepcopy(record)
+        wrong["event_id"]="NONEXISTENT-EVENT"
+        with self.assertRaisesRegex(ReplyGateError,"LEDGER_EVIDENCE_ID_MISMATCH"):
+            _verified_evidence_receipts(context,{ref:wrong},state,ROOT)
+        state["last_event_seq"]=10
+        record["source_event_seq"]=10
+        for name in context:
+            context[name]["source_event_seq"]=10
+        record["reviewed_claim_sha256"]={
+            name:canonical_state_sha256(value) for name,value in context.items()}
+        with self.assertRaisesRegex(ReplyGateError,"LIVE_EVENT_NOT_CURRENT_ACCEPTED_SOURCE"):
+            _verified_evidence_receipts(context,{ref:record},state,ROOT)
+
     def test_local_fourth_session_label_requires_exact_source_certification(self):
         state=copy.deepcopy(self.state)
         state["timeline_status"]="TRUSTED"
