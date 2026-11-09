@@ -195,6 +195,15 @@ def _verified_draft_reply(bridge: dict[str, Any],
              canonical_state_sha256(context),
              "EVIDENCE_RECEIPT_MISMATCH")
     candidate = bridge.get("candidate")
+    _require(isinstance(candidate, dict)
+             and isinstance(context, dict)
+             and isinstance(context.get("training_readiness"), dict)
+             and isinstance(context.get("failure_assessment"), dict)
+             and bridge.get("failure_evidence_refs") ==
+             context["failure_assessment"].get("evidence_refs")
+             and candidate.get("readiness_evidence_refs") ==
+             context["training_readiness"].get("evidence_refs"),
+             "EVIDENCE_REF_NOT_BOUND_TO_CONTEXT")
     draft = bridge.get("verified_action_draft")
     _require(isinstance(candidate, dict) and isinstance(draft, dict)
              and candidate.get("ready") is True
