@@ -1,0 +1,7 @@
+{
+  "schema_version": "1.0",
+  "request_id": "p7f-skill-20261109-01",
+  "intent": "SKILL",
+  "expected_main_sha": "3ce86b7c0b20b1135d6a9e5e8b575cf4dc53f902",
+  "expected_event_seq": 10
+}
