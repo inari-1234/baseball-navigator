@@ -26,6 +26,7 @@ on:
       - "check_reply.py"
       - "docs/REPLY_GUARD_P7D.md"
       - "docs/REPLY_GUARD_P7E.md"
+      - "docs/REPLY_GUARD_P7F.md"
       - "project_bootstrap.py"
       - "PROJECT_ENTRYPOINT.json"
       - "docs/PROJECT_RESUME_P6.md"

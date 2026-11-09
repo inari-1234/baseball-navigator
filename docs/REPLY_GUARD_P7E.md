@@ -29,6 +29,10 @@ The public bridge may return a `safe_reply` only when `safe_reply_check.status=P
 
 In ChatGPT replies, null/not-certified means: **no proposed game action, no three-person lineup, no Cheer setting and no spending plan.** Report only the verified status and the minimum missing evidence. Passing GitHub CI does not provide an automatic chat-output hook, and a paraphrase of a certified template is not itself certified.
 
+## P7-F evidence-bound local drafts
+
+The P7-F extension in `docs/REPLY_GUARD_P7F.md` requires every selected local training draft to carry per-evidence SHA-256 receipts and a digest of the reviewed failure/readiness context. Evidence IDs must be resolved against exact current accepted event IDs or locally readable source bytes and independently supplied hashes; a nonempty string or unreviewed source fails closed. This remains a human-reviewed evidence-integrity mechanism, not automated verification of player HP or image semantics. The public P4 bridge stays enum-only and cannot accept private evidence indexes.
+
 ## Regressions
 
 Synthetic future-TRUSTED states cover: exact count and lower-bound coexistence, missing counts, tampered observations, TRUSTED but insufficient context, source-attested current readiness, full manual draft cost/participants/Cheer/accept-reload output, cost forgery, missing readiness proof and exact fourth checkpoint provenance. A future public bridge-validated candidate without private current context must be suppressed rather than exposed.
