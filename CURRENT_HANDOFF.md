@@ -3,6 +3,13 @@
 Last updated: 2026-11-09
 State: ACTIVE_Y1_JUNE_POST_ROLLBACK_CAPTURE — SAVEPOINT_UNKNOWN
 
+## Roster screenshots — provisional evidence only (2026-11-11)
+- User submitted a ZIP containing 19 screenshots of `打順変更` six display tabs and two `選手情報` detail pages. The archive SHA-256 is `6ec60a855270aa1243c25ccb9ca6d0ed90a00d7073b3f7572fe9026f1686945e`. Source content hashes and extracted 12-player lineup/bench metadata are recorded in `ROSTER_SCREEN_CANDIDATE_20261111.json` with `PENDING_CURRENT_SAVE_CHRONOLOGY` status. Original screenshot bytes are NOT in public Git, and no persistent private-library backup has been verified.
+- Visible: batting order 1-9 and bench 3, all player names and game levels; visual green HP bars, two player detail screens for 入江ドコンジ and 石渡いなり with skill icons. No numerically verified HP, identified skill icon meaning or per-player exact training session counts can be inferred.
+- Crucial boundary: these overlay screens show no game-period/clock and user has not separately attested that they depict the SAME unadvanced post-LOAD SAVE as the Y1 June PM5:20 capture. The ZIP entry time is real-world metadata, not game time. Do NOT ingest as accepted LIVE_EVENTS or change CURRENT_LIVE_STATE, ledger 14/decision 14, SAVE lineage, training count, or skill award.
+- Next no-cost evidence: current world/home screen with visible game date/time from the same branch, or direct user assertion of uninterrupted same-save chronology. If confirmed, review linked player HP/skill evidence under the normal source gate; no action/lineup/Cheer/cost recommendation yet.
+- Acceptance pending candidate CI, checked main fast-forward, and final main CI/readback. All records are candidate observations only.
+
 ## New observational origin preflight — main verified (2026-11-09)
 - Source: directly user-confirmed Y1 June PM5:20 immediate post-LOAD screenshot IMG_8971, recorded as user-attested source in Ledger v14 / DECISION_LOG #14, with zero intervening game operations. It is NOT evidence of the restored prior SAVE checkpoint, lifetime player-training totals or retained skill/match events.
 - Read-only `save_baseline_preflight.py` validates replay==snapshot, SHA-256 source correspondence, direct user report, no post-LOAD mutation, and unknown rollback gate. A PASS returns `POSTLOAD_CAPTURE_VERIFIED_HISTORY_UNKNOWN`; `rebaseline_ready=false`, `action_authorized=false`, `side_effects=false`. No live game event, inventory, player skill or count changed.

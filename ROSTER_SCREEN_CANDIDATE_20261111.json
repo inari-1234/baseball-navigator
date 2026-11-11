@@ -1,0 +1,164 @@
+{
+  "schema_version": "1.0",
+  "type": "UNCOMMITTED_ROSTER_SCREEN_OBSERVATION",
+  "evidence_status": "PENDING_CURRENT_SAVE_CHRONOLOGY",
+  "action_authorized": false,
+  "accepted_live_event": false,
+  "current_save_continuity_verified": false,
+  "game_period_from_this_source": null,
+  "game_clock_from_this_source": null,
+  "reference_main_commit": "97ad8cfbb8f427cc425865258cfd3eb45528702f",
+  "reference_live_event_seq": 10,
+  "source_archive_sha256": "6ec60a855270aa1243c25ccb9ca6d0ed90a00d7073b3f7572fe9026f1686945e",
+  "archive_media_type": "application/zip",
+  "image_count": 19,
+  "image_size_px": [
+    2622,
+    1206
+  ],
+  "image_sha256_in_lexicographic_archive_order": [
+    "9dd7caa9582b21af40d824e6060d443f17141753809ca35cd074c4180b29dddf",
+    "1170f9f7a6759ec4717e8817adf16dfda19b422e43ddb0f4c376c364bc1613f4",
+    "8eeadc049b2f357ae5fb049ddc10bc751cbc5d745dd732a7f1e850a96139b785",
+    "2a4875aca63a8450970bc66857ffbc1e28f056cda1e69e807df2889e72726037",
+    "1b108db2c36d0e2262611663c9174a43a4a5cfd2d038f85165aea2cc31069a98",
+    "1198f914780825bafe48203b390233821faa4e9ffc8cdd0bd911fe5e38a3c989",
+    "db585c5e43b9cf34f464f918eb899b5658b40583ef986a14f0cc2b871efa06a6",
+    "25a0c0f2d6073683158ac213c3e1b786c3ddce79a210d7be53cf2f93a8977e14",
+    "e1e7c2a1f03abd3b4af883d0564c48f787ced1e0eb00fb0ad0f5b1a177313f2a",
+    "3fa6cf651f25d14cdc0f51463c34644dfec379945f283fe7668622ef0d68c88d",
+    "14e3c6c0be9a21b069c92a3c4dd67aac98a88374703197455dae692c86b0851f",
+    "2ab2e967cdb22cb9131d874cb08d26987d5eb8d09e06ceda489260077a7eef14",
+    "687425721617fa3f21439d837ffc25441245660c1b502e76a6a13084a0e2c03a",
+    "2badd37e8cb3ac6a2619c0929ad9c6a6b73cd12d41e2bca35cdb31e2c05af5da",
+    "4b8041da2a14ee406ef8f98f02e71abf585f00048bda326538dcc6495a6e7015",
+    "8909421b4eabfef39ebef13a43bfdf4cc38e38a28d990d297cfac1476b5e607b",
+    "e39b43750fa521994b72300adb8233aa88b98c0d4870ccd8ec312e89383f9c6b",
+    "24692c74e8c4cc96fd04da2aca15c0e27000875324828265c822f57d7ca91760",
+    "5a55603a219bead9a147cf7b27d341739f3e2703b4c240ec7113e57808adbc8b"
+  ],
+  "original_image_bytes_in_public_repository": false,
+  "private_image_backup_verified": false,
+  "source_note": "Chat upload received 2026-11-11, with zip-entry metadata indicating images captured within approx. 16:59-17:00 local; this metadata is not in-game clock or attested same-SAVE chronology.",
+  "screen_types": [
+    "打順変更 / 選手一覧 pages 1/6-6/6",
+    "選手情報 details for two players"
+  ],
+  "roster": [
+    {
+      "player": "芦田はじめ",
+      "school_year": 2,
+      "level": 4,
+      "lineup": 1,
+      "defensive_position": "右翼手",
+      "bench": false
+    },
+    {
+      "player": "たき翼",
+      "school_year": 2,
+      "level": 3,
+      "lineup": 2,
+      "defensive_position": "遊撃手",
+      "bench": false
+    },
+    {
+      "player": "入江ドコンジ",
+      "school_year": 2,
+      "level": 4,
+      "lineup": 3,
+      "defensive_position": "左翼手",
+      "bench": false
+    },
+    {
+      "player": "長島トオル",
+      "school_year": 2,
+      "level": 3,
+      "lineup": 4,
+      "defensive_position": "捕手",
+      "bench": false
+    },
+    {
+      "player": "岡治和彦",
+      "school_year": 1,
+      "level": 2,
+      "lineup": 5,
+      "defensive_position": "一塁手",
+      "bench": false
+    },
+    {
+      "player": "今井タッツ",
+      "school_year": 1,
+      "level": 4,
+      "lineup": 6,
+      "defensive_position": "二塁手",
+      "bench": false
+    },
+    {
+      "player": "高橋しょん",
+      "school_year": 1,
+      "level": 3,
+      "lineup": 7,
+      "defensive_position": "中堅手",
+      "bench": false
+    },
+    {
+      "player": "中山勇介",
+      "school_year": 1,
+      "level": 3,
+      "lineup": 8,
+      "defensive_position": "三塁手",
+      "bench": false
+    },
+    {
+      "player": "石渡いなり",
+      "school_year": 1,
+      "level": 3,
+      "lineup": 9,
+      "defensive_position": "投手",
+      "bench": false
+    },
+    {
+      "player": "石高悟",
+      "school_year": 1,
+      "level": 2,
+      "lineup": null,
+      "defensive_position": null,
+      "bench": true
+    },
+    {
+      "player": "近藤達也",
+      "school_year": 1,
+      "level": 1,
+      "lineup": null,
+      "defensive_position": null,
+      "bench": true
+    },
+    {
+      "player": "吉澤ミチル",
+      "school_year": 1,
+      "level": 1,
+      "lineup": null,
+      "defensive_position": null,
+      "bench": true
+    }
+  ],
+  "detail_previews": [
+    {
+      "player": "入江ドコンジ",
+      "player_page": "3/12",
+      "skill_icon_visible": true,
+      "skill_name_certified": false
+    },
+    {
+      "player": "石渡いなり",
+      "player_page": "9/12",
+      "skill_icon_visible": true,
+      "skill_name_certified": false
+    }
+  ],
+  "hp_gauge_observation": "Vertical green bars visible for roster players. Exact game HP percent, calibration and training eligibility have not been certified.",
+  "exact_training_counts_status": "UNKNOWN",
+  "current_acquired_skill_names_status": "UNVERIFIED_FROM_THIS_SOURCE",
+  "inventory_complete": false,
+  "next_evidence": "Confirm current home/world-screen game period and time on the same SAVE without advancing gameplay; then inspect target players' named skill details if needed."
+}
