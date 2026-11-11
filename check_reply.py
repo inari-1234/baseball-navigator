@@ -83,7 +83,8 @@ def _accepted_lineage_evidence(events, ref, claim, latest_seq, period):
     return source
 
 
-def _verified_evidence_receipts(context, evidence_sources, state, root):
+def _verified_evidence_receipts(context, evidence_sources, state, root, *,
+                                claims=("failure_assessment", "training_readiness")):
     """Private local evidence: resolve every ID to bytes or a current ledger event.
 
     Hashes certify the reviewed bytes and context version; not the semantic
@@ -91,11 +92,12 @@ def _verified_evidence_receipts(context, evidence_sources, state, root):
     """
     _require(isinstance(context, dict) and isinstance(evidence_sources, dict),
              "LOCAL_EVIDENCE_INDEX_REQUIRED")
-    _require(state.get("timeline_status") == "TRUSTED",
+    observation_only = claims == ("roster_chronology",)
+    _require(observation_only or state.get("timeline_status") == "TRUSTED",
              "EVIDENCE_BRANCH_UNTRUSTED")
     seq, period = state.get("last_event_seq"), state.get("period_floor")
     receipts, events = {}, None
-    for claim in ("failure_assessment", "training_readiness"):
+    for claim in claims:
         block = context.get(claim)
         _require(isinstance(block, dict)
                  and block.get("verified_for_current_state") is True
@@ -121,6 +123,8 @@ def _verified_evidence_receipts(context, evidence_sources, state, root):
                      and record["reviewed_claim_sha256"].get(claim) == claim_sha,
                      "EVIDENCE_REF_UNRESOLVED_OR_STALE")
             kind = record.get("kind")
+            _require(not observation_only or kind == "LOCAL_FILE",
+                     "DIRECT_ROSTER_ATTESTATION_SOURCE_REQUIRED")
             if kind == "LOCAL_FILE":
                 local = record.get("path")
                 _require(isinstance(local, str) and bool(local.strip()),
@@ -144,6 +148,15 @@ def _verified_evidence_receipts(context, evidence_sources, state, root):
                         raise ReplyGateError("LIVE_EVENT_LEDGER_UNAVAILABLE") from exc
                 source = _accepted_lineage_evidence(
                     events, ref, claim, seq, period)
+                if (claim == "failure_assessment" and source["kind"] == "MATCH_ATTEMPT"
+                        and "match_samples" in block):
+                    samples = [sample for sample in block["match_samples"]
+                               if sample.get("evidence_ref") == ref]
+                    _require(len(samples) == 1
+                             and source.get("attempt") == 1
+                             and samples[0].get("match_id") == source.get("match_id")
+                             and samples[0].get("runs") == source.get("our_runs"),
+                             "MATCH_SAMPLE_NOT_BOUND_TO_LIVE_EVENT")
                 actual = canonical_state_sha256(source)
             else:
                 raise ReplyGateError("EVIDENCE_SOURCE_TYPE_UNSUPPORTED")
@@ -223,136 +236,116 @@ def _count_reply(bridge: dict[str, Any], state: dict[str, Any],
     return "\n".join(lines)
 
 
-def _verified_draft_reply(bridge: dict[str, Any],
-                          state: dict[str, Any], line: str,
-                          *, contract: dict[str, Any] | None,
-                          root: str | Path,
+# These messages reproduce the navigator's three actionable goal routes without
+# storing the caller's private text in the reply packet.
+DECISION_MESSAGES = {
+    "SKILL": "スキル獲得に向けて何をすべき？",
+    "OFFENSE": "得点のために何をすべき？",
+    "GENERAL": "次は何をすべき？",
+}
+
+
+def _training_projection(result):
+    _require(result.get("status") == "VALIDATED_DRAFT_REVIEW"
+             and result.get("action_authorized") is False
+             and result.get("side_effects") is False
+             and result.get("requires_manual_acceptance") is True
+             and result.get("failure_assessment_current") is True,
+             "LOCAL_DRAFT_NOT_VALIDATED")
+    draft = result.get("action_draft")
+    _require(isinstance(draft, dict) and draft.get("action_type") == "TRAIN",
+             "UNSUPPORTED_ACTION_FOR_CERTIFIED_REPLY")
+    cid = result.get("selected_candidate")
+    matches = [c for c in result["candidates"] if c.get("id") == cid]
+    _require(len(matches) == 1 and matches[0].get("action_draft") == draft
+             and matches[0].get("ready") is True
+             and matches[0].get("blocking_reasons") == [],
+             "LOCAL_DRAFT_NOT_READY")
+    source = matches[0]
+    return {
+        "intent": "SKILL" if result["decision_goal"] == "SKILL" else "GENERAL",
+        "decision_goal": result["decision_goal"],
+        "status": result["status"],
+        "current_failure_assessed": result["failure_assessment_current"],
+        "failure_evidence_refs": result["failure_evidence_refs"],
+        "requires_manual_acceptance": result["requires_manual_acceptance"],
+        "rule_ids": result["rule_ids"],
+        "knowledge_refs": result["knowledge_refs"],
+        "primary_next_step": result["primary_next_step"],
+        "selected_candidate": cid,
+        "provisional_target": None,
+        "fallback": result["fallback"],
+        "verified_action_draft": draft,
+        "candidate": {
+            key: source[key] for key in (
+                "id", "ready", "blocking_reasons", "drill", "cheer", "participants",
+                "cost", "cost_fully_known", "cost_source", "accept_reload_plan",
+                "target_skill", "target_skill_at_this_drill_not_guaranteed",
+                "training_readiness_evidence_refs", "participant_selection_evidence_refs",
+            )
+        },
+    }
+
+
+def _verified_draft_reply(bridge: dict[str, Any], state: dict[str, Any], line: str,
+                          *, contract: dict[str, Any] | None, root: str | Path,
                           context: dict[str, Any] | None,
                           evidence_sources: dict[str, Any] | None) -> str:
-    from live_state_engine import validate_recommendation, training_count_status
-    from knowledge_engine import validate_skill_recommendation
-    from navigator_step import _load_catalog
-    _require(bridge.get("context_source") == "VERIFIED_CURRENT_RUN_CONTEXT"
-             and bridge.get("status") == "VALIDATED_DRAFT_REVIEW"
-             and bridge.get("requires_manual_acceptance") is True
-             and bridge.get("current_failure_assessed") is True
-             and isinstance(bridge.get("failure_evidence_refs"), list)
-             and bool(bridge["failure_evidence_refs"]),
-             "CURRENT_RUN_CONTEXT_REQUIRED")
-    _require(isinstance(contract, dict),
-             "DECISION_CONTRACT_REQUIRED")
-    receipts = _verified_evidence_receipts(
-        context, evidence_sources, state, root)
+    from live_state_engine import training_count_status
+    from navigator_step import navigator_step
+    _require(isinstance(contract, dict), "DECISION_CONTRACT_REQUIRED")
+    receipts = _verified_evidence_receipts(context, evidence_sources, state, root)
     _require(bridge.get("evidence_receipts") == receipts
-             and bridge.get("evidence_receipts_sha256") ==
-             canonical_state_sha256(receipts)
-             and bridge.get("reviewed_context_sha256") ==
-             canonical_state_sha256(context),
+             and bridge.get("evidence_receipts_sha256") == canonical_state_sha256(receipts)
+             and bridge.get("reviewed_context_sha256") == canonical_state_sha256(context),
              "EVIDENCE_RECEIPT_MISMATCH")
-    candidate = bridge.get("candidate")
-    _require(isinstance(candidate, dict)
-             and isinstance(context, dict)
-             and isinstance(context.get("training_readiness"), dict)
-             and isinstance(context.get("failure_assessment"), dict)
-             and bridge.get("failure_evidence_refs") ==
-             context["failure_assessment"].get("evidence_refs")
-             and candidate.get("readiness_evidence_refs") ==
-             context["training_readiness"].get("evidence_refs"),
-             "EVIDENCE_REF_NOT_BOUND_TO_CONTEXT")
-    draft = bridge.get("verified_action_draft")
-    _require(isinstance(candidate, dict) and isinstance(draft, dict)
-             and candidate.get("ready") is True
-             and candidate.get("blocked_by") == []
-             and isinstance(candidate.get("readiness_evidence_refs"), list)
-             and bool(candidate["readiness_evidence_refs"])
-             and candidate.get("id") == bridge.get("selected_candidate")
-             and candidate.get("id") == bridge.get("primary_next_step"),
-             "CURRENT_VERIFIED_CANDIDATE_REQUIRED")
-    participants = candidate.get("participants")
-    cost = candidate.get("cost")
-    cheer = candidate.get("cheer")
-    drill = candidate.get("drill")
-    _require(isinstance(participants, list)
-             and len(participants) == 3
-             and len(set(participants)) == 3
-             and all(isinstance(p, str) and p.strip() for p in participants)
-             and isinstance(drill, str) and bool(drill)
-             and cheer in {"ON", "OFF"}
-             and isinstance(cost, dict) and set(cost).issubset({"sports", "cheer"})
-             and type(cost.get("sports")) is int and cost["sports"] > 0
-             and (cheer == "OFF" and "cheer" not in cost
-                  or cheer == "ON" and type(cost.get("cheer")) is int
-                  and cost["cheer"] > 0),
-             "TRAINING_DRAFT_FIELDS_INVALID")
-    _require(candidate.get("cost_fully_known") is True,
-             "EXACT_TRAINING_COST_NOT_VERIFIED")
-    catalog = _load_catalog(root)
-    spec = next((d for d in catalog["drills"]
-                 if d["id"] + "_" + cheer == candidate.get("id")
-                 and d["drill"] == drill), None)
-    _require(spec is not None and cost["sports"] == spec["sports_cost"],
-             "CATALOG_TRAINING_COST_MISMATCH")
-    if cheer == "ON":
-        measured = spec.get("cheer_on_cost")
-        _require((type(measured) is int and cost["cheer"] == measured)
-                 or (measured is None
-                     and candidate.get("cost_source") ==
-                     "CURRENT_SOURCE_ATTESTED_PLUS_HISTORICAL_SPORTS"),
-                 "CHEER_COST_SOURCE_MISMATCH")
-    _require(draft.get("action_type") == "TRAIN"
-             and draft.get("participants") == participants
-             and draft.get("drill") == drill
-             and draft.get("cheer") == cheer
-             and draft.get("spend") == cost
-             and draft.get("rule_ids") == bridge.get("rule_ids")
-             and draft.get("based_on_event_seq") == state["last_event_seq"],
-             "DRAFT_FIELDS_NOT_BOUND_TO_VALIDATOR")
-    _require(validate_recommendation(draft, state, contract) == [],
-             "TRAINING_RECOMMENDATION_NOT_VALIDATED")
-    if draft.get("skill_goal") is not None:
-        _require(validate_skill_recommendation(
-            draft, state, contract, root=root) == [],
-            "SKILL_RECOMMENDATION_NOT_VALIDATED")
+    goal = bridge.get("decision_goal")
+    _require(isinstance(goal, str) and goal in DECISION_MESSAGES,
+             "LOCAL_DRAFT_GOAL_UNSUPPORTED")
+    fresh = navigator_step(
+        DECISION_MESSAGES[goal], state=state, contract=contract,
+        boot_verified=True, expected_event_seq=state["last_event_seq"],
+        context=context, root=root)
+    expected = _training_projection(fresh)
+    _require(all(bridge.get(key) == value for key, value in expected.items()),
+             "NAVIGATOR_REVALIDATION_MISMATCH")
+
+    candidate, draft = expected["candidate"], expected["verified_action_draft"]
+    drill, cheer, cost = candidate["drill"], candidate["cheer"], candidate["cost"]
     checkpoint = "4回目の根拠は未確認（習得保証なし）"
-    if draft.get("claimed_fourth_checkpoint") is True:
-        player = draft.get("checkpoint_player")
-        _require(isinstance(player, str) and player in participants,
-                 "FOURTH_CHECKPOINT_PLAYER_REQUIRED")
+    if draft["claimed_fourth_checkpoint"]:
+        player = draft["checkpoint_player"]
         info = training_count_status(state, player, drill)
-        _require(info["count_certainty"] == "EXACT_CURRENT_SAVE"
-                 and info["exact_committed_count"] == 3,
-                 "EXACT_FOURTH_CHECKPOINT_NOT_VERIFIED")
-        checkpoint = f"{player}は現セーブで確定3回のため、次の特訓が4回目の候補（習得保証なし、根拠 {info['certification_event_id']}）"
-    plan = candidate.get("accept_reload_plan")
+        checkpoint = (f"{player}は現セーブで確定3回のため、次の特訓が4回目の候補"
+                      f"（習得保証なし、根拠 {info['certification_event_id']}）")
+    target = candidate["target_skill"]
+    if target:
+        checkpoint = f"目標 {target}／" + checkpoint
+    plan = candidate["accept_reload_plan"]
     accept = {
         "TARGET_OR_HIGH_VALUE_SKILL_ACQUIRED": "目標または高価値のスキルを確認した場合",
         "ABILITY_GAIN_MEETS_DEVELOPMENT_GOAL": "能力上昇が育成目標に合った場合",
     }
     reload = {
         "OPTIONAL_TARGETED_FOURTH_REROLL_WHEN_SAVE_AND_BUDGET_VERIFIED":
-            "セーブと時間負担を確認した場合に限り任意で再試行を検討",
-        "DO_NOT_FARM_FIRST_THREE_BASED_ON_HISTORICAL_NEGATIVES":
-            "過去の陰性結果だけを根拠に1〜3回目の再試行を繰り返さない",
-        "NO_SKILL_REROLL_TARGET": "スキル目的のやり直しは設定しない",
+            "目標・高価値スキルを得られず、直前のセーブと時間負担を確認できた場合に限り、再試行を検討",
+        "NO_VERIFIED_SKILL_REROLL_TARGET": "スキル目的の再試行は保留",
     }
-    _require(isinstance(plan, dict)
-             and plan.get("not_a_guaranteed_reward") is True
-             and plan.get("accept_if") in accept
-             and plan.get("reload_if") in reload
-             and candidate.get("skills_not_guaranteed") is True,
-             "ACCEPT_RELOAD_PROVENANCE_REQUIRED")
+    fallback = {
+        "STOP_IF_RESOURCES_HP_OR_SAVE_BRANCH_CHANGE":
+            "実行前の状態変化、費用の不一致、候補選手の準備不足があれば実行せず再検証します。",
+    }[expected["fallback"]]
     expense = f"スポーツ{cost['sports']}" + (
         f"、応援{cost['cheer']}" if cheer == "ON" else "")
     return "\n".join([
-        "現在のセーブで条件を確認した特訓の下書きです。ゲーム操作は実行していません。",
-        "参加者：" + "・".join(participants),
+        f"次の1手の候補は{drill}の特訓です。手動承認前の下書きです。",
+        "参加者：" + "・".join(candidate["participants"]),
         f"特訓：{drill}／応援{cheer}／消費予定：{expense}",
         "回数・スキル：" + checkpoint,
         "採用基準：" + accept[plan["accept_if"]],
         "再試行基準：" + reload[plan["reload_if"]],
-        "手動承認前の候補です。実行直前に資源・参加可能状態・セーブの同一性を再確認してください。",
         line,
-        "Fallback: 実行前の状態変化、費用の不一致、候補選手の準備不足があれば実行せず再検証します。",
+        "Fallback: " + fallback,
     ])
 
 
@@ -387,6 +380,21 @@ def render_guarded_reply(bridge: dict[str, Any],
              "RULE_IDS_REQUIRED")
     line = "Rule: " + "、".join(rules)
     intent = bridge.get("intent")
+    if intent == "LOCAL_OBSERVATION_STOP":
+        from current_observation import current_observations, render_observation_stop
+        _no_action_fields(bridge)
+        _require(isinstance(contract, dict) and
+                 all(rule in {r["rule_id"] for r in contract["rules"]
+                              if r["status"] == "ACTIVE"} for rule in rules),
+                 "INVALID_RULE_ID")
+        observed = current_observations(state, root, context, evidence_sources)
+        _require(bridge.get("current_observation") == observed,
+                 "CURRENT_OBSERVATION_MISMATCH")
+        return render_observation_stop(observed, state, line)
+    if bridge.get("context_source") == "VERIFIED_CURRENT_RUN_CONTEXT":
+        return _verified_draft_reply(
+            bridge, state, line, contract=contract, root=root,
+            context=context, evidence_sources=evidence_sources)
     if intent == "TRAINING_COUNTS":
         return _count_reply(bridge, state, line)
     if intent != "SKILL":
@@ -408,10 +416,6 @@ def render_guarded_reply(bridge: dict[str, Any],
         )
     _require(state["timeline_status"] == "TRUSTED",
              "UNSUPPORTED_TIMELINE_FOR_TEMPLATE")
-    if bridge.get("status") == "VALIDATED_DRAFT_REVIEW":
-        return _verified_draft_reply(
-            bridge, state, line, contract=contract, root=root,
-            context=context, evidence_sources=evidence_sources)
     _no_action_fields(bridge)
     _require(bridge.get("context_source") == "NO_USER_CONTEXT_PUBLIC_REQUEST"
              and bridge.get("status") in {
@@ -438,43 +442,20 @@ def make_local_verified_draft_packet(
     The input MUST be a sourced, already validated navigator_step result.
     Context and raw observations stay local, not on the public request branch.
     """
-    _require(isinstance(navigator_result, dict)
-             and navigator_result.get("status") == "VALIDATED_DRAFT_REVIEW"
-             and navigator_result.get("action_authorized") is False
-             and navigator_result.get("side_effects") is False
-             and state.get("timeline_status") == "TRUSTED"
-             and navigator_result.get("source_event_seq") ==
-             state.get("last_event_seq"), "LOCAL_DRAFT_NOT_VALIDATED")
     from navigator_step import navigator_step
+
+    requested = _training_projection(navigator_result)
+    _require(navigator_result.get("source_event_seq") == state.get("last_event_seq"),
+             "LOCAL_DRAFT_NOT_VALIDATED")
     fresh = navigator_step(
         decision_message, state=state, contract=contract,
         boot_verified=True, expected_event_seq=state["last_event_seq"],
         context=context, root=root)
-    _require(fresh.get("status") == "VALIDATED_DRAFT_REVIEW"
-             and fresh.get("selected_candidate") ==
-             navigator_result.get("selected_candidate")
-             and fresh.get("action_draft") == navigator_result.get("action_draft")
-             and fresh.get("failure_evidence_refs") ==
-             navigator_result.get("failure_evidence_refs"),
-             "NAVIGATOR_REVALIDATION_MISMATCH")
-    receipts = _verified_evidence_receipts(
-        context, evidence_sources, state, root)
-    cid = navigator_result.get("selected_candidate")
-    matches = [item for item in navigator_result.get("candidates", [])
-               if isinstance(item, dict) and item.get("id") == cid]
-    _require(len(matches) == 1 and matches[0].get("ready") is True
-             and matches[0].get("blocking_reasons") == [],
-             "LOCAL_DRAFT_NOT_READY")
-    source = matches[0]
-    _require(source.get("action_draft") == navigator_result.get("action_draft"),
-             "LOCAL_DRAFT_MISMATCH")
-    draft = navigator_result["action_draft"]
+    _require(_training_projection(fresh) == requested, "NAVIGATOR_REVALIDATION_MISMATCH")
+    receipts = _verified_evidence_receipts(context, evidence_sources, state, root)
     packet = {
-        "intent": "SKILL",
-        "status": "VALIDATED_DRAFT_REVIEW",
+        **requested,
         "context_source": "VERIFIED_CURRENT_RUN_CONTEXT",
-        "current_failure_assessed": navigator_result.get("failure_assessment_current"),
-        "failure_evidence_refs": navigator_result.get("failure_evidence_refs"),
         "source_is_current_only_at_this_commit": True,
         "source_commit_sha": source_commit_sha,
         "state_event_seq": state["last_event_seq"],
@@ -483,26 +464,8 @@ def make_local_verified_draft_packet(
         "reviewed_context_sha256": canonical_state_sha256(context),
         "evidence_receipts": receipts,
         "evidence_receipts_sha256": canonical_state_sha256(receipts),
-        "action_authorized": False, "side_effects": False,
-        "requires_manual_acceptance": True,
-        "rule_ids": navigator_result.get("rule_ids"),
-        "knowledge_refs": navigator_result.get("knowledge_refs"),
-        "primary_next_step": cid,
-        "selected_candidate": cid,
-        "provisional_target": None,
-        "verified_action_draft": draft,
-        "candidate": {
-            "id": source["id"],
-            "ready": source["ready"],
-            "blocked_by": source["blocking_reasons"],
-            "drill": source["drill"], "cheer": source["cheer"],
-            "participants": source["participants"], "cost": source["cost"],
-            "accept_reload_plan": source["accept_reload_plan"],
-            "skills_not_guaranteed": source["target_skill_at_this_drill_not_guaranteed"],
-            "cost_fully_known": source["cost_fully_known"],
-            "cost_source": source["cost_source"],
-            "readiness_evidence_refs": source.get("training_readiness_evidence_refs", []),
-        },
+        "action_authorized": False,
+        "side_effects": False,
     }
     reply = render_guarded_reply(
         packet, state, contract=contract, root=root,
@@ -544,7 +507,7 @@ def check_reply(text: str, *, bridge: dict[str, Any],
             context=context, evidence_sources=evidence_sources)
         _require(isinstance(text, str), "REPLY_MUST_BE_TEXT")
         _require(text == expected, "REPLY_NOT_CANONICAL")
-    except (ReplyGateError, TypeError, AttributeError, KeyError) as exc:
+    except (ValueError, TypeError, AttributeError, KeyError) as exc:
         error = (str(exc) if isinstance(exc, ReplyGateError)
                  else "MALFORMED_REPLY_INPUT")
     return {

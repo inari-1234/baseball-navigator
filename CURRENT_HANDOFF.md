@@ -1,7 +1,12 @@
 # CURRENT_HANDOFF
 
-Last updated: 2026-11-09
+Last updated: 2026-11-12
 State: ACTIVE_Y1_JUNE_POST_ROLLBACK_CAPTURE — SAVEPOINT_UNKNOWN
+
+## P7-H strategy and reply verification
+- Local user-facing entry: `next_action.py` runs ordered BOOT, event replay, candidate comparison, strategy validation and exact-text reply verification. Display `safe_reply` only on PASS. Contact and conversion special-training drafts can be certified with current sources. Normal-practice focus/load settings, matches, items, school activities and other decisions lack a certified action rendering in this entry.
+- The current world observation at seq 10 already has Y1 June PM 5:20 and fresh counters. The 19 roster screens are indexed. Ask whether they were captured on that same SAVE without intervening gameplay. Reuse the existing images and counters, and retain the sourced confirmation for repeated requests at the same revision. The restored checkpoint and historical training/skills require independent evidence.
+- Tests exercise refusal of the unverified batting-focus/light-load instruction and forged retry criteria, and successful display of source-backed special training with unknown counts. Real iOS acceptance needs a reconciled active SAVE and current match, participant, menu and resource evidence. Only a source-certified exact count can establish a fourth-session candidate.
 
 ## Roster screenshots — provisional evidence only (2026-11-11)
 - User submitted a ZIP containing 19 screenshots of `打順変更` six display tabs and two `選手情報` detail pages. The archive SHA-256 is `6ec60a855270aa1243c25ccb9ca6d0ed90a00d7073b3f7572fe9026f1686945e`. Source content hashes and extracted 12-player lineup/bench metadata are recorded in `ROSTER_SCREEN_CANDIDATE_20261111.json` with `PENDING_CURRENT_SAVE_CHRONOLOGY` status. Original screenshot bytes are NOT in public Git, and no persistent private-library backup has been verified.

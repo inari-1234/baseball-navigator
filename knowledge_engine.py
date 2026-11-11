@@ -323,14 +323,15 @@ def skill_guidance(state: dict[str, Any], *, root: str | Path = ".",
 
 def validate_skill_recommendation(rec: dict[str, Any], state: dict[str, Any],
                                   contract: dict[str, Any],
-                                  *, root: str | Path = ".") -> list[str]:
+                                  *, root: str | Path = ".",
+                                  context: dict[str, Any] | None = None) -> list[str]:
     """Combine existing action gate with proof that skill advice used knowledge.
 
     Only an explicit current-save exact count attestation, preserved in the
     active replay lineage, can certify a fourth-session claim. Three recorded
     events alone are a lower bound, not proof of the exact total.
     """
-    errors = validate_recommendation(rec, state, contract)
+    errors = validate_recommendation(rec, state, contract, context=context, root=root)
     try:
         validate_knowledge(root)
     except KnowledgeError as exc:

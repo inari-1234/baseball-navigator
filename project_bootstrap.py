@@ -109,6 +109,15 @@ def git_sha(root):
 
 def bootstrap(message, *, root=".", expected_main_sha=None,
               checked_main_sha=None):
+    report, _, _, _, _ = bootstrap_sources(
+        message, root=root, expected_main_sha=expected_main_sha,
+        checked_main_sha=checked_main_sha)
+    return report
+
+
+def bootstrap_sources(message, *, root=".", expected_main_sha=None,
+                      checked_main_sha=None):
+    """Return the BOOT report and the exact inputs already checked by replay."""
     root = Path(root)
     agents = read(root, "AGENTS.md")  # always first authority access
     check_agents(agents)
@@ -211,7 +220,7 @@ def bootstrap(message, *, root=".", expected_main_sha=None,
         if info.get("status") == "SCHEDULED"
     ]
     trusted = state.get("timeline_status") == "TRUSTED"
-    return {
+    report = {
         "schema_version": "1.0",
         "project_id": registry["project_id"],
         "project_match": "UNAMBIGUOUS_PROJECT_ALIAS",
@@ -270,6 +279,7 @@ def bootstrap(message, *, root=".", expected_main_sha=None,
         "automatic_new_chat_invocation_guaranteed": False,
         "requires_connector_invocation": True,
     }
+    return report, state, contract, ledger, events
 
 
 def main():

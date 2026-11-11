@@ -13,6 +13,7 @@ from knowledge_engine import (
     validate_skill_recommendation, FOURTH, ACCEPTED,
 )
 from text_fast import TextFastEngine, classify_text
+from test_navigator_step import context_for
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -32,7 +33,8 @@ def load_canonical():
 
 def draft(*, count_player="入江", claimed_fourth=True):
     return {"action_type":"TRAIN","based_on_event_seq":10,
-            "rule_ids":["DC-TRAIN-001"],"participants":["入江","今井","芦田"],
+            "rule_ids":["DC-TRAIN-001","DC-TRAIN-002","DC-CHEER-001",
+                        "DC-ACTION-001","DC-OFF-001"],"participants":["入江","今井","芦田"],
             "cheer":"ON","spend":{"sports":6,"cheer":20},
             "skill_goal":"ACQUIRE","drill":"素振り",
             "knowledge_refs":[FOURTH],"claimed_fourth_checkpoint":claimed_fourth,
@@ -285,8 +287,11 @@ class NavigationGate(unittest.TestCase):
         self.assertEqual(out["certification_event_id"],"TEST-SOURCE-EXACT")
         self.assertTrue(out["is_fourth_checkpoint"])
         self.assertEqual(out["next_ordinal"],4)
+        rec = draft()
+        context = context_for(s)
+        context["training_readiness"]["preferred_participant_groups"]["素振り"]["players"] = rec["participants"]
         self.assertEqual(validate_skill_recommendation(
-            draft(),s,self.contract,root=ROOT),[])
+            rec,s,self.contract,root=ROOT,context=context),[])
 
     def test_two_or_four_committed_trainings_are_not_fourth(self):
         for count in (2, 4):

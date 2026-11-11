@@ -11,6 +11,7 @@ import unittest
 from pathlib import Path
 
 from navigator_step import navigator_step, _load_catalog
+from strategy_policy import PARTICIPANT_FACTORS
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -32,12 +33,39 @@ def attested(state, **kwargs):
     }
 
 
+def match_samples(ref, failure):
+    if failure not in {"CONTACT", "CONVERSION"}:
+        return []
+    return [
+        {"match_id": f"SYNTHETIC-MATCH-{i}", "hits": 2 if failure == "CONTACT" else 5,
+         "runs": 0, "evidence_ref": ref, "first_attempt": True,
+         "opponent_role": "BENCHMARK"}
+        for i in (1, 2)
+    ]
+
+
+def group_selection(players, refs, basis="CURRENT_OCTOBER_LINEUP_SCORING_NEED"):
+    return {"players": players, "basis": basis, "evidence_refs": refs,
+            "factors_reviewed": sorted(PARTICIPANT_FACTORS),
+            "opportunity_cost_favorable": True}
+
+
 def context_for(state, failure="CONTACT", *, ready=True):
-    ctx = {"failure_assessment": attested(state, mode=failure)}
+    ref = state["resources"]["last_observed"]
+    ctx = {"failure_assessment": attested(
+        state, mode=failure, match_samples=match_samples(ref, failure))}
     if ready:
+        groups = {
+            "素振り": group_selection(["岡治", "今井", "たき"], [ref]),
+            "ダンベル": group_selection(["芦田", "今井", "入江"], [ref]),
+        }
         ctx["training_readiness"] = attested(
-            state, available_drills=["素振り", "ダンベル"],
-            ready_players=["岡治", "今井", "たき", "芦田", "入江"])
+            state, available_drills=list(groups),
+            ready_players=["岡治", "今井", "たき", "芦田", "入江"],
+            preferred_participant_groups=groups,
+            cheer_purposes={drill: {"ON": "HIGH_VALUE_COMMITTED_DEVELOPMENT",
+                                    "OFF": "RESOURCE_PRESERVATION"}
+                            for drill in groups})
     return ctx
 
 
@@ -206,13 +234,11 @@ class NavigatorStepRegression(unittest.TestCase):
     def test_current_verified_group_overrides_historical_fixed_three(self):
         state = self.trusted()
         ctx = context_for(state)
-        ctx["training_readiness"]["preferred_participant_groups"] = {
-            "素振り": {
-                "players": ["入江", "今井", "たき"],
-                "basis": "CURRENT_OCTOBER_LINEUP_SCORING_NEED",
-                "evidence_refs": ["EV-ACTIVE-LINEUP-DECISION"],
-            }
-        }
+        ref = "EV-ACTIVE-LINEUP-DECISION"
+        readiness = ctx["training_readiness"]
+        readiness["evidence_refs"].append(ref)
+        readiness["preferred_participant_groups"]["素振り"] = group_selection(
+            ["入江", "今井", "たき"], [ref])
         out = self.navigate(state=state, context=ctx)
         self.assertEqual(out["status"], "VALIDATED_DRAFT_REVIEW")
         self.assertEqual(out["selected_candidate"], "TRAIN_CONTACT_ON")
@@ -311,7 +337,8 @@ class NavigatorStepRegression(unittest.TestCase):
         state = self.trusted()
         ctx = context_for(state, "RECOVERY_REQUIRED")
         ctx["recovery"] = attested(state, player="石渡", item="チョコレート",
-                                   needed=True, verified_recovery_effect=True)
+                                   needed=True, verified_recovery_effect=True,
+                                   unlocks_high_value_action=True)
         out = self.navigate(state=state, context=ctx)
         self.assertEqual(out["status"], "BLOCKED_CANDIDATE")
         self.assertEqual(out["provisional_target"], "RECOVERY")
@@ -336,7 +363,8 @@ class NavigatorStepRegression(unittest.TestCase):
         state.setdefault("hp_by_player", {})["石渡"] = {"fresh": True}
         ctx = context_for(state, "RECOVERY_REQUIRED")
         ctx["recovery"] = attested(state, player="石渡", item="チョコレート",
-                                   needed=True, verified_recovery_effect=True)
+                                   needed=True, verified_recovery_effect=True,
+                                   unlocks_high_value_action=True)
         out = self.navigate(state=state, context=ctx)
         self.assertEqual(out["status"], "VALIDATED_DRAFT_REVIEW")
         self.assertEqual(out["selected_candidate"], "RECOVERY")
@@ -348,7 +376,7 @@ class NavigatorStepRegression(unittest.TestCase):
         state = self.trusted()
         ctx = context_for(state, "ADEQUATE")
         match_id = "Y1-JUL-MANRUI"
-        ctx["match_readiness"] = attested(state, match_id=match_id, ready=True)
+        ctx["match_readiness"] = attested(state, match_id=match_id, ready=True, reliably_beatable=True)
         out = self.navigate(state=state, context=ctx)
         self.assertEqual(out["status"], "BLOCKED_CANDIDATE")
         self.assertIn("MATCH_NOT_IN_CURRENT_GAME_PERIOD", out["blocking_reasons"])
@@ -358,7 +386,7 @@ class NavigatorStepRegression(unittest.TestCase):
         state["period_floor"] = "Y1-07"
         ctx = context_for(state, "ADEQUATE")
         ctx["match_readiness"] = attested(
-            state, match_id="Y1-JUL-MANRUI", ready=True)
+            state, match_id="Y1-JUL-MANRUI", ready=True, reliably_beatable=True)
         out = self.navigate(state=state, context=ctx)
         self.assertEqual(out["status"], "VALIDATED_DRAFT_REVIEW")
         self.assertEqual(out["selected_candidate"], "MATCH:Y1-JUL-MANRUI")

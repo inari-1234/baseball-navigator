@@ -14,6 +14,8 @@ from navigator_step import navigator_step
 from live_state_engine import replay
 from text_fast import _read_only_projection
 
+from test_navigator_step import context_for
+
 ROOT=Path(__file__).resolve().parents[1]
 SHA="a"*40
 
@@ -193,19 +195,7 @@ class GuardedReplyRegression(unittest.TestCase):
         state=copy.deepcopy(self.state)
         state["timeline_status"]="TRUSTED"
         contract=json.loads((ROOT/"DECISION_CONTRACT.json").read_text(encoding="utf-8"))
-        source=state["resources"]["last_observed"]
-        def attested(**fields):
-            return {"verified_for_current_state":True,
-                    "source_event_seq":state["last_event_seq"],
-                    "period":state["period_floor"],
-                    "branch":"ACCEPTED",
-                    "evidence_refs":[source],**fields}
-        context={
-            "failure_assessment":attested(mode="CONTACT"),
-            "training_readiness":attested(
-                available_drills=["素振り","ダンベル"],
-                ready_players=["岡治","今井","たき","芦田","入江"]),
-        }
+        context=context_for(state)
         decision=navigator_step(
             "スキル獲得に向けて何をすべき？",state=state,
             contract=contract,boot_verified=True,
@@ -231,14 +221,14 @@ class GuardedReplyRegression(unittest.TestCase):
         altered=copy.deepcopy(packet)
         altered["candidate"]["cost"]["sports"]=1
         altered["verified_action_draft"]["spend"]["sports"]=1
-        self.assertIn("CATALOG_TRAINING_COST_MISMATCH",
+        self.assertIn("NAVIGATOR_REVALIDATION_MISMATCH",
                       check_reply(packet["safe_reply"],bridge=altered,state=state,
                           expected_main_sha=SHA,expected_event_seq=10,
                           contract=contract,root=ROOT,context=context,
                           evidence_sources=sources)["error_codes"])
         altered=copy.deepcopy(packet)
-        altered["candidate"]["readiness_evidence_refs"]=[]
-        self.assertIn("EVIDENCE_REF_NOT_BOUND_TO_CONTEXT",
+        altered["candidate"]["training_readiness_evidence_refs"]=[]
+        self.assertIn("NAVIGATOR_REVALIDATION_MISMATCH",
                       check_reply(packet["safe_reply"],bridge=altered,state=state,
                           expected_main_sha=SHA,expected_event_seq=10,
                           contract=contract,root=ROOT,context=context,
@@ -275,14 +265,14 @@ class GuardedReplyRegression(unittest.TestCase):
         verdict=check_reply(packet["safe_reply"],bridge=tampered,state=state,
             expected_main_sha=SHA,expected_event_seq=10,contract=contract,root=ROOT,
             context=context,evidence_sources=sources)
-        self.assertIn("EVIDENCE_REF_NOT_BOUND_TO_CONTEXT",verdict["error_codes"])
+        self.assertIn("NAVIGATOR_REVALIDATION_MISMATCH",verdict["error_codes"])
 
         tampered=copy.deepcopy(packet)
         tampered["failure_evidence_refs"]=["FAKE-NONEMPTY-ID"]
         verdict=check_reply(packet["safe_reply"],bridge=tampered,state=state,
             expected_main_sha=SHA,expected_event_seq=10,contract=contract,root=ROOT,
             context=context,evidence_sources=sources)
-        self.assertIn("EVIDENCE_REF_NOT_BOUND_TO_CONTEXT",verdict["error_codes"])
+        self.assertIn("NAVIGATOR_REVALIDATION_MISMATCH",verdict["error_codes"])
 
         tampered=copy.deepcopy(packet)
         tampered["evidence_receipts"]["training_readiness:"+ref][
@@ -509,16 +499,7 @@ class GuardedReplyRegression(unittest.TestCase):
             "event_id":"TEST-EXACT-IMAI","source_kind":"USER_REPORT",
             "scope":"EXACT_CURRENT_ACCEPTED_SAVE"}}
         contract=json.loads((ROOT/"DECISION_CONTRACT.json").read_text(encoding="utf-8"))
-        source=state["resources"]["last_observed"]
-        context={"failure_assessment":{
-                     "verified_for_current_state":True,"source_event_seq":10,
-                     "period":state["period_floor"],"branch":"ACCEPTED",
-                     "evidence_refs":[source],"mode":"CONTACT"},
-                 "training_readiness":{
-                     "verified_for_current_state":True,"source_event_seq":10,
-                     "period":state["period_floor"],"branch":"ACCEPTED",
-                     "evidence_refs":[source],"available_drills":["素振り"],
-                     "ready_players":["岡治","今井","たき"]}}
+        context=context_for(state)
         result=navigator_step("スキル獲得に向けて何をすべき？",
                               state=state,contract=contract,boot_verified=True,
                               expected_event_seq=10,context=context,root=ROOT)

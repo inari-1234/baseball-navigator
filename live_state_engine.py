@@ -476,40 +476,83 @@ def training_count_status(state,player,drill):
         "certification_event_id":proof["event_id"] if certified else None,
     }
 
-def validate_recommendation(rec,state,contract):
+def validate_recommendation(rec, state, contract, *, context=None, root=None):
+    from strategy_policy import context_current, training_strategy_errors
+
+    if not isinstance(rec, dict):
+        return ["RECOMMENDATION_OBJECT_REQUIRED"]
+    if root is None:
+        root = Path(__file__).resolve().parent
     errors=[]
-    if rec.get("based_on_event_seq")!=state["last_event_seq"]:
+    if (type(rec.get("based_on_event_seq")) is not int
+            or rec["based_on_event_seq"] != state["last_event_seq"]):
         errors.append("STALE_REVISION")
     active={r["rule_id"] for r in contract.get("rules",[]) if r.get("status")=="ACTIVE"}
     ids=rec.get("rule_ids")
-    if not isinstance(ids,list) or not ids or any(r not in active for r in ids):
+    if not isinstance(ids,list) or not ids or any(not isinstance(r,str) or r not in active for r in ids):
         errors.append("INVALID_RULE_ID")
     action_type=rec.get("action_type")
-    if action_type not in {"MATCH","TRAIN","ITEM","ACTIVITY","OTHER"}:
+    if action_type not in ("MATCH", "TRAIN", "ITEM", "ACTIVITY", "OTHER"):
         errors.append("ACTION_TYPE_REQUIRED")
+    if (action_type == "ACTIVITY" or (action_type == "OTHER" and
+            (not (rec.get("hp_claims") or rec.get("hp_min_by_player"))
+             or set(rec) - {"action_type", "based_on_event_seq", "rule_ids",
+                            "hp_claims", "hp_min_by_player"}))):
+        errors.append("ACTION_STRATEGY_UNSUPPORTED")
     if state.get("timeline_status")=="UNKNOWN_AFTER_ROLLBACK":
         errors.append("UNRESOLVED_ROLLBACK")
     if state.get("timeline_status")=="UNRESOLVED_CAPTURE_CHRONOLOGY":
         errors.append("UNRESOLVED_CAPTURE_CHRONOLOGY")
     if state.get("timeline_status")=="ROLLBACK_CONFIRMED_SAVEPOINT_UNKNOWN":
         errors.append("ROLLBACK_SAVEPOINT_UNKNOWN")
+    if state.get("timeline_status") not in {
+            "TRUSTED", "UNKNOWN_AFTER_ROLLBACK", "UNRESOLVED_CAPTURE_CHRONOLOGY",
+            "ROLLBACK_CONFIRMED_SAVEPOINT_UNKNOWN"}:
+        errors.append("TIMELINE_NOT_TRUSTED")
     if action_type=="MATCH":
-        if not rec.get("target_match_id"):errors.append("MATCH_ID_REQUIRED")
+        if not isinstance(ids, list) or not {"DC-MATCH-001", "DC-OFF-003"}.issubset(
+                r for r in ids if isinstance(r, str)):
+            errors.append("MATCH_STRATEGY_RULE_MISMATCH")
+        if rec.get("target_period") != state.get("period_floor"):
+            errors.append("MATCH_NOT_IN_CURRENT_GAME_PERIOD")
+        mid = rec.get("target_match_id")
+        if not isinstance(mid, str) or not mid.strip():
+            errors.append("MATCH_ID_REQUIRED")
+        assessment = context.get("failure_assessment") if isinstance(context, dict) else None
+        readiness = context.get("match_readiness") if isinstance(context, dict) else None
+        if not context_current(assessment, state) or assessment.get("mode") != "ADEQUATE":
+            errors.append("MATCH_SCORING_ADEQUACY_NOT_VERIFIED")
+        if (not context_current(readiness, state) or readiness.get("match_id") != mid
+                or readiness.get("ready") is not True):
+            errors.append("MATCH_DAY_OR_ROSTER_READINESS_NOT_VERIFIED")
+        if not context_current(readiness, state) or readiness.get("reliably_beatable") is not True:
+            errors.append("MATCH_VALUE_OR_BEATABILITY_NOT_VERIFIED")
         if not rec.get("target_period"):errors.append("MATCH_PERIOD_REQUIRED")
         if rec.get("target_period") in state["completed_match_periods"]:
             errors.append("COMPLETED_PERIOD_MATCH")
     if action_type=="TRAIN":
         players=rec.get("participants")
-        if rec.get("cheer") not in {"ON","OFF"} or not isinstance(players,list) or len(players)!=3 or not all(isinstance(x,str) and x for x in players) or len(set(players))!=3:
+        if rec.get("cheer") not in ("ON","OFF") or not isinstance(players,list) or len(players)!=3 or not all(isinstance(x,str) and x for x in players) or len(set(players))!=3:
             errors.append("TRAINING_DETAILS_REQUIRED")
         if not isinstance(rec.get("spend"),dict) or "sports" not in rec["spend"]:
             errors.append("TRAINING_COST_REQUIRED")
         if rec.get("cheer")=="ON" and (not isinstance(rec.get("spend"),dict) or "cheer" not in rec["spend"]):
             errors.append("CHEER_COST_REQUIRED")
         if not state["resources"]["fresh"]:errors.append("STALE_RESOURCES")
+        errors.extend(training_strategy_errors(rec, state, context, root))
+        if rec.get("claimed_fourth_checkpoint") is True:
+            player, drill = rec.get("checkpoint_player"), rec.get("drill")
+            if (rec.get("skill_goal") is None or not isinstance(player, str)
+                    or not isinstance(drill, str) or not isinstance(players, list)
+                    or player not in players):
+                errors.append("FOURTH_CHECKPOINT_PLAYER_DRILL_REQUIRED")
+            elif training_count_status(state, player, drill)["exact_committed_count"] != 3:
+                errors.append("FOURTH_CHECKPOINT_EXACT_COUNT_REQUIRED")
     if action_type in {"ITEM","ACTIVITY"} and not isinstance(rec.get("spend"),dict):
         errors.append("COST_DECLARATION_REQUIRED")
     if action_type=="ITEM":
+        if not isinstance(ids, list) or "DC-ITEM-001" not in ids:
+            errors.append("ITEM_STRATEGY_RULE_MISMATCH")
         items=rec.get("items")
         if not isinstance(items,list) or not items:
             errors.append("ITEM_SELECTION_REQUIRED")
@@ -566,7 +609,7 @@ def validate_recommendation(rec,state,contract):
         elif obs["hp_numeric_percent"]<minimum:
             errors.append(f"HP_BELOW_THRESHOLD:{player}")
     mid=rec.get("target_match_id")
-    if mid:
+    if isinstance(mid, str) and mid:
         m=state["matches"].get(mid)
         if m is None:errors.append("UNKNOWN_MATCH")
         elif m["status"]!="SCHEDULED" or m["period"] in state["completed_match_periods"]:

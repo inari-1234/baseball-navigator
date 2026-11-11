@@ -20,13 +20,17 @@ from knowledge_engine import (
     validate_skill_recommendation,
 )
 from live_state_engine import validate_recommendation, training_count_status
+from strategy_policy import (
+    OFFENSE_RULE, TRAINING_RULES, context_current as _context_current,
+    load_tactics as _load_catalog, offense_pattern, training_cost,
+)
 from text_fast import TextFastEngine
 
 FAILURE_MODES = {"CONTACT", "CONVERSION", "ADEQUATE", "RECOVERY_REQUIRED", "UNKNOWN"}
 RULE_BASE = ("DC-PROC-001", "DC-PROC-002", "DC-ACTION-001")
-RULE_TRAIN = ("DC-TRAIN-001", "DC-TRAIN-002")
+RULE_TRAIN = tuple(rule for rule in TRAINING_RULES if rule not in RULE_BASE)
 RULE_MATCH = ("DC-MATCH-001",)
-RULE_HP = ("DC-HP-001",)
+RULE_HP = ("DC-HP-001", "DC-ITEM-001")
 FALLBACK_SAVE = "RECONCILE_ACTIVE_SAVE_ANCHOR_WITH_CURRENT_LIVE_EVIDENCE"
 FALLBACK_REVIEW = "INGEST_FRESH_CURRENT_BRANCH_EVIDENCE"
 FALLBACK_TRAIN = "STOP_IF_RESOURCES_HP_OR_SAVE_BRANCH_CHANGE"
@@ -42,65 +46,13 @@ def _active_rules(contract: dict[str, Any]) -> set[str]:
             and r.get("status") == "ACTIVE" and isinstance(r.get("rule_id"), str)}
 
 
-def _context_current(obj: Any, state: dict[str, Any]) -> bool:
-    """A caller-attested, current-source observation, NOT evidence authentication."""
-    return (isinstance(obj, dict)
-            and obj.get("verified_for_current_state") is True
-            and type(obj.get("source_event_seq")) is int
-            and obj["source_event_seq"] == state["last_event_seq"]
-            and obj.get("period") == state.get("period_floor")
-            and obj.get("branch") == "ACCEPTED"
-            and isinstance(obj.get("evidence_refs"), list)
-            and bool(obj["evidence_refs"])
-            and all(isinstance(x, str) and x.strip() for x in obj["evidence_refs"]))
-
-
-def _load_catalog(root: Path) -> dict[str, Any]:
-    try:
-        result = json.loads((root / "NAV_TACTICS.json").read_text(encoding="utf-8"))
-    except (OSError, ValueError) as exc:
-        raise ValueError("NAV_TACTICS_UNAVAILABLE") from exc
-    if (not isinstance(result, dict) or result.get("schema_version") != "1.0"
-            or not isinstance(result.get("drills"), list)
-            or len(result["drills"]) < 2):
-        raise ValueError("NAV_TACTICS_INVALID")
-    ids = [x.get("id") for x in result["drills"] if isinstance(x, dict)]
-    if len(set(ids)) != len(ids) or not {"TRAIN_CONTACT", "TRAIN_POWER"}.issubset(set(ids)):
-        raise ValueError("NAV_TACTICS_REQUIRED_DRILLS_MISSING")
-    for entry in result["drills"]:
-        if (not isinstance(entry, dict) or
-                type(entry.get("sports_cost")) is not int or
-                entry["sports_cost"] < 1 or
-                not isinstance(entry.get("drill"), str) or not entry["drill"] or
-                not isinstance(entry.get("historical_group"), list) or
-                len(entry["historical_group"]) != 3 or
-                len(set(entry["historical_group"])) != 3):
-            raise ValueError("NAV_TACTICS_INVALID_DRILL")
-        amount = entry.get("cheer_on_cost")
-        if amount is not None and (type(amount) is not int or amount < 0):
-            raise ValueError("NAV_TACTICS_INVALID_CHEER_COST")
-    try:
-        manifest = json.loads((root / "KNOWLEDGE_MANIFEST.json").read_text(encoding="utf-8"))
-        expected = manifest["required_navigation_tactics"]
-    except (OSError, ValueError, KeyError, TypeError) as exc:
-        raise ValueError("NAV_TACTICS_MANIFEST_MISSING") from exc
-    if not isinstance(expected, dict) or not expected:
-        raise ValueError("NAV_TACTICS_MANIFEST_INVALID")
-    catalog_by_id = {entry["id"]: entry for entry in result["drills"]}
-    for drill_id, required_fields in expected.items():
-        entry = catalog_by_id.get(drill_id)
-        if (not isinstance(entry, dict) or not isinstance(required_fields, dict)
-                or any(entry.get(field) != value for field, value in required_fields.items())):
-            raise ValueError("NAV_TACTICS_SOURCE_INTEGRITY_MISMATCH:" + drill_id)
-    return result
-
-
 def _mode_and_provenance(context: dict[str, Any], state: dict[str, Any]):
     block = context.get("failure_assessment")
     if not _context_current(block, state):
         return "UNKNOWN", [], False
     mode = block.get("mode")
-    if mode not in FAILURE_MODES:
+    if (not isinstance(mode, str) or mode not in FAILURE_MODES
+            or (mode in OFFENSE_RULE and offense_pattern(block, state) is None)):
         return "UNKNOWN", [], False
     return mode, list(block["evidence_refs"]), True
 
@@ -122,49 +74,18 @@ def _train_candidate(drill: dict, cheer: str, state: dict[str, Any],
     players = list(drill["historical_group"])
     readiness = context.get("training_readiness")
     ready_source = _context_current(readiness, state)
-    group_selected_from_live = False
-    invalid_group_override = False
-    if ready_source:
-        groups = readiness.get("preferred_participant_groups", {})
-        override = groups.get(drill["drill"]) if isinstance(groups, dict) else None
-        if override is not None:
-            if (isinstance(override, dict)
-                    and isinstance(override.get("players"), list)
-                    and len(override["players"]) == 3
-                    and all(isinstance(p, str) and p.strip()
-                            for p in override["players"])
-                    and len(set(override["players"])) == 3
-                    and isinstance(override.get("basis"), str)
-                    and bool(override["basis"].strip())
-                    and isinstance(override.get("evidence_refs"), list)
-                    and bool(override["evidence_refs"])
-                    and all(isinstance(e, str) and e.strip()
-                            for e in override["evidence_refs"])):
-                players = list(override["players"])
-                group_selected_from_live = True
-            else:
-                invalid_group_override = True
-    available = (isinstance(readiness.get("available_drills"), list)
-                 and drill["drill"] in readiness["available_drills"]) if ready_source else False
-    eligible = (isinstance(readiness.get("ready_players"), list)
-                and all(p in readiness["ready_players"] for p in players)
-                ) if ready_source else False
-    cost = {"sports": drill["sports_cost"]}
-    cost_source = drill["cost_basis"]
-    cost_known = cost_source == "HISTORICAL_EXPLICIT_MEASUREMENT"
-    cheer_amount = drill.get("cheer_on_cost")
-    if cheer == "ON":
-        if cheer_amount is None and ready_source:
-            measured = readiness.get("cheer_on_costs", {}).get(drill["drill"])
-            if type(measured) is int and measured >= 0:
-                cheer_amount = measured
-                cost_source = "CURRENT_SOURCE_ATTESTED_PLUS_HISTORICAL_SPORTS"
-        if cheer_amount is not None:
-            cost["cheer"] = cheer_amount
-        else:
-            cost_known = False
-    rules = list(RULE_BASE + RULE_TRAIN)
-    rules.append("DC-OFF-001" if drill["purpose"] == "CONTACT" else "DC-OFF-002")
+    groups = readiness.get("preferred_participant_groups") if ready_source else None
+    override = groups.get(drill["drill"]) if isinstance(groups, dict) else None
+    group_selected_from_live = (
+        isinstance(override, dict)
+        and isinstance(override.get("players"), list)
+        and all(isinstance(player, str) for player in override["players"])
+    )
+    if group_selected_from_live:
+        players = list(override["players"])
+    cost, cost_source, cost_known = training_cost(
+        drill, cheer, readiness if ready_source else {})
+    rules = list(RULE_BASE + RULE_TRAIN) + [OFFENSE_RULE[drill["purpose"]]]
     skill_aim = cheer == "ON"
     info = {player: _skills_for(player, drill["drill"], state) for player in players}
     fourth_player = next((p for p in players if info[p]["fourth_checkpoint"]), None)
@@ -181,27 +102,17 @@ def _train_candidate(drill: dict, cheer: str, state: dict[str, Any],
         "claimed_fourth_checkpoint": bool(skill_aim and fourth_player),
         "checkpoint_player": fourth_player if skill_aim else None,
     }
-    required = []
-    if invalid_group_override:
-        required.append("LIVE_PARTICIPANT_GROUP_OVERRIDE_NOT_VERIFIED")
-    if not ready_source:
-        required.append("CURRENT_TRAINING_READINESS_SOURCE_MISSING_OR_STALE")
-    elif not available:
-        required.append("DRILL_AVAILABILITY_UNVERIFIED")
-    if ready_source and not eligible:
-        required.append("CURRENT_PLAYER_HP_OR_ELIGIBILITY_UNVERIFIED")
-    if not cost_known:
-        required.append("EXACT_CHEER_ON_COST_UNVERIFIED")
-    if state.get("timeline_status") != "TRUSTED":
-        required.append("CURRENT_SAVE_ANCHOR_UNVERIFIED")
     if skill_aim:
-        errors = validate_skill_recommendation(recommendation, state, contract,
-                                               root=context["_knowledge_root"])
+        errors = validate_skill_recommendation(
+            recommendation, state, contract, root=context["_knowledge_root"],
+            context=context)
     else:
-        errors = validate_recommendation(recommendation, state, contract)
-    # Cheer OFF can still be a valid ability/level progression action. Its
-    # skill acquisition probability remains UNKNOWN, never a proven benefit.
-    blocked = sorted(set(required + errors))
+        errors = validate_recommendation(
+            recommendation, state, contract, root=context["_knowledge_root"],
+            context=context)
+    blocked = sorted(set(errors))
+    targeted_reroll = (skill_aim and fourth_player
+                       and drill["supports_skill_popup_with_cheer_on"] is True)
     return {
         "id": drill["id"] + "_" + cheer,
         "action_type": "TRAIN",
@@ -211,10 +122,10 @@ def _train_candidate(drill: dict, cheer: str, state: dict[str, Any],
         "participants": players,
         "participants_are_historical_candidates": not group_selected_from_live,
         "participant_selection_basis": (
-            override["basis"] if group_selected_from_live
+            override.get("basis") if group_selected_from_live
             else drill["group_basis"]),
         "participant_selection_evidence_refs": (
-            list(override["evidence_refs"]) if group_selected_from_live else []),
+            override.get("evidence_refs", []) if group_selected_from_live else []),
         "training_readiness_evidence_refs": (
             list(readiness["evidence_refs"]) if ready_source else []),
         "historical_fit": drill["group_basis"],
@@ -222,17 +133,19 @@ def _train_candidate(drill: dict, cheer: str, state: dict[str, Any],
         "cost_source": cost_source,
         "cost_fully_known": cost_known,
         "target_skill_chain_candidates": list(drill["skill_chain_candidates"]),
+        "target_skill": (drill["skill_chain_candidates"][0]
+                         if skill_aim and drill["supports_skill_popup_with_cheer_on"] is True
+                         else None),
         "target_skill_at_this_drill_not_guaranteed": True,
         "skill_popup_evidence": (drill["supports_skill_popup_with_cheer_on"]
                                  if cheer == "ON" else "UNKNOWN"),
         "accept_reload_plan": {
             "accept_if": ("TARGET_OR_HIGH_VALUE_SKILL_ACQUIRED"
-                          if skill_aim else "ABILITY_GAIN_MEETS_DEVELOPMENT_GOAL"),
+                          if skill_aim and drill["supports_skill_popup_with_cheer_on"] is True
+                          else "ABILITY_GAIN_MEETS_DEVELOPMENT_GOAL"),
             "reload_if": (
                 "OPTIONAL_TARGETED_FOURTH_REROLL_WHEN_SAVE_AND_BUDGET_VERIFIED"
-                if skill_aim and fourth_player
-                else "DO_NOT_FARM_FIRST_THREE_BASED_ON_HISTORICAL_NEGATIVES"
-                if skill_aim else "NO_SKILL_REROLL_TARGET"),
+                if targeted_reroll else "NO_VERIFIED_SKILL_REROLL_TARGET"),
             "not_a_guaranteed_reward": True,
         },
         "training_observed_counts": info,
@@ -248,9 +161,6 @@ def _train_candidate(drill: dict, cheer: str, state: dict[str, Any],
 
 def _match_candidates(state: dict[str, Any], context: dict[str, Any],
                       contract: dict[str, Any]) -> list[dict]:
-    group = context.get("match_readiness")
-    verified = _context_current(group, state)
-    target = group.get("match_id") if verified else None
     candidates = []
     for mid, match in sorted(state.get("matches", {}).items()):
         if match.get("status") != "SCHEDULED":
@@ -258,15 +168,11 @@ def _match_candidates(state: dict[str, Any], context: dict[str, Any],
         reasons = []
         if state.get("timeline_status") != "TRUSTED":
             reasons.append("CURRENT_SAVE_ANCHOR_UNVERIFIED")
-        if match.get("period") != state.get("period_floor"):
-            reasons.append("MATCH_NOT_IN_CURRENT_GAME_PERIOD")
-        if not verified or target != mid or group.get("ready") is not True:
-            reasons.append("MATCH_DAY_OR_ROSTER_READINESS_NOT_VERIFIED")
-        rules = list(RULE_BASE + RULE_MATCH)
+        rules = list(RULE_BASE + RULE_MATCH) + ["DC-OFF-003"]
         rec = {"action_type": "MATCH", "based_on_event_seq": state["last_event_seq"],
                "rule_ids": rules, "target_match_id": mid,
                "target_period": match.get("period"), "spend": {}}
-        reasons += validate_recommendation(rec, state, contract)
+        reasons += validate_recommendation(rec, state, contract, context=context)
         reasons = sorted(set(reasons))
         candidates.append({
             "id": "MATCH:" + mid, "action_type": "MATCH",
@@ -293,6 +199,8 @@ def _recovery_candidate(state: dict[str, Any], context: dict[str, Any],
         reasons.append("RECOVERY_TARGET_AND_ITEM_NOT_SOURCE_VERIFIED")
     if verified and recover.get("needed") is not True:
         reasons.append("RECOVERY_NEED_NOT_VERIFIED")
+    if verified and recover.get("unlocks_high_value_action") is not True:
+        reasons.append("RECOVERY_UNLOCK_NOT_VERIFIED")
     if verified and recover.get("verified_recovery_effect") is not True:
         reasons.append("ITEM_RECOVERY_EFFECT_NOT_SOURCE_VERIFIED")
     obs = state.get("hp_by_player", {}).get(player, {}) if isinstance(player, str) else {}
@@ -331,7 +239,6 @@ def navigator_step(message: str, *, state: dict, contract: dict,
     allowed to fabricate a player's HP, a match time or an acquired skill.
     """
     root = Path(root)
-    original_context = context
     context = deepcopy(context) if isinstance(context, dict) else {}
     engine = TextFastEngine(root)
     routed = engine.plan(message, state=state, contract=contract,
@@ -404,7 +311,7 @@ def navigator_step(message: str, *, state: dict, contract: dict,
         controlling += list(RULE_TRAIN)
         controlling.append("DC-OFF-001" if mode == "CONTACT" else "DC-OFF-002")
     elif mode == "ADEQUATE":
-        controlling += list(RULE_MATCH)
+        controlling += ["DC-OFF-003", *RULE_MATCH]
     elif mode == "RECOVERY_REQUIRED":
         controlling += list(RULE_HP)
     else:
@@ -418,6 +325,7 @@ def navigator_step(message: str, *, state: dict, contract: dict,
         "knowledge_refs": [FOURTH, ACCEPTED],
         "candidate_count": len(ranked), "candidates": ranked,
         "rule_ids": sorted(active.intersection(set(controlling))),
+        "decision_goal": goal,
         "ranking_is_expected_value_estimate": False,
         "ranking_basis": "EVIDENCE_SCOPED_FAILURE_MODE_PRIORITY_NO_INVENTED_UTILITY",
     }
@@ -515,6 +423,11 @@ def main() -> None:
                                  boot_verified=args.boot_verified,
                                  expected_event_seq=args.expected_event_seq,
                                  context=context, root=args.root)
+            if out["candidates"]:
+                out.update(candidates=[], selected_candidate=None, action_draft=None,
+                           provisional_target=None, requires_manual_acceptance=False)
+                if out["status"] == "VALIDATED_DRAFT_REVIEW":
+                    out["primary_next_step"] = "RUN_NEXT_ACTION_FOR_CERTIFIED_REPLY"
     except (OSError, ValueError) as exc:
         p.exit(1, "NAVIGATOR_INPUT_ERROR: " + str(exc) + "\n")
     print(json.dumps(out, ensure_ascii=False, indent=2))

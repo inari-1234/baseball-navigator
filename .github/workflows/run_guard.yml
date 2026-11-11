@@ -24,6 +24,11 @@ on:
       - "docs/FAST_PLAY_PROTOCOL.md"
       - "chat_bridge.py"
       - "check_reply.py"
+      - "next_action.py"
+      - "strategy_policy.py"
+      - "current_observation.py"
+      - "ROSTER_SCREEN_CANDIDATE_20261111.json"
+      - "docs/NEXT_ACTION_P7H.md"
       - "docs/REPLY_GUARD_P7D.md"
       - "docs/REPLY_GUARD_P7E.md"
       - "docs/REPLY_GUARD_P7F.md"
@@ -217,3 +222,23 @@ jobs:
             --events LIVE_EVENTS.jsonl \
             --snapshot CURRENT_LIVE_STATE.json \
             --contract DECISION_CONTRACT.json
+
+      - name: Verify the P7-H single entry at the checked-out revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, os, subprocess, sys
+          from pathlib import Path
+          state = json.loads(Path("CURRENT_LIVE_STATE.json").read_text(encoding="utf-8"))
+          command = [sys.executable, "next_action.py", "次は何をすべき？",
+                     "--expected-main-sha", os.environ["GITHUB_SHA"],
+                     "--expected-event-seq", str(state["last_event_seq"])]
+          report = json.loads(subprocess.check_output(command))
+          assert report["live_replay_verified"] and report["candidates_compared"] > 0
+          assert report["status"] == "CERTIFIED_NO_ACTION"
+          assert report["safe_reply_check"]["status"] == "PASS"
+          assert report["current_observation"]["next_evidence"] == "CONFIRM_UPLOADED_ROSTER_CONTINUITY"
+          assert not report["action_authorized"] and not report["side_effects"]
+          print("P7H_EXACT_REVISION_ENTRY_PASS")
+          PY

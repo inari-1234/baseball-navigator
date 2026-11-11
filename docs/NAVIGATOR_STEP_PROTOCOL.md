@@ -1,7 +1,7 @@
 # Navigator Step P3: source-grounded tactical comparison
 
 ## Integration
-navigator_step.py is a single read-only Python/CLI entrypoint for comparing next-step *drafts*. It combines TEXT FAST, the present live-state projection, evidence-backed skill knowledge, source-pinned historical drill facts, and the existing action validator. It does **not** operate iOS, run automatically inside ChatGPT, perform an in-game action, mutate event logs, or estimate unmeasured win percentages.
+Use [the P7-H entry](NEXT_ACTION_P7H.md) for user-facing next-action replies. navigator_step.py supplies its internal comparison and a read-only diagnostic CLI. It combines TEXT FAST, the present live-state projection, evidence-backed skill knowledge, source-pinned historical drill facts, and the existing action validator. It does **not** operate iOS, run automatically inside ChatGPT, perform an in-game action, mutate event logs, or estimate unmeasured win percentages.
 
 Ordered AGENTS.md BOOT must be complete. Source of truth:
 1. text_fast.TextFastEngine.plan: intent, revision, BOOT and DELTA routing.
@@ -21,13 +21,13 @@ Ordered AGENTS.md BOOT must be complete. Source of truth:
 | Match | A scheduled opponent | Current match period and explicit match-day, player and opponent readiness |
 | Recovery | Explicit current item and player | Current HP, verified inventory, sourced need and branch |
 
-Historical group affinity is evidence for testing, not proof of present roster optimality. When training_readiness includes a source-attested preferred_participant_groups entry for the specific drill, the current verified three-player selection overrides the historical group. Every override must include exactly three distinct named players, a basis, and source evidence references; unsubstantiated overrides block the training recommendation instead of silently falling back to the old group. An override is still only a supplied, independently reviewed tactical choice, not a proven numerical optimum.
+Historical group affinity is research evidence. Training eligibility requires a current source-reviewed selection of three distinct participants, justified for the October objective, and a current Cheer purpose. See the [P7-H input contract](NEXT_ACTION_P7H.md).
 
 Failure-mode preference is ordinal, not a claim of expected runs:
-- CONTACT: poor contact -> contact training.
-- CONVERSION: hits but 0–1 run -> power/high-impact skills.
-- ADEQUATE: only if a current-period match is genuinely ready.
-- RECOVERY_REQUIRED: only with proven player need, stocked item, fresh player HP and verified actual recovery effect of that item.
+- CONTACT: repeated low-hit or heavy-strikeout results -> contact training.
+- CONVERSION: repeated 4–7 hit, 0–1 run games -> power/high-impact skills.
+- ADEQUATE: only if a current-period match is ready and reliably beatable.
+- RECOVERY_REQUIRED: only with proven player need, stocked item, fresh player HP, verified recovery effect and an otherwise blocked high-value action.
 - UNKNOWN: ask for the minimal current match failure signal; keep conditional comparisons instead of prescribing a paid action.
 
 Skill training checks the experimental fourth-session pattern (about 40 negative rerolls at 1–3, positive popup on four). The exact game-internal counter unit and guaranteed reward are UNKNOWN. A specifically claimed next-fourth session requires *exactly three source-certified current-save sessions for that player and drill*, via the `TRAINING_COUNT_BASELINE` plus subsequently accepted trainings, on a TRUSTED active branch. Three logged events alone are only a lower bound. Retired screenshots never add current skills. For Cheer ON, return ACCEPT/RELOAD criteria; do not recommend exhaustive reloads at steps 1–3.
@@ -42,46 +42,17 @@ Optional caller-reviewed context JSON is divided into failure_assessment, traini
 
 The module checks those keys but cannot authenticate the truth of a caller's verified flag or item-effect claim. The source-ingestion layer or assistant MUST independently inspect and bind reports/screenshots before setting the flag. Do not infer HP, hidden skill or match playability from older pictures.
 
-Example source-attested context structure (replace placeholders with actually validated current evidence, not fabricated):
-
-    {
-      "failure_assessment": {
-        "verified_for_current_state": true,
-        "source_event_seq": 10,
-        "period": "Y1-06",
-        "branch": "ACCEPTED",
-        "evidence_refs": ["SOURCE_ID_FROM_VERIFIED_CURRENT_REPORT"],
-        "mode": "CONTACT"
-      },
-      "training_readiness": {
-        "verified_for_current_state": true,
-        "source_event_seq": 10,
-        "period": "Y1-06",
-        "branch": "ACCEPTED",
-        "evidence_refs": ["SOURCE_ID_FROM_VERIFIED_CURRENT_MENU_AND_HP"],
-        "available_drills": ["素振り"],
-        "ready_players": ["岡治", "今井", "たき"],
-        "preferred_participant_groups": {
-          "素振り": {
-            "players": ["岡治", "今井", "たき"],
-            "basis": "CURRENT_VERIFIED_OCTOBER_LINEUP_NEED",
-            "evidence_refs": ["SOURCE_ID_FOR_CURRENT_LINEUP"]
-          }
-        }
-      }
-    }
-
-Do not submit this sample as though evidence has been inspected.
+See [the current context and evidence format](NEXT_ACTION_P7H.md#source-reviewed-training-inputs).
 
 ## CLI
-From repository root after actually verifying BOOT:
+For internal diagnostics from repository root after actually verifying BOOT:
 
     python3 navigator_step.py "スキル獲得に向けて何をすべき？" --boot-verified --expected-event-seq 10
     python3 navigator_step.py "次は何をすべき？" --boot-verified --context /path/to/verified_context.json
 
 Current game: rollback confirmed, SAVE anchor unknown -> result BLOCKED_UNVERIFIED_TIMELINE. No item or training is authorized. The P3 internal candidate comparison can contain historical costs/groups, but the ChatGPT-facing P4 bridge MUST suppress all blocked candidate fields (including historical participant names, Cheer and costs). Respond with only the blocking status and evidence needed for current-run reconciliation; never turn a conditional internal candidate into a recommended sequence.
 
-With a trusted state and current-sourced readiness, result may be VALIDATED_DRAFT_REVIEW including exactly one selected validated draft, controlling ACTIVE rule IDs, evidence/knowledge IDs and fallback. action_authorized remains false in all cases, and no game state is modified.
+With a trusted state and current-sourced readiness, result may be VALIDATED_DRAFT_REVIEW in the internal Python result, with exactly one selected draft, controlling ACTIVE rule IDs, evidence/knowledge IDs and fallback. The diagnostic CLI suppresses candidate details. action_authorized remains false in all cases, and no game state is modified.
 
 ## Acceptance tests
 - BOOT, stale revision, unknown rollback and incomplete source must all block paid advice.
