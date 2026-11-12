@@ -1,8 +1,8 @@
 {
   "schema_version": "1.0",
-  "ledger_version": 14,
+  "ledger_version": 15,
   "run_id": "SAPPORO_SPRINT_RESTART_20261103",
-  "expected_parent_sha": "f166658b30426222d7eb3e4e8e3900078b72b28b",
+  "expected_parent_sha": "93ad40b97107315598e34cf83d293b7ca1158915",
   "run_status": {
     "previous_run": "ABANDONED_FOR_REDESIGN",
     "new_run": "ACTIVE_Y1_JUNE_AFTER_USER_CONFIRMED_ROLLBACK_SAVEPOINT_UNKNOWN",
@@ -28,10 +28,10 @@
     "interpretation": "Direct user confirmation 2026-11-09: PM5:20 image was taken immediately after SAVE load; no intervening gameplay. The restored SAVE checkpoint identity and retained prior branch effects remain UNKNOWN."
   },
   "current_gate": {
-    "id": "ROLLBACK_SAVEPOINT_AUTHORITY_RECONCILE",
+    "id": "CURRENT_ACTION_SOURCE_REVIEW",
     "status": "BLOCKED_UNKNOWN",
     "reason_refs": [
-      "UNK-ROLLBACK-SAVEPOINT-20261106"
+      "UNK-CURRENT-ACTION-FIRST-ATTEMPT-STATS"
     ]
   },
   "canonical_strategy": {
@@ -176,6 +176,20 @@
       "statement": "The Y1 June PM5:20 screen (IMG_8971 image, SHA256 de88e4b7fe160910ee10b543bc547f45239635fc120136bcddab3844bf6fc197) was captured immediately after the user loaded a SAVE; no gameplay operations were performed between loading and that screen. This identifies the present post-load snapshot, not which earlier SAVE checkpoint or effects were retained.",
       "locator": "Direct user confirmation in this chat, 2026-11-09; image bytes independently SHA256-verified in this turn.",
       "source_refs": [
+        "EV-RAW-Y1-JUNE-ITEM-MENUS-8971-8972"
+      ]
+    },
+    {
+      "evidence_id": "EV-RAW-20261111-ROSTER-ARCHIVE",
+      "kind": "RAW_EVIDENCE",
+      "locator": "Indexed 19-image roster archive SHA256 6ec60a855270aa1243c25ccb9ca6d0ed90a00d7073b3f7572fe9026f1686945e; original archive and entry digests matched independently."
+    },
+    {
+      "evidence_id": "EV-USER-20261112-SAME-SAVE-NO-CHANGE",
+      "kind": "USER_ASSERTION",
+      "statement": "The user confirmed the 19 roster screens were captured on the same SAVE as the Y1 June PM 5:20 post-LOAD world capture, and confirmed no intervening match, training, item use, time advancement or reload through this report.",
+      "source_refs": [
+        "EV-RAW-20261111-ROSTER-ARCHIVE",
         "EV-RAW-Y1-JUNE-ITEM-MENUS-8971-8972"
       ]
     }
@@ -505,6 +519,25 @@
       ],
       "usable_for_decision": false,
       "notes": "Direct user report supports the present post-load snapshot. It is not evidence of the identity of the loaded checkpoint, pre-save actions, exact training counts, current skills or full inventory."
+    },
+    {
+      "fact_id": "FACT-Y1-JUNE-OBSERVED-TRACKING-ORIGIN",
+      "fact_type": "OBSERVED",
+      "path": "new_run.current.observed_tracking_origin",
+      "value": {
+        "pre_tracking_history": "UNKNOWN",
+        "restored_save_checkpoint": "UNKNOWN",
+        "roster_archive_sha256": "6ec60a855270aa1243c25ccb9ca6d0ed90a00d7073b3f7572fe9026f1686945e",
+        "start_event_id": "LIVE-OBSERVED-TRACKING-11",
+        "world_event_id": "LIVE-Y1-JUN-CURRENT-IMG8971-8972-20261106"
+      },
+      "source_refs": [
+        "EV-USER-20261112-SAME-SAVE-NO-CHANGE",
+        "EV-RAW-20261111-ROSTER-ARCHIVE",
+        "EV-RAW-Y1-JUNE-ITEM-MENUS-8971-8972"
+      ],
+      "usable_for_decision": true,
+      "notes": "Attests chronology and links the observed roster and counters. This does not establish eligibility to train or reconstruct pre-origin history."
     }
   ],
   "strategy_policy": {
@@ -686,11 +719,18 @@
       "unknown_id": "UNK-ROLLBACK-SAVEPOINT-20261106",
       "field": "new_run.current.confirmed_rollback_restore_anchor",
       "status": "OPEN",
-      "material_to_next_action": true,
+      "material_to_next_action": false,
       "material_to_goal": false,
       "default": "Recognize June PM5:20 as the current post-rollback screenshot. Do not assume any effects of matches, training, items or resources from pre-rollback captures survived; deny paid actions until the active SAVE branch and game state are reconciled. An explicit rollback report is not proof of which SAVE was restored.",
       "resolve_by": "Independently identify the restored save/checkpoint or accept a new source-grounded baseline for the ongoing branch; check retained match/training/skills and current full inventory before acting.",
       "notes": "2026-11-09 user confirmed IMG_8971 capture immediately after loading a SAVE and without intervening gameplay. Snapshot continuity at capture is confirmed; identity of restored checkpoint, retained actions/skills/training counts remain unknown. Do not mark TRUSTED from capture timing alone."
+    },
+    {
+      "unknown_id": "UNK-CURRENT-ACTION-FIRST-ATTEMPT-STATS",
+      "status": "OPEN",
+      "material_to_next_action": true,
+      "field": "current_next_action.failure_assessment",
+      "resolve_by": "Review sourced hits and runs or the applicable heavy-strikeout evidence for two comparable first attempts."
     }
   ]
 }

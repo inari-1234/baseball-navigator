@@ -1,19 +1,19 @@
 # CURRENT_HANDOFF
 
 Last updated: 2026-11-12
-State: ACTIVE_Y1_JUNE_POST_ROLLBACK_CAPTURE — SAVEPOINT_UNKNOWN
+State: ACTIVE_Y1_JUNE_TRACKED_FROM_CURRENT_OBSERVATION — FIRST_ACTION_SOURCE_REVIEW
 
-## Observed tracking transition and real acceptance
-- The current capture and roster manifest remain at live seq 10. The original world image, the roster ZIP and all 19 images matched the recorded hashes on independent readback. The direct same-SAVE, no-intervening-gameplay confirmation is required to link the existing roster to the world capture and start the new segment. No replacement images or repeat entry of known counters is needed.
-- `save_baseline_preflight.py` can preview the new observation start using the existing private receipt format. Once source-reviewed and committed, `OBSERVED_TRACKING_START` makes replay start from the observed world screen without restoring earlier history. The original log and the unresolved checkpoint remain auditable. `next_action.py` treats 「進めて」 as a next-action request at its explicit entry.
-- Actual training-draft acceptance remains open. The first two recorded zero-run initial scores alone do not establish either P7-H batting failure mode. The indexed 19 roster screens do not establish the availability of the training menu or participant eligibility. Review existing action evidence before asking for a missing field.
+## Observed tracking started at live seq 11
+- The user confirmed the 19 existing roster screens and current world observation are on the same SAVE with no intervening gameplay or reload through the current report. The world image, ZIP and each of its 19 images matched the recorded hashes. No repeat upload or resource capture is needed for this revision.
+- The reviewed dry-run event was appended as `LIVE-OBSERVED-TRACKING-11` and the snapshot was regenerated. The world observation remains Y1 June PM 5:20. The restored checkpoint and pre-origin history remain UNKNOWN. Earlier matches and awards stay in the raw log for audit.
+- The next action still requires an independently sourced failure assessment and the chosen drill's current availability and participant readiness. The recorded zero-run first attempts do not include verified batting totals. First real training-draft acceptance is open.
 
 ## P7-H strategy and reply verification
 - Local user-facing entry: `next_action.py` runs ordered BOOT, event replay, candidate comparison, strategy validation and exact-text reply verification. Display `safe_reply` only on PASS. Contact and conversion special-training drafts can be certified with current sources. Normal-practice focus/load settings, matches, items, school activities and other decisions lack a certified action rendering in this entry.
-- The current world observation at seq 10 already has Y1 June PM 5:20 and fresh counters. The 19 roster screens are indexed. Ask whether they were captured on that same SAVE without intervening gameplay. Reuse the existing images and counters, and retain the sourced confirmation for repeated requests at the same revision. The restored checkpoint and historical training/skills require independent evidence.
+- At the original seq 10 review, the world observation already had Y1 June PM 5:20 and fresh counters. The 19 roster screens were indexed pending continuity, since resolved at seq 11. The restored checkpoint and historical training/skills require independent evidence.
 - Tests exercise refusal of the unverified batting-focus/light-load instruction and forged retry criteria, and successful display of source-backed special training with unknown counts. Real iOS acceptance needs a reconciled active SAVE and current match, participant, menu and resource evidence. Only a source-certified exact count can establish a fourth-session candidate.
 
-## Roster screenshots — provisional evidence only (2026-11-11)
+## Roster screenshots — initial provisional review (2026-11-11)
 - User submitted a ZIP containing 19 screenshots of `打順変更` six display tabs and two `選手情報` detail pages. The archive SHA-256 is `6ec60a855270aa1243c25ccb9ca6d0ed90a00d7073b3f7572fe9026f1686945e`. Source content hashes and extracted 12-player lineup/bench metadata are recorded in `ROSTER_SCREEN_CANDIDATE_20261111.json` with `PENDING_CURRENT_SAVE_CHRONOLOGY` status. Original screenshot bytes are NOT in public Git, and no persistent private-library backup has been verified.
 - Visible: batting order 1-9 and bench 3, all player names and game levels; visual green HP bars, two player detail screens for 入江ドコンジ and 石渡いなり with skill icons. No numerically verified HP, identified skill icon meaning or per-player exact training session counts can be inferred.
 - Crucial boundary: these overlay screens show no game-period/clock and user has not separately attested that they depict the SAME unadvanced post-LOAD SAVE as the Y1 June PM5:20 capture. The ZIP entry time is real-world metadata, not game time. Do NOT ingest as accepted LIVE_EVENTS or change CURRENT_LIVE_STATE, ledger 14/decision 14, SAVE lineage, training count, or skill award.
