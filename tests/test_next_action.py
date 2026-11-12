@@ -10,6 +10,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from check_reply import (canonical_state_sha256, check_reply,
                          make_local_verified_draft_packet)
@@ -91,8 +92,8 @@ class NextActionTests(unittest.TestCase):
         for name, claim in context.items():
             for ref in claim["evidence_refs"]:
                 path = self.root / (ref + ".json")
-                path.write_text(json.dumps({"ref": ref, "context": context}, ensure_ascii=False),
-                                encoding="utf-8")
+                content = {"ref": ref} if ref == "ROSTER-IMAGE" else {"ref": ref, "context": context}
+                path.write_text(json.dumps(content, ensure_ascii=False), encoding="utf-8")
                 record = sources.setdefault(ref, {
                     "kind": "LOCAL_FILE", "path": str(path),
                     "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
@@ -100,6 +101,8 @@ class NextActionTests(unittest.TestCase):
                     "period": self.state["period_floor"], "branch": "ACCEPTED",
                     "reviewed_for_current_state": True, "reviewed_claim_sha256": {},
                 })
+                if name == "training_readiness" and ref == claim.get("menu_evidence_ref"):
+                    record["capture_scope"] = "CURRENT_PRE_EXECUTION"
                 record["reviewed_claim_sha256"][name] = canonical_state_sha256(claim)
         return sources
 
@@ -305,37 +308,48 @@ class NextActionTests(unittest.TestCase):
                 with self.assertRaisesRegex(ObservationError, "audit-only"):
                     replay([*base, readded])
 
-    def development_fixture(self):
+    def development_fixture(self, *, contact=False):
         events, preview = self.tracking_preview()
         base = [*events, preview["event_preview"]]
         self.state = replay(base)
         tracking = self.state["observed_tracking"]
-        players = ["入江ドコンジ", "今井タッツ", "芦田はじめ"]
+        players = ["芦田はじめ", "入江ドコンジ", "今井タッツ"]
+        target = "入江ドコンジ"
+        drill, cheer, role = ("素振り", "ON", "GET_ON_BASE") if contact else (
+            "ダンベル", "OFF", "ADVANCE_RUNNERS_WITH_POWER")
+        spend = {"sports": 6, "cheer": 20} if contact else {"sports": 7}
         context = {
             "development_plan": attested(
                 self.state, evidence_refs=["ROSTER-IMAGE", "MENU"],
                 roster_origin_event_id=tracking["start_event_id"],
                 roster_archive_sha256=tracking["roster_archive_sha256"],
                 roster_image_evidence_refs=["ROSTER-IMAGE"],
-                target_player=players[0], target_role="CORE_DEVELOP",
-                player_observation={"player": players[0], "contact": 27, "slugging": 34,
+                target_player=target, target_role="CORE_DEVELOP",
+                player_observation={"player": target, "contact": 27, "slugging": 34,
                                     "evidence_ref": "ROSTER-IMAGE"},
-                october_role="ADVANCE_RUNNERS_WITH_POWER", drill="ダンベル", cheer="OFF",
+                october_role=role, drill=drill, cheer=cheer,
                 priority_review={
                     "timing": "LOW_LEVEL_CORE_BEFORE_MASS_MATCH_LEVELING",
-                    "other_drill": "DOES_NOT_SERVE_REVIEWED_OCTOBER_ROLE",
-                    "cheer_tradeoff": "PRESERVE_FOR_NAMED_SPRINT_USE",
-                    "role_and_drill_fit": "Synthetic: support extra-base production in the middle of the order.",
+                    "other_drill": "LOWER_PRIORITY_FOR_REVIEWED_OCTOBER_ROLE",
+                    "cheer_tradeoff": ("COMMIT_HIGH_VALUE_GROWTH" if contact
+                                       else "PRESERVE_FOR_NAMED_SPRINT_USE"),
+                    "role_and_drill_fit": ("Synthetic: improve the batting core's on-base chances."
+                                           if contact else "Synthetic: support extra-base production."),
                     "why_before_alternatives": "Synthetic: develop the current core before match leveling.",
-                    "cheer_reason": "Synthetic: reserve Cheer for the next reviewed pitching-core drill.",
+                    "cheer_reason": ("Synthetic: commit Cheer to batting-core growth." if contact
+                                     else "Synthetic: reserve Cheer for the next pitching-core drill."),
                 }),
             "training_readiness": attested(
                 self.state, evidence_refs=["MENU"], menu_evidence_ref="MENU",
-                available_drills=["ダンベル"], ready_players=players,
-                menu_selection={"drill": "ダンベル", "players": players, "cheer": "OFF",
-                                "available_now": True, "displayed_spend": {"sports": 7}},
-                preferred_participant_groups={"ダンベル": group_selection(players, ["MENU"])},
-                cheer_purposes={"ダンベル": {"OFF": "RESOURCE_PRESERVATION"}}),
+                available_drills=[drill], ready_players=players,
+                menu_selection={"drill": drill, "players": players, "cheer": cheer,
+                                "available_now": True, "displayed_spend": spend,
+                                "current_balances": dict(spend),
+                                "confirmed_immediately_before_execution": True,
+                                "same_save_no_material_change": True},
+                preferred_participant_groups={drill: group_selection(players, ["MENU"])},
+                cheer_purposes={drill: {cheer: ("HIGH_VALUE_COMMITTED_DEVELOPMENT"
+                                              if contact else "RESOURCE_PRESERVATION")}}),
         }
         sources = self.sources(context)
         # The synthetic reviewed bytes stand in for an archive image only inside this fixture.
@@ -362,6 +376,127 @@ class NextActionTests(unittest.TestCase):
                                   proposed_reply=report["safe_reply"] + "\n" + DENIED)
         self.assertIsNone(appended["safe_reply"])
         self.assertEqual(appended["safe_reply_check"]["error_codes"], ["REPLY_NOT_CANONICAL"])
+
+    def test_october_contact_uses_reviewed_balances_despite_natural_counter_change(self):
+        context, _ = self.development_fixture(contact=True)
+        selection = context["training_readiness"]["menu_selection"]
+        selection.pop("displayed_spend")  # The reviewed catalog supplies the fixed costs.
+        canonical_state = (self.repo / "CURRENT_LIVE_STATE.json").read_bytes()
+        ledger = (self.repo / "LIVE_EVENTS.jsonl").read_bytes()
+        self.assertEqual(self.state["resources"]["values"]["sports"], 28)
+        self.assertEqual(self.state["resources"]["values"]["cheer"], 100)
+        self.assertEqual(selection["current_balances"], {"sports": 6, "cheer": 20})
+        sources = self.sources(context)
+        original_context, original_sources = deepcopy(context), deepcopy(sources)
+        report = self.run_entry(context=context, evidence_sources=sources)
+        self.assertEqual(report["status"], "CERTIFIED_TRAINING_DRAFT", report)
+        self.assertEqual(report["safe_reply_check"]["status"], "PASS")
+        self.assertIn("素振り／応援ON／消費予定：スポーツ6、応援20", report["safe_reply"])
+        for player in selection["players"]:
+            self.assertIn(player, report["safe_reply"])
+        self.assertEqual(report["save_history_status"], OBSERVED_TRACKING)
+        self.assertFalse(report["action_authorized"])
+        self.assertFalse(report["side_effects"])
+        self.assertEqual(context, original_context)
+        self.assertEqual(sources, original_sources)
+        self.assertEqual((self.repo / "CURRENT_LIVE_STATE.json").read_bytes(), canonical_state)
+        self.assertEqual((self.repo / "LIVE_EVENTS.jsonl").read_bytes(), ledger)
+
+    def test_october_visible_cost_fields_can_be_partial(self):
+        context, _ = self.development_fixture(contact=True)
+        selection = context["training_readiness"]["menu_selection"]
+        selection["displayed_spend"] = {"sports": 6}
+        report = self.run_entry(context=context, evidence_sources=self.sources(context))
+        self.assertEqual(report["status"], "CERTIFIED_TRAINING_DRAFT", report)
+        self.assertIn("スポーツ6、応援20", report["safe_reply"])
+
+    def test_october_action_requires_reviewed_current_balances_even_if_ledger_can_pay(self):
+        context, _ = self.development_fixture(contact=True)
+        for balances, expected in (
+                (None, "CURRENT_TRAINING_BALANCES_UNVERIFIED"),
+                ({"sports": 6}, "CURRENT_TRAINING_BALANCES_UNVERIFIED"),
+                ({"sports": True, "cheer": 20}, "CURRENT_TRAINING_BALANCES_UNVERIFIED"),
+                ({"sports": 6, "cheer": -1}, "CURRENT_TRAINING_BALANCES_UNVERIFIED"),
+                ({"sports": 6, "cheer": 20, "study": 4}, "CURRENT_TRAINING_BALANCES_UNVERIFIED"),
+                ({"sports": 5, "cheer": 20}, "INSUFFICIENT_OR_UNKNOWN_RESOURCE:sports"),
+                ({"sports": 6, "cheer": 19}, "INSUFFICIENT_OR_UNKNOWN_RESOURCE:cheer")):
+            with self.subTest(balances=balances):
+                modified = deepcopy(context)
+                selection = modified["training_readiness"]["menu_selection"]
+                if balances is None:
+                    selection.pop("current_balances")
+                else:
+                    selection["current_balances"] = balances
+                report = self.run_entry(context=modified, evidence_sources=self.sources(modified))
+                self.assertEqual(report["status"], "CERTIFIED_NO_ACTION", report)
+                self.assertIn(expected, report["blocking_reasons"])
+
+    def test_october_menu_requires_immediate_same_save_and_available_selection(self):
+        context, _ = self.development_fixture(contact=True)
+        for key, expected in (
+                ("confirmed_immediately_before_execution", "CURRENT_TRAINING_MENU_NOT_IMMEDIATE"),
+                ("same_save_no_material_change", "CURRENT_TRAINING_MENU_NOT_IMMEDIATE"),
+                ("available_now", "CURRENT_SPECIAL_TRAINING_MENU_EVIDENCE_REQUIRED")):
+            with self.subTest(key=key):
+                modified = deepcopy(context)
+                modified["training_readiness"]["menu_selection"][key] = False
+                report = self.run_entry(context=modified, evidence_sources=self.sources(modified))
+                self.assertEqual(report["status"], "CERTIFIED_NO_ACTION", report)
+                self.assertIn(expected, report["blocking_reasons"])
+
+    def test_october_menu_receipt_rejects_historical_and_unscoped_sources(self):
+        context, sources = self.development_fixture(contact=True)
+        for capture_scope, filename in (
+                (None, None), ("HISTORICAL", None),
+                ("CURRENT_PRE_EXECUTION", "IMG_9036.png"),
+                ("CURRENT_PRE_EXECUTION", "img_9037.HEIC")):
+            with self.subTest(capture_scope=capture_scope, filename=filename):
+                modified = deepcopy(sources)
+                menu = modified["MENU"]
+                if capture_scope is None:
+                    menu.pop("capture_scope")
+                else:
+                    menu["capture_scope"] = capture_scope
+                if filename is not None:
+                    path = self.root / filename
+                    path.write_bytes(Path(menu["path"]).read_bytes())
+                    menu["path"] = str(path)
+                report = self.run_entry(context=context, evidence_sources=modified)
+                self.assertEqual(report["status"], "CERTIFIED_NO_ACTION", report)
+                self.assertIn("CURRENT_TRAINING_MENU_SOURCE_NOT_REVIEWED",
+                              report["blocking_reasons"])
+
+    def test_october_menu_receipt_rejects_renamed_historical_bytes(self):
+        context, sources = self.development_fixture(contact=True)
+        menu = sources["MENU"]
+        self.assertEqual(Path(menu["path"]).stem, "MENU")
+        with patch.dict("current_observation.HISTORICAL_TRAINING_MENU_IMAGES",
+                        {"SYNTHETIC-HISTORICAL": menu["sha256"]}):
+            report = self.run_entry(context=context, evidence_sources=sources)
+        self.assertEqual(report["status"], "CERTIFIED_NO_ACTION", report)
+        self.assertIn("CURRENT_TRAINING_MENU_SOURCE_NOT_REVIEWED", report["blocking_reasons"])
+
+    def test_october_current_menu_expires_after_training_and_load(self):
+        context, sources = self.development_fixture(contact=True)
+        base = read_events(self.repo / "LIVE_EVENTS.jsonl")
+        period = base[-1]["period"]
+        event = {"seq": self.state["last_event_seq"] + 1, "event_id": "SYNTHETIC-MUTATION",
+                 "period": period, "source": {"kind": "USER_REPORT", "locator": "test fixture"}}
+        for mutation in (
+                dict(event, kind="TRAINING", branch="ACCEPTED", drill="素振り",
+                     participants=context["training_readiness"]["ready_players"]),
+                dict(event, kind="ROLLBACK")):
+            with self.subTest(kind=mutation["kind"]):
+                self.commit_fixture([*base, mutation])
+                report = self.run_entry(context=context, evidence_sources=sources)
+                self.assertEqual(report["status"], "CERTIFIED_NO_ACTION", report)
+                self.assertFalse(self.state["resources"]["fresh"])
+                # Even restamping the claim cannot restore resource freshness or lost lineage.
+                restamped = deepcopy(context)
+                for claim in restamped.values():
+                    claim["source_event_seq"] = self.state["last_event_seq"]
+                report = self.run_entry(context=restamped, evidence_sources=self.sources(restamped))
+                self.assertEqual(report["status"], "CERTIFIED_NO_ACTION", report)
 
     def test_october_plan_rejects_unsourced_priority_readiness_and_changed_cost(self):
         context, _ = self.development_fixture()

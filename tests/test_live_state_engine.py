@@ -1,5 +1,10 @@
+import json
+from pathlib import Path
 import unittest
-from live_state_engine import replay, validate_recommendation, training_count_status, ObservationError
+
+from current_observation import ROSTER_RECORD, tracked_roster_record
+from live_state_engine import (OBSERVED_TRACKING, ObservationError, replay,
+                               training_count_status, validate_recommendation)
 
 def e(n,kind,month=6,**fields):
     return {"seq":n,"event_id":f"E{n}","kind":kind,
@@ -788,6 +793,84 @@ class LiveJulyAndItemCorrectionRegression(unittest.TestCase):
         first["visible_item_slots"][2]["display_denominator"]=0
         with self.assertRaises(ObservationError):
             replay([first])
+
+
+class TrackedRosterContinuityRegression(unittest.TestCase):
+    root = Path(__file__).resolve().parents[1]
+
+    def setUp(self):
+        self.roster = json.loads((self.root / ROSTER_RECORD).read_text(encoding="utf-8"))
+        self.world = dict(
+            screen(1), clock="PM 5:20", user_attested_current=True,
+            user_attestation_locator="test confirms current post-load screen",
+            source={"kind": "RAW_SCREEN", "locator": "test world screen"})
+        self.correction_source = {"kind": "USER_CORRECTION", "locator": "test confirms load"}
+        self.events = [
+            self.world,
+            e(2, "CORRECTION", target_event_id="E1", source=self.correction_source,
+              patch={"preceded_by_rollback": True}),
+            e(3, "OBSERVED_TRACKING_START", branch="ACCEPTED", world_event_id="E1",
+              rollback_report_event_id="E2", same_save_no_intervening_gameplay=True,
+              roster_archive_sha256=self.roster["source_archive_sha256"],
+              continuity_sha256="0" * 64),
+        ]
+
+    def test_new_screen_updates_counters_and_keeps_roster(self):
+        later = dict(screen(4), clock="PM 5:30", resources=dict(self.world["resources"], sports=27))
+        state = replay([*self.events, later])
+        self.assertEqual(state["timeline_status"], OBSERVED_TRACKING)
+        self.assertEqual(state["resources"]["last_observed"], "E4")
+        self.assertEqual(state["resources"]["values"]["sports"], 27)
+        self.assertEqual(tracked_roster_record(state, self.root), self.roster)
+
+    def test_unattested_older_screen_cannot_overwrite_world_record(self):
+        earlier = dict(screen(4), clock="PM 5:10", resources=dict(self.world["resources"], sports=27))
+        state = replay([*self.events, earlier])
+        self.assertEqual(state["timeline_status"], OBSERVED_TRACKING)
+        self.assertEqual(state["observations_ignored_as_stale"], ["E4"])
+        self.assertEqual(state["resources"]["values"]["sports"], 28)
+        self.assertEqual(tracked_roster_record(state, self.root), self.roster)
+
+    def test_current_screen_after_mutation_does_not_refresh_roster(self):
+        for change in (
+            e(4, "TRAINING", drill="素振り", participants=["芦田", "入江", "今井"], branch="ACCEPTED"),
+            e(4, "ITEM_USE", items=[{"item": "チョコレート", "quantity": 1}], branch="ACCEPTED"),
+            e(4, "MATCH_ATTEMPT", match_id="M1", opponent="生南", attempt=1,
+              our_runs=2, their_runs=0, branch="ACCEPTED"),
+            e(4, "MATCHES_COMPLETED"),
+        ):
+            with self.subTest(kind=change["kind"]):
+                later = dict(screen(5), clock="PM 5:30", after_event_id="E4")
+                state = replay([*self.events, change, later])
+                self.assertTrue(state["resources"]["fresh"])
+                self.assertEqual(state["observed_tracking"]["roster_invalidated_by_event_id"], "E4")
+                self.assertIsNone(tracked_roster_record(state, self.root))
+
+    def test_new_game_period_requires_new_roster_evidence(self):
+        state = replay([*self.events, screen(4, month=7)])
+        self.assertEqual(state["period_floor"], "Y1-07")
+        self.assertIsNone(tracked_roster_record(state, self.root))
+
+    def test_known_load_invalidates_roster_even_after_counter_refresh(self):
+        checkpoint = e(4, "SAVE_CHECKPOINT")
+        state = replay([*self.events, checkpoint])
+        self.assertEqual(tracked_roster_record(state, self.root), self.roster)
+        load = e(5, "ROLLBACK", to_checkpoint_id="E4")
+        state = replay([*self.events, checkpoint, load,
+                        dict(screen(6), clock="PM 5:20", after_event_id="E5")])
+        self.assertTrue(state["resources"]["fresh"])
+        self.assertEqual(state["timeline_status"], OBSERVED_TRACKING)
+        self.assertEqual(state["observed_tracking"]["roster_invalidated_by_event_id"], "E5")
+        self.assertIsNone(tracked_roster_record(state, self.root))
+
+    def test_reported_load_closes_lineage_even_when_clock_and_counters_match(self):
+        current = dict(self.world, seq=4, event_id="E4")
+        correction = e(5, "CORRECTION", target_event_id="E4", source=self.correction_source,
+                       patch={"preceded_by_rollback": True})
+        state = replay([*self.events, current, correction])
+        self.assertEqual(state["timeline_status"], "ROLLBACK_CONFIRMED_SAVEPOINT_UNKNOWN")
+        self.assertEqual(state["rollback_report_event_id"], "E5")
+        self.assertIsNone(tracked_roster_record(state, self.root))
 
 
 if __name__=="__main__":unittest.main()

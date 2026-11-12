@@ -172,7 +172,8 @@ def development_plan_errors(plan, spec, rec, state, context, root):
     cheer = rec.get("cheer")
     if (not isinstance(cheer, str) or not isinstance(reasons, dict)
             or reasons.get("timing") != "LOW_LEVEL_CORE_BEFORE_MASS_MATCH_LEVELING"
-            or reasons.get("other_drill") != "DOES_NOT_SERVE_REVIEWED_OCTOBER_ROLE"
+            or reasons.get("other_drill") not in ("LOWER_PRIORITY_FOR_REVIEWED_OCTOBER_ROLE",
+                                                   "DOES_NOT_SERVE_REVIEWED_OCTOBER_ROLE")
             or not isinstance(reasons.get("cheer_tradeoff"), str)
             or reasons["cheer_tradeoff"] not in DEVELOPMENT_CHEER.get(cheer, ())
             or any(not isinstance(reasons.get(key), str) or not reasons[key].strip()
@@ -190,8 +191,16 @@ def development_plan_errors(plan, spec, rec, state, context, root):
             or selection.get("drill") != spec["drill"] or selection.get("cheer") != cheer
             or selection.get("players") != players or selection.get("available_now") is not True):
         errors.append("CURRENT_SPECIAL_TRAINING_MENU_EVIDENCE_REQUIRED")
-    elif "displayed_spend" in selection and selection["displayed_spend"] != rec.get("spend"):
-        errors.append("CURRENT_MENU_COST_MISMATCH")
+    else:
+        if (selection.get("confirmed_immediately_before_execution") is not True
+                or selection.get("same_save_no_material_change") is not True):
+            errors.append("CURRENT_TRAINING_MENU_NOT_IMMEDIATE")
+        if "displayed_spend" in selection:
+            shown, spend = selection["displayed_spend"], rec.get("spend")
+            if (not isinstance(shown, dict) or not shown or not isinstance(spend, dict)
+                    or any(type(value) is not int or spend.get(key) != value
+                           for key, value in shown.items())):
+                errors.append("CURRENT_MENU_COST_MISMATCH")
     return errors
 
 

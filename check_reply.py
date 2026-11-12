@@ -10,7 +10,7 @@ from __future__ import annotations
 import argparse
 from hashlib import sha256
 import json
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 from typing import Any
 
 from live_state_engine import OBSERVED_TRACKING, has_current_lineage
@@ -92,6 +92,8 @@ def _verified_evidence_receipts(context, evidence_sources, state, root, *,
     Hashes certify the reviewed bytes and context version; not the semantic
     accuracy of an image/user recollection. Human review is still necessary.
     """
+    from current_observation import HISTORICAL_TRAINING_MENU_IMAGES
+
     _require(isinstance(context, dict) and isinstance(evidence_sources, dict),
              "LOCAL_EVIDENCE_INDEX_REQUIRED")
     observation_only = claims == ("roster_chronology",)
@@ -167,6 +169,10 @@ def _verified_evidence_receipts(context, evidence_sources, state, root, *,
                      and all(v in "0123456789abcdef" for v in expected)
                      and actual == expected,
                      "EVIDENCE_CONTENT_HASH_MISMATCH")
+            if claim == "training_readiness" and kind == "LOCAL_FILE":
+                _require(PureWindowsPath(local).stem.upper() not in HISTORICAL_TRAINING_MENU_IMAGES
+                         and actual not in HISTORICAL_TRAINING_MENU_IMAGES.values(),
+                         "CURRENT_TRAINING_MENU_SOURCE_NOT_REVIEWED")
             receipts[claim + ":" + ref] = {
                 "source_kind": kind, "content_sha256": actual,
                 "reviewed_claim_sha256": claim_sha,
@@ -196,8 +202,10 @@ def _training_receipts(projection, context, evidence_sources, state, root):
         _require(receipt.get("source_kind") == "LOCAL_FILE"
                  and receipt.get("content_sha256") in hashes,
                  "ROSTER_IMAGE_NOT_FROM_TRACKED_ARCHIVE")
-    menu = receipts.get("training_readiness:" + context["training_readiness"]["menu_evidence_ref"], {})
+    menu_ref = context["training_readiness"]["menu_evidence_ref"]
+    menu = receipts.get("training_readiness:" + menu_ref, {})
     _require(menu.get("source_kind") == "LOCAL_FILE"
+             and evidence_sources[menu_ref].get("capture_scope") == "CURRENT_PRE_EXECUTION"
              and menu.get("content_sha256") not in hashes,
              "CURRENT_TRAINING_MENU_SOURCE_NOT_REVIEWED")
     return receipts

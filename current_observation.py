@@ -9,6 +9,10 @@ from live_state_engine import OBSERVED_TRACKING, has_current_lineage
 from strategy_policy import context_current
 
 ROSTER_RECORD = "ROSTER_SCREEN_CANDIDATE_20261111.json"
+HISTORICAL_TRAINING_MENU_IMAGES = {
+    "IMG_9036": "810b80cd1c2373b642e17124f5df747156dba10f818c17b75b11723e853243c8",
+    "IMG_9037": "f9cdc0a4939f1a737346fad2420c5c2bc30cd2c8a237e7260b3954fda5f30eea",
+}
 
 
 def _roster_record(root):
@@ -25,10 +29,9 @@ def _roster_record(root):
 
 def tracked_roster_record(state, root):
     tracking = state.get("observed_tracking")
-    resources = state["resources"]
-    if (state["timeline_status"] != OBSERVED_TRACKING or not resources["fresh"]
+    if (state["timeline_status"] != OBSERVED_TRACKING
             or not isinstance(tracking, dict)
-            or tracking["world_event_id"] != resources["last_observed"]):
+            or "roster_invalidated_by_event_id" in tracking):
         return None
     record = _roster_record(root)
     if record and tracking["roster_archive_sha256"] == record["source_archive_sha256"]:
@@ -91,9 +94,15 @@ def current_observations(state, root, context, evidence_sources):
             else "CURRENT_WORLD_COUNTERS")
     elif state["timeline_status"] == OBSERVED_TRACKING:
         readiness = context.get("training_readiness") if isinstance(context, dict) else None
-        if not resources["fresh"]:
+        selection = readiness.get("menu_selection") if context_current(readiness, state) else None
+        if state.get("observed_tracking", {}).get("roster_invalidated_by_event_id"):
+            observed["next_evidence"] = "REVIEW_CHANGED_ROSTER_CONTEXT"
+        elif not resources["fresh"]:
             observed["next_evidence"] = "CURRENT_WORLD_COUNTERS"
-        elif not context_current(readiness, state) or not readiness.get("menu_selection"):
+        elif (not isinstance(selection, dict) or selection.get("available_now") is not True
+              or selection.get("confirmed_immediately_before_execution") is not True
+              or selection.get("same_save_no_material_change") is not True
+              or not selection.get("current_balances")):
             observed["next_evidence"] = "CURRENT_SPECIAL_TRAINING_SELECTION"
     return observed
 
@@ -107,7 +116,7 @@ def render_observation_stop(observed, state, line):
     counters = observed["counters"]
     if counters:
         lines.append(
-            f"現画面の記録は {observed['period']} {observed['clock']}、"
+            f"台帳の観測記録は {observed['period']} {observed['clock']}、"
             f"勉強{counters['study']}・スポーツ{counters['sports']}・遊び{counters['play']}・"
             f"自然{counters['nature']}・応援{counters['cheer']} です。")
     if observed["roster"]:
@@ -122,8 +131,10 @@ def render_observation_stop(observed, state, line):
         "RECONCILE_RESTORED_SAVE_ANCHOR":
             "復元元を特定できる既存のSAVE記録を確認します。確認済みの画面や数値の再提出は不要です。",
         "CURRENT_WORLD_COUNTERS": "現在の時刻と資源カウンターを確認します。",
+        "REVIEW_CHANGED_ROSTER_CONTEXT":
+            "記録された状態変更以降の選手情報を確認します。",
         "CURRENT_SPECIAL_TRAINING_SELECTION":
-            "次の確認は、現行SAVEの特訓画面で、入江ドコンジを含む3人を選べる特訓が今あるかです。",
+            "実行を押さず、現行SAVEの素振り候補の選択画面で、入江ドコンジを含む3人の参加可否、応援設定、消費する資源の残高を確認します。",
         None: "候補に不足している根拠を確認するまで操作を保留します。",
     }[observed["next_evidence"]]
     return "\n".join([*lines, line, "Fallback: " + next_evidence])

@@ -252,7 +252,12 @@ def replay(events):
            "rollback_report_event_id":None}
     floor=None;closed=set();matches={};seen_attempts=set()
     last_mutation_id=None;last_screen_clock=None;last_screen_period=None;last_context_event_id=None
-    def invalidate():
+    def invalidate_roster(event_id):
+        tracking=state.get("observed_tracking")
+        if tracking is not None:
+            tracking.setdefault("roster_invalidated_by_event_id",event_id)
+    def invalidate(event_id):
+        invalidate_roster(event_id)
         state["resources"]["fresh"]=False
         state["resources"]["values"]=None
         state["inventory"]["fresh"]=False
@@ -291,14 +296,16 @@ def replay(events):
                 if not attested:
                     state["observations_ignored_as_stale"].append(eid)
                     continue
-                # The player may later explain why this earlier game clock
-                # is current. A user-confirmed rollback still does not prove
-                # which SAVE was restored, so keep the action gate closed.
-                if e.get("rollback_report_event_id"):
-                    state["timeline_status"]="ROLLBACK_CONFIRMED_SAVEPOINT_UNKNOWN"
-                    state["rollback_report_event_id"]=e["rollback_report_event_id"]
-                else:
-                    state["timeline_status"]="UNRESOLVED_CAPTURE_CHRONOLOGY"
+            if e.get("rollback_report_event_id"):
+                # A reported LOAD invalidates the earlier state even if the
+                # restored clock and counters happen to look the same.
+                invalidate(e["rollback_report_event_id"])
+                state["timeline_status"]="ROLLBACK_CONFIRMED_SAVEPOINT_UNKNOWN"
+                state["rollback_report_event_id"]=e["rollback_report_event_id"]
+            elif clock_regressed:
+                state["timeline_status"]="UNRESOLVED_CAPTURE_CHRONOLOGY"
+            if floor is not None and p>floor:
+                invalidate_roster(eid)
             state["last_seen_screen_period"]=pk
             state["resources"]={"fresh":True,"values":{k:vals[k] for k in COUNTERS},"last_observed":eid}
             slots=e.get("visible_item_slots")
@@ -372,6 +379,8 @@ def replay(events):
             if stale:
                 state["observations_ignored_as_stale"].append(eid)
                 continue
+            if floor is not None and p>floor:
+                invalidate_roster(eid)
             for player,result in parsed.items():
                 state["hp_by_player"][player]={**result,"fresh":True,"event_id":eid,"period":pk,
                     "source_locator":e["source"]["locator"],"hp_corrected_by_event_id":e.get("hp_corrected_by_event_id")}
@@ -415,7 +424,7 @@ def replay(events):
                 m["classification"]=(("RESET_ASSISTED_WIN" if reset_assisted else "STABLE_WIN")
                     if a>b else ("DRAW" if a==b else "LOSS"))
                 if not historical:
-                    invalidate();state["current_exact_time"]="UNKNOWN";last_mutation_id=eid;last_context_event_id=eid
+                    invalidate(eid);state["current_exact_time"]="UNKNOWN";last_mutation_id=eid;last_context_event_id=eid
                     floor=max(floor,p) if floor else p
         elif kind=="MATCHES_COMPLETED":
             if e.get("completion_retracted_by_event_id"):
@@ -426,7 +435,7 @@ def replay(events):
             for m in matches.values():
                 if m["period"]==pk and m["status"]=="SCHEDULED":m["status"]="COMPLETED_SCORE_UNKNOWN"
             if not historical:
-                invalidate();state["current_exact_time"]="UNKNOWN";last_mutation_id=eid;last_context_event_id=eid
+                invalidate(eid);state["current_exact_time"]="UNKNOWN";last_mutation_id=eid;last_context_event_id=eid
                 floor=max(floor,p) if floor else p
         elif kind=="TRAINING_COUNT_BASELINE":
             # This is a DIRECT, explicit current-save total attestation, not
@@ -478,7 +487,7 @@ def replay(events):
             state["training_history"].append({"event_id":eid,"drill":drill,"participants":list(players),
                 "drill_level":e.get("drill_level"),"cheer":e.get("cheer")})
             if not historical:
-                invalidate();state["current_exact_time"]="UNKNOWN";last_mutation_id=eid;last_context_event_id=eid
+                invalidate(eid);state["current_exact_time"]="UNKNOWN";last_mutation_id=eid;last_context_event_id=eid
                 floor=max(floor,p) if floor else p
         elif kind=="ITEM_USE":
             if e.get("branch")!="ACCEPTED":continue
@@ -495,13 +504,16 @@ def replay(events):
             state["item_effects"].append(item_entry)
             state["item_uses"].append(item_entry)
             if not historical:
-                invalidate();state["current_exact_time"]="UNKNOWN";last_mutation_id=eid;last_context_event_id=eid
+                invalidate(eid);state["current_exact_time"]="UNKNOWN";last_mutation_id=eid;last_context_event_id=eid
                 floor=max(floor,p) if floor else p
         elif kind=="ROLLBACK":
-            invalidate();state["current_exact_time"]="UNKNOWN";last_mutation_id=eid;last_context_event_id=eid
+            invalidate(eid);state["current_exact_time"]="UNKNOWN";last_mutation_id=eid;last_context_event_id=eid
             last_screen_clock=None;last_screen_period=None
         elif kind=="SAVE_CHECKPOINT":
             pass
+    for e in events[tracking_seq:]:
+        if e["kind"]=="CORRECTION" and {"player","skill","preceded_by_rollback"}.intersection(e["patch"]):
+            invalidate_roster(e["event_id"])
     for mid,m in matches.items():
         if m["first_attempt"] is None and mid in prior_first:
             m["first_attempt"]=prior_first[mid]
@@ -538,7 +550,7 @@ def training_count_status(state,player,drill):
     }
 
 def validate_recommendation(rec, state, contract, *, context=None, root=None):
-    from strategy_policy import context_current, training_strategy_errors
+    from strategy_policy import DEVELOPMENT_BASIS, context_current, training_strategy_errors
 
     if not isinstance(rec, dict):
         return ["RECOMMENDATION_OBJECT_REQUIRED"]
@@ -686,6 +698,14 @@ def validate_recommendation(rec, state, contract, *, context=None, root=None):
         if not state["resources"]["fresh"]:errors.append("STALE_RESOURCES")
         else:
             vals=state["resources"]["values"]
+            if action_type == "TRAIN" and rec.get("decision_basis") == DEVELOPMENT_BASIS:
+                readiness = context.get("training_readiness") if isinstance(context, dict) else None
+                selection = readiness.get("menu_selection") if context_current(readiness, state) else None
+                vals = selection.get("current_balances") if isinstance(selection, dict) else None
+                if (not isinstance(vals, dict) or vals.keys() != spend.keys()
+                        or any(type(value) is not int or value < 0 for value in vals.values())):
+                    errors.append("CURRENT_TRAINING_BALANCES_UNVERIFIED")
+                    vals = {}
             for key,value in spend.items():
                 if key not in vals or type(value) is not int or value<0 or value>vals[key]:
                     errors.append(f"INSUFFICIENT_OR_UNKNOWN_RESOURCE:{key}")
