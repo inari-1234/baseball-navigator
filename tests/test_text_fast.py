@@ -355,15 +355,15 @@ class TextFastSafetyRegression(unittest.TestCase):
         self.assertEqual(p["status"],"ACTION_BLOCKED")
         self.assertIn("INVALID_RULE_ID",p["errors"])
 
-    def test_cli_uses_real_canonical_snapshot_and_writes_nothing(self):
+    def test_cli_uses_frozen_rollback_snapshot_and_writes_nothing(self):
         import hashlib
         import subprocess
         import sys
-        paths=[Path("CURRENT_LIVE_STATE.json"),Path("DECISION_CONTRACT.json")]
+        paths=[POSTLOAD / "CURRENT_LIVE_STATE.json", Path("DECISION_CONTRACT.json")]
         before=[hashlib.sha256(path.read_bytes()).hexdigest() for path in paths]
         proc=subprocess.run(
             [sys.executable,"text_fast.py","アイテムを使うべき？",
-             "--boot-verified","--expected-event-seq","10"],
+             "--boot-verified","--expected-event-seq","10","--state",str(paths[0])],
             capture_output=True,text=True,check=True)
         result=json.loads(proc.stdout)
         self.assertEqual(result["status"],"BLOCKED_UNVERIFIED_TIMELINE",result)

@@ -341,7 +341,7 @@ class GuardedReplyRegression(unittest.TestCase):
         record["reviewed_claim_sha256"]={
             name:canonical_state_sha256(value) for name,value in context.items()}
         with self.assertRaisesRegex(ReplyGateError,"LIVE_EVENT_CORRECTED_SOURCE_NEEDS_REVIEW"):
-            _verified_evidence_receipts(context,{ref:record},state,ROOT)
+            _verified_evidence_receipts(context,{ref:record},state,POSTLOAD)
 
     def test_two_earlier_sources_remain_valid_through_screen_and_save(self):
         source={"kind":"USER_REPORT","locator":"synthetic-current-active-branch"}
