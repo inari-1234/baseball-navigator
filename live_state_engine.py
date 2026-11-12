@@ -10,10 +10,15 @@ from typing import Any
 
 KINDS={"SCREEN","MATCH_SCHEDULE","MATCH_ATTEMPT","MATCHES_COMPLETED","TRAINING",
        "TRAINING_COUNT_BASELINE","ITEM_USE","CORRECTION","SAVE_CHECKPOINT",
-       "ROLLBACK","HP_OBSERVATION"}
+       "ROLLBACK","HP_OBSERVATION","OBSERVED_TRACKING_START"}
 SOURCES={"RAW_SCREEN","USER_REPORT","USER_CORRECTION"}
 BRANCHES={"ACCEPTED","REJECTED"}
 COUNTERS=("study","sports","play","nature","cheer")
+OBSERVED_TRACKING = "TRACKED_FROM_CURRENT_OBSERVATION"
+
+
+def has_current_lineage(state):
+    return state.get("timeline_status") in {"TRUSTED", OBSERVED_TRACKING}
 
 class ObservationError(ValueError):
     pass
@@ -153,6 +158,29 @@ def resolve_active_lineage(events):
     """Keep discarded branches for audit, but never apply their skills/items to current state."""
     active=[];discarded=[];discarded_match_ids=set();rollback_count=0;unknown_after_rollback=False
     for e in events:
+        if e["kind"] == "OBSERVED_TRACKING_START":
+            world = active[-1] if active else {}
+            if (world.get("kind") != "SCREEN"
+                    or world.get("event_id") != e.get("world_event_id")
+                    or world.get("branch") != "ACCEPTED"
+                    or world.get("source", {}).get("kind") != "RAW_SCREEN"
+                    or world.get("user_attested_current") is not True
+                    or world.get("rollback_report_event_id") != e.get("rollback_report_event_id")
+                    or not world.get("rollback_report_event_id")
+                    or period(world) != period(e)
+                    or clock_minutes(world.get("clock")) is None
+                    or e["source"]["kind"] != "USER_REPORT"
+                    or e.get("branch") != "ACCEPTED"
+                    or e.get("same_save_no_intervening_gameplay") is not True
+                    or any(not isinstance(e.get(key), str)
+                           or not re.fullmatch(r"[0-9a-f]{64}", e[key])
+                           for key in ("roster_archive_sha256", "continuity_sha256"))):
+                raise ObservationError("observed tracking requires a current post-load screen and reviewed continuity")
+            # The old segment is audit-only; the restore's actual effects are unknown.
+            discarded_match_ids.clear()
+            unknown_after_rollback = False
+            active = [world, e]
+            continue
         if e["kind"]!="ROLLBACK":
             active.append(e)
             continue
@@ -189,11 +217,21 @@ def replay(events):
         if e["kind"]!="CORRECTION":period(e)
     if seqs!=list(range(1,len(events)+1)):
         raise ObservationError("event seq must be contiguous starting at 1")
+    for index, event in enumerate(events):
+        if event["kind"] == "OBSERVED_TRACKING_START":
+            previous = events[index - 1] if index else {}
+            if (previous.get("kind") != "CORRECTION"
+                    or previous.get("event_id") != event.get("rollback_report_event_id")
+                    or previous.get("target_event_id") != event.get("world_event_id")
+                    or previous.get("patch") != {"preceded_by_rollback": True}):
+                raise ObservationError("tracking start must immediately follow the reviewed rollback correction")
     corrected=apply_corrections(events)
     active,discarded,reverted_match_ids,rollback_count,unknown_after_rollback=resolve_active_lineage(corrected)
     prior_first={}
+    tracking_seq = max((event["seq"] for event in corrected
+                        if event["kind"] == "OBSERVED_TRACKING_START"), default=0)
     for e in corrected:
-        if e["kind"]=="MATCH_ATTEMPT" and e.get("attempt")==1 and e.get("match_id") not in prior_first:
+        if e["seq"] > tracking_seq and e["kind"]=="MATCH_ATTEMPT" and e.get("attempt")==1 and e.get("match_id") not in prior_first:
             prior_first[e["match_id"]]={"attempt":1,"our_runs":e.get("our_runs"),
                 "their_runs":e.get("their_runs"),"evidence_id":e["event_id"]}
     state={"schema_version":"1.2","last_event_seq":len(events),"period_floor":None,
@@ -222,6 +260,9 @@ def replay(events):
     for e in active:
         kind=e["kind"];p=period(e);pk=label(p);eid=e["event_id"]
         historical=bool(floor and p<floor)
+        if (historical and state.get("timeline_status") == OBSERVED_TRACKING
+                and kind in {"TRAINING", "ITEM_USE", "MATCH_ATTEMPT", "MATCHES_COMPLETED"}):
+            raise ObservationError(f"{eid}: gameplay event predates the observed period")
         if kind=="SCREEN":
             vals=e.get("resources")
             if not isinstance(vals,dict) or not set(COUNTERS).issubset(vals):
@@ -294,6 +335,20 @@ def replay(events):
             state["current_exact_time"]=e.get("clock") or "UNKNOWN"
             floor=max(floor,p) if floor else p
             last_screen_clock=current_clock;last_screen_period=pk;last_mutation_id=None;last_context_event_id=eid
+        elif kind=="OBSERVED_TRACKING_START":
+            if (not state["resources"]["fresh"]
+                    or state["resources"]["last_observed"] != e["world_event_id"]):
+                raise ObservationError("tracking start has no replayed world counters")
+            state["timeline_status"] = OBSERVED_TRACKING
+            state["rollback_report_event_id"] = e["rollback_report_event_id"]
+            state["observed_tracking"] = {
+                "start_event_id": eid,
+                "world_event_id": e["world_event_id"],
+                "roster_archive_sha256": e["roster_archive_sha256"],
+                "restored_save_checkpoint": "UNKNOWN",
+                "pre_tracking_history": "UNKNOWN",
+            }
+            last_context_event_id = eid
         elif kind=="HP_OBSERVATION":
             entries=e.get("entries")
             if not isinstance(entries,list) or not entries:
@@ -376,7 +431,7 @@ def replay(events):
                     or e.get("confirmed_current_save") is not True
                     or e.get("count_scope")!="EXACT_CURRENT_ACCEPTED_SAVE"
                     or not isinstance(counts,dict) or not counts
-                    or state["timeline_status"]!="TRUSTED" or historical
+                    or not has_current_lineage(state) or historical
                     or floor is None or p!=floor
                     or last_context_event_id is None
                     or e.get("after_event_id")!=last_context_event_id):
@@ -456,7 +511,7 @@ def training_count_status(state,player,drill):
     Certification metadata is emitted only by replay(TRAINING_COUNT_BASELINE).
     """
     key=player+"|"+drill
-    trusted=state.get("timeline_status")=="TRUSTED"
+    trusted=has_current_lineage(state)
     logged=state.get("training_counts_by_player_drill",{}).get(key)
     lower=logged if trusted and type(logged) is int and logged>=0 else None
     exact=state.get("training_counts_exact_by_player_drill",{}).get(key)
@@ -506,7 +561,7 @@ def validate_recommendation(rec, state, contract, *, context=None, root=None):
     if state.get("timeline_status")=="ROLLBACK_CONFIRMED_SAVEPOINT_UNKNOWN":
         errors.append("ROLLBACK_SAVEPOINT_UNKNOWN")
     if state.get("timeline_status") not in {
-            "TRUSTED", "UNKNOWN_AFTER_ROLLBACK", "UNRESOLVED_CAPTURE_CHRONOLOGY",
+            "TRUSTED", OBSERVED_TRACKING, "UNKNOWN_AFTER_ROLLBACK", "UNRESOLVED_CAPTURE_CHRONOLOGY",
             "ROLLBACK_CONFIRMED_SAVEPOINT_UNKNOWN"}:
         errors.append("TIMELINE_NOT_TRUSTED")
     if action_type=="MATCH":

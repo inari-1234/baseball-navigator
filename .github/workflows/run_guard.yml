@@ -108,12 +108,6 @@ jobs:
           python3 knowledge_engine.py validate | tee "${RUNNER_TEMP}/KNOWLEDGE_RESULT.json"
           cat "${RUNNER_TEMP}/KNOWLEDGE_RESULT.json" >> "${GITHUB_STEP_SUMMARY}"
 
-      - name: Verify navigator P3 current snapshot gate
-        shell: bash
-        run: |
-          set -euo pipefail
-          python3 navigator_step.py "スキル獲得に向けて何をすべき？" --boot-verified --expected-event-seq 10 > "${RUNNER_TEMP}/NAVIGATOR_RESULT.json"
-          python3 -c 'import json,sys;p=json.load(open(sys.argv[1])); assert p["status"]=="BLOCKED_UNVERIFIED_TIMELINE"; assert p["action_authorized"] is False; assert "SKILL-4TH-PATTERN" in p["knowledge_refs"]' "${RUNNER_TEMP}/NAVIGATOR_RESULT.json"
       - name: Verify P4 chat bridge pinned CLI
         shell: bash
         run: |
@@ -148,10 +142,14 @@ jobs:
           python3 - <<'PY'
           import json, os
           from chat_bridge import bridge_response
+          from live_state_engine import has_current_lineage
           sha = os.environ["GITHUB_SHA"]
           report = json.load(open(os.environ["RUNNER_TEMP"] + "/PROJECT_BOOT.json", encoding="utf-8"))
           assert report["source_commit_sha"] == sha
-          assert report["status"] == "BOOT_VERIFIED_ACTIONS_BLOCKED"
+          state = json.load(open("CURRENT_LIVE_STATE.json", encoding="utf-8"))
+          assert report["status"] == ("BOOT_VERIFIED" if has_current_lineage(state)
+                                       else "BOOT_VERIFIED_ACTIONS_BLOCKED")
+          assert report["state"]["event_seq"] == state["last_event_seq"]
           assert report["live_replay_verified"] is True
           assert report["knowledge_integrity_verified"] is True
           assert "SKILL-4TH-PATTERN" in report["knowledge"]["required_claim_ids"]
@@ -194,25 +192,6 @@ jobs:
               result,ensure_ascii=False))
           PY
 
-      - name: Verify immediate post-LOAD capture preflight
-        shell: bash
-        run: |
-          set -euo pipefail
-          python3 save_baseline_preflight.py --root . > "${RUNNER_TEMP}/SAVE_BASELINE_PREFLIGHT.json"
-          python3 - <<'PY'
-          import json, os
-          from pathlib import Path
-          report=json.loads((Path(os.environ["RUNNER_TEMP"])/"SAVE_BASELINE_PREFLIGHT.json").read_text(encoding="utf-8"))
-          state=json.loads(Path("CURRENT_LIVE_STATE.json").read_text(encoding="utf-8"))
-          assert report["status"] == "POSTLOAD_CAPTURE_VERIFIED_HISTORY_UNKNOWN"
-          assert report["source_event_seq"] == state["last_event_seq"]
-          assert report["captured"]["clock"] == "PM 5:20"
-          assert not report["rebaseline_ready"] and not report["trusted_timeline"]
-          assert not report["action_authorized"] and not report["side_effects"]
-          assert report["next_evidence"]["type"] == "CURRENT_PLAYER_SCREEN"
-          print("SAVE_BASELINE_PREFLIGHT_PASS")
-          PY
-
       - name: Test live state ingestion and replay
         shell: bash
         run: |
@@ -238,7 +217,7 @@ jobs:
           assert report["live_replay_verified"] and report["candidates_compared"] > 0
           assert report["status"] == "CERTIFIED_NO_ACTION"
           assert report["safe_reply_check"]["status"] == "PASS"
-          assert report["current_observation"]["next_evidence"] == "CONFIRM_UPLOADED_ROSTER_CONTINUITY"
+          assert report["state_event_seq"] == state["last_event_seq"]
           assert not report["action_authorized"] and not report["side_effects"]
           print("P7H_EXACT_REVISION_ENTRY_PASS")
           PY

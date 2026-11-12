@@ -18,7 +18,7 @@ import statistics
 import time
 from typing import Any
 
-from live_state_engine import ObservationError, replay, read_events, clock_minutes
+from live_state_engine import ObservationError, replay, read_events, clock_minutes, has_current_lineage
 from screen_reader import read_image, propose_hp_event
 
 COUNTERS = ("study", "sports", "play", "nature", "cheer")
@@ -202,7 +202,7 @@ class QuickImageSession:
         # does not create a game-screen context. Other branch manipulations
         # must be reconciled by the FULL canonical ingestion pipeline.
         contextual = {"SCREEN", "HP_OBSERVATION", "MATCH_ATTEMPT",
-                      "TRAINING", "ITEM_USE", "ROLLBACK"}
+                      "TRAINING", "ITEM_USE", "ROLLBACK", "OBSERVED_TRACKING_START"}
         latest_context = next((e["event_id"] for e in reversed(events)
                                if e["kind"] in contextual
                                and e.get("branch", "ACCEPTED") == "ACCEPTED"),
@@ -271,7 +271,7 @@ class QuickImageSession:
             raise QuickImageError("LIVE_EVENT_REPLAY_FAILED:" + str(exc)) from exc
         _need(event_id not in proposed.get("observations_ignored_as_stale", []),
               "SCREENSHOT_DRAFT_DISCARDED_AS_STALE")
-        status = ("REVIEWABLE_NOT_COMMITTED" if proposed.get("timeline_status") == "TRUSTED"
+        status = ("REVIEWABLE_NOT_COMMITTED" if has_current_lineage(proposed)
                   else "PROVISIONAL_ROLLBACK_OR_BRANCH_UNVERIFIED")
         return {
             "schema_version": "1.0",

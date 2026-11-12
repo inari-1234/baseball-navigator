@@ -2,6 +2,7 @@ import json
 import re
 import unittest
 from pathlib import Path
+from postload_fixture import POSTLOAD
 
 ROOT=Path(__file__).resolve().parents[1]
 
@@ -30,12 +31,12 @@ class UploadedRosterCandidateGate(unittest.TestCase):
         self.assertFalse(report["original_image_bytes_in_public_repository"])
     def test_live_state_remains_untrusted_and_game_events_unchanged(self):
         report=json.loads((ROOT/"ROSTER_SCREEN_CANDIDATE_20261111.json").read_text(encoding="utf-8"))
-        state=json.loads((ROOT/"CURRENT_LIVE_STATE.json").read_text(encoding="utf-8"))
+        state=json.loads((POSTLOAD/"CURRENT_LIVE_STATE.json").read_text(encoding="utf-8"))
         self.assertEqual(state["last_event_seq"],report["reference_live_event_seq"])
         self.assertEqual(state["timeline_status"],"ROLLBACK_CONFIRMED_SAVEPOINT_UNKNOWN")
         self.assertEqual(state.get("training_counts_by_player_drill"),{})
         self.assertEqual(state.get("skills"),[])
-        ledger=json.loads((ROOT/"CURRENT_RUN_LEDGER.yaml").read_text(encoding="utf-8"))
+        ledger=json.loads((POSTLOAD/"CURRENT_RUN_LEDGER.yaml").read_text(encoding="utf-8"))
         self.assertEqual(ledger["current_gate"]["status"],"BLOCKED_UNKNOWN")
 
 if __name__ == "__main__":

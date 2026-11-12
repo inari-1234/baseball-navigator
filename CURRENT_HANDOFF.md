@@ -3,6 +3,11 @@
 Last updated: 2026-11-12
 State: ACTIVE_Y1_JUNE_POST_ROLLBACK_CAPTURE — SAVEPOINT_UNKNOWN
 
+## Observed tracking transition and real acceptance
+- The current capture and roster manifest remain at live seq 10. The original world image, the roster ZIP and all 19 images matched the recorded hashes on independent readback. The direct same-SAVE, no-intervening-gameplay confirmation is required to link the existing roster to the world capture and start the new segment. No replacement images or repeat entry of known counters is needed.
+- `save_baseline_preflight.py` can preview the new observation start using the existing private receipt format. Once source-reviewed and committed, `OBSERVED_TRACKING_START` makes replay start from the observed world screen without restoring earlier history. The original log and the unresolved checkpoint remain auditable. `next_action.py` treats 「進めて」 as a next-action request at its explicit entry.
+- Actual training-draft acceptance remains open. The first two recorded zero-run initial scores alone do not establish either P7-H batting failure mode. The indexed 19 roster screens do not establish the availability of the training menu or participant eligibility. Review existing action evidence before asking for a missing field.
+
 ## P7-H strategy and reply verification
 - Local user-facing entry: `next_action.py` runs ordered BOOT, event replay, candidate comparison, strategy validation and exact-text reply verification. Display `safe_reply` only on PASS. Contact and conversion special-training drafts can be certified with current sources. Normal-practice focus/load settings, matches, items, school activities and other decisions lack a certified action rendering in this entry.
 - The current world observation at seq 10 already has Y1 June PM 5:20 and fresh counters. The 19 roster screens are indexed. Ask whether they were captured on that same SAVE without intervening gameplay. Reuse the existing images and counters, and retain the sourced confirmation for repeated requests at the same revision. The restored checkpoint and historical training/skills require independent evidence.

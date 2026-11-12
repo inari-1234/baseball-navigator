@@ -3,6 +3,7 @@ from __future__ import annotations
 import copy
 import json
 from pathlib import Path
+from postload_fixture import POSTLOAD, copy_postload_runtime
 import unittest
 import hashlib
 import tempfile
@@ -47,9 +48,13 @@ class GuardedReplyRegression(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.state=json.loads((ROOT/"CURRENT_LIVE_STATE.json").read_text(encoding="utf-8"))
-        cls.skill=bridge_response(request("SKILL"),root=ROOT,actual_main_sha=SHA)
-        cls.counts=bridge_response(request("TRAINING_COUNTS"),root=ROOT,actual_main_sha=SHA)
+        temp = tempfile.TemporaryDirectory()
+        cls.addClassCleanup(temp.cleanup)
+        cls.postload = Path(temp.name)
+        copy_postload_runtime(cls.postload)
+        cls.state=json.loads((POSTLOAD/"CURRENT_LIVE_STATE.json").read_text(encoding="utf-8"))
+        cls.skill=bridge_response(request("SKILL"),root=cls.postload,actual_main_sha=SHA)
+        cls.counts=bridge_response(request("TRAINING_COUNTS"),root=cls.postload,actual_main_sha=SHA)
 
     def verdict(self, text, bridge=None, sha=SHA, seq=10):
         return check_reply(text,bridge=self.skill if bridge is None else bridge,
@@ -131,7 +136,7 @@ class GuardedReplyRegression(unittest.TestCase):
 
     def test_unsupported_intent_and_status_never_implicitly_certified(self):
         for intent in ("MATCH","RECOVERY","GENERAL","STATUS"):
-            r=bridge_response(request(intent),root=ROOT,actual_main_sha=SHA)
+            r=bridge_response(request(intent),root=self.postload,actual_main_sha=SHA)
             self.assertNotIn("safe_reply",r)
         x=copy.deepcopy(self.skill);x["status"]="VALIDATED_DRAFT_REVIEW"
         with self.assertRaises(ReplyGateError):
@@ -308,7 +313,7 @@ class GuardedReplyRegression(unittest.TestCase):
                  "training_readiness":claim(
                      available_drills=["素振り"],
                      ready_players=["岡治","今井","たき"])}
-        events=[json.loads(line) for line in (ROOT/"LIVE_EVENTS.jsonl").read_text(
+        events=[json.loads(line) for line in (POSTLOAD/"LIVE_EVENTS.jsonl").read_text(
             encoding="utf-8").splitlines() if line.strip()]
         event=next(e for e in events if e["event_id"]==ref)
         record={"kind":"LIVE_EVENT","event_id":ref,

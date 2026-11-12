@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from live_state_engine import validate_recommendation, training_count_status
+from live_state_engine import validate_recommendation, training_count_status, has_current_lineage
 from knowledge_engine import KnowledgeError, skill_guidance, validate_skill_recommendation
 
 
@@ -140,7 +140,7 @@ def _read_only_projection(message: str, state: dict[str, Any]) -> dict[str, Any]
              else "MATCHES" if any(word in text for word in
              ("試合", "対戦"))
              else "STATUS")
-    branch_trusted = state.get("timeline_status") == "TRUSTED"
+    branch_trusted = has_current_lineage(state)
     base = {
         "topic": topic, "source_event_seq": state["last_event_seq"],
         "current_game_period": state.get("period_floor"),
@@ -300,7 +300,7 @@ class TextFastEngine:
             base["knowledge_refs"] = base["knowledge"]["knowledge_refs"]
             base["rule_ids"] = base["rule_ids"] + ["DC-TRAIN-001"]
         status = state.get("timeline_status")
-        if status != "TRUSTED":
+        if not has_current_lineage(state):
             return {**base, "status": "BLOCKED_UNVERIFIED_TIMELINE",
                     "errors": ["UNVERIFIED_TIMELINE:" + str(status)],
                     "fallback": "VERIFY_ACTIVE_SAVE_BRANCH"}

@@ -5,7 +5,8 @@ import json
 from pathlib import Path
 import re
 
-from strategy_policy import context_current
+from live_state_engine import OBSERVED_TRACKING, has_current_lineage
+from strategy_policy import context_current, offense_pattern
 
 ROSTER_RECORD = "ROSTER_SCREEN_CANDIDATE_20261111.json"
 
@@ -37,7 +38,14 @@ def current_observations(state, root, context, evidence_sources):
             "status": "STALE_OR_UNLINKED",
         }
         observed["roster"] = roster
-        if (resources["fresh"] and record.get("reference_live_event_seq") ==
+        tracking = state.get("observed_tracking")
+        if (state["timeline_status"] == OBSERVED_TRACKING
+                and resources["fresh"]
+                and tracking["world_event_id"] == resources["last_observed"]
+                and tracking["roster_archive_sha256"] == archive):
+            roster["status"] = "CURRENT_ROSTER_OBSERVATION"
+            roster["players"] = record["roster"]
+        elif (resources["fresh"] and record.get("reference_live_event_seq") ==
                 state["last_event_seq"]):
             roster["status"] = "PENDING_SAME_SAVE_CONTINUITY"
             observed["next_evidence"] = "CONFIRM_UPLOADED_ROSTER_CONTINUITY"
@@ -56,16 +64,26 @@ def current_observations(state, root, context, evidence_sources):
                     roster["status"] = "CURRENT_ROSTER_OBSERVATION"
                     roster["players"] = record["roster"]
                     observed["next_evidence"] = None
-    if state["timeline_status"] != "TRUSTED" and observed["next_evidence"] is None:
+    if not has_current_lineage(state) and observed["next_evidence"] is None:
         observed["next_evidence"] = (
             "RECONCILE_RESTORED_SAVE_ANCHOR" if resources["fresh"]
             else "CURRENT_WORLD_COUNTERS")
+    elif state["timeline_status"] == OBSERVED_TRACKING:
+        assessment = context.get("failure_assessment") if isinstance(context, dict) else None
+        if not resources["fresh"]:
+            observed["next_evidence"] = "CURRENT_WORLD_COUNTERS"
+        elif not offense_pattern(assessment, state):
+            observed["next_evidence"] = "REVIEW_MATCH_EVIDENCE"
+        else:
+            observed["next_evidence"] = "REVIEW_TRAINING_READINESS"
     return observed
 
 
 def render_observation_stop(observed, state, line):
     lines = ["現時点で表示できる攻略行動の候補はありません。"]
-    if state["timeline_status"] != "TRUSTED":
+    if state["timeline_status"] == OBSERVED_TRACKING:
+        lines.append("現在の観測から追跡中です。復元元と観測起点以前の履歴は未確定です。")
+    elif not has_current_lineage(state):
         lines.append("復元元のSAVE、過去の特訓総回数、保持スキルは未確定です。")
     counters = observed["counters"]
     if counters:
@@ -85,6 +103,8 @@ def render_observation_stop(observed, state, line):
         "RECONCILE_RESTORED_SAVE_ANCHOR":
             "復元元を特定できる既存のSAVE記録を確認します。確認済みの画面や数値の再提出は不要です。",
         "CURRENT_WORLD_COUNTERS": "現在の時刻と資源カウンターを確認します。",
+        "REVIEW_MATCH_EVIDENCE": "比較できる初戦の安打数・得点を、既存記録から先に確認します。",
+        "REVIEW_TRAINING_READINESS": "候補の特訓メニューと対象選手の参加可否を確認します。",
         None: "候補に不足している根拠を確認するまで操作を保留します。",
     }[observed["next_evidence"]]
     return "\n".join([*lines, line, "Fallback: " + next_evidence])

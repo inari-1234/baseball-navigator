@@ -1,0 +1,73 @@
+{
+  "ledger_version": 14,
+  "goal": {
+    "primary": {
+      "id": "GOAL-Y1-SAPPOKO",
+      "description": "Y1 10月 さっぽこ高校撃破",
+      "locked": true,
+      "published_profile_note": "Public tables describe Sapporo as overall C with strong pitching/defense; live run overrides public details."
+    },
+    "secondary": [
+      "Preserve first-attempt match results for stability measurement.",
+      "Use targeted skill SAVE/LOAD only under the scoped reroll evidence and current contract."
+    ]
+  },
+  "current_gate": {
+    "id": "ROLLBACK_SAVEPOINT_AUTHORITY_RECONCILE",
+    "status": "BLOCKED_UNKNOWN",
+    "reason_refs": [
+      "UNK-ROLLBACK-SAVEPOINT-20261106"
+    ]
+  },
+  "facts": [
+    {
+      "fact_id": "FACT-Y1-JUNE-520-IMMEDIATE-POSTLOAD",
+      "fact_type": "OBSERVED",
+      "path": "new_run.current.image_capture_relation_to_save_load",
+      "value": {
+        "screen_period": "Y1-06",
+        "clock": "PM 5:20",
+        "image_sha256": "de88e4b7fe160910ee10b543bc547f45239635fc120136bcddab3844bf6fc197",
+        "post_load_immediate": true,
+        "intervening_game_actions": false,
+        "restored_save_checkpoint": "UNKNOWN",
+        "retained_historical_training_skill_item_match_effects": "UNKNOWN"
+      },
+      "source_refs": [
+        "EV-USER-20261109-IMMEDIATE-POSTLOAD-NO-ACTIONS",
+        "EV-RAW-Y1-JUNE-ITEM-MENUS-8971-8972"
+      ],
+      "usable_for_decision": false,
+      "notes": "Direct user report supports the present post-load snapshot. It is not evidence of the identity of the loaded checkpoint, pre-save actions, exact training counts, current skills or full inventory."
+    }
+  ],
+  "evidence": [
+    {
+      "evidence_id": "EV-RAW-Y1-JUNE-ITEM-MENUS-8971-8972",
+      "kind": "RAW_EVIDENCE",
+      "locator": "User-uploaded IMG_8971.png SHA256 de88e4b7fe160910ee10b543bc547f45239635fc120136bcddab3844bf6fc197; IMG_8972.png SHA256 c5ae334bd764fbecdba68ba0aafc03a300b6e5ccfb58074f32e601793903cd67",
+      "notes": "Both show Y1 June PM5:20, 15,980 yen; on item menu four user-labeled visible icon slots show 0/1,0/2,0/2,0/2. Bottom independently displays Chocolate stock 1. No claim that 0/2 denominator equals full stock or that item was used."
+    },
+    {
+      "evidence_id": "EV-USER-20261109-IMMEDIATE-POSTLOAD-NO-ACTIONS",
+      "kind": "USER_ASSERTION",
+      "statement": "The Y1 June PM5:20 screen (IMG_8971 image, SHA256 de88e4b7fe160910ee10b543bc547f45239635fc120136bcddab3844bf6fc197) was captured immediately after the user loaded a SAVE; no gameplay operations were performed between loading and that screen. This identifies the present post-load snapshot, not which earlier SAVE checkpoint or effects were retained.",
+      "locator": "Direct user confirmation in this chat, 2026-11-09; image bytes independently SHA256-verified in this turn.",
+      "source_refs": [
+        "EV-RAW-Y1-JUNE-ITEM-MENUS-8971-8972"
+      ]
+    }
+  ],
+  "unknowns": [
+    {
+      "unknown_id": "UNK-ROLLBACK-SAVEPOINT-20261106",
+      "field": "new_run.current.confirmed_rollback_restore_anchor",
+      "status": "OPEN",
+      "material_to_next_action": true,
+      "material_to_goal": false,
+      "default": "Recognize June PM5:20 as the current post-rollback screenshot. Do not assume any effects of matches, training, items or resources from pre-rollback captures survived; deny paid actions until the active SAVE branch and game state are reconciled. An explicit rollback report is not proof of which SAVE was restored.",
+      "resolve_by": "Independently identify the restored save/checkpoint or accept a new source-grounded baseline for the ongoing branch; check retained match/training/skills and current full inventory before acting.",
+      "notes": "2026-11-09 user confirmed IMG_8971 capture immediately after loading a SAVE and without intervening gameplay. Snapshot continuity at capture is confirmed; identity of restored checkpoint, retained actions/skills/training counts remain unknown. Do not mark TRUSTED from capture timing alone."
+    }
+  ]
+}

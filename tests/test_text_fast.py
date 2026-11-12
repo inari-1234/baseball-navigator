@@ -4,6 +4,7 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from postload_fixture import POSTLOAD
 from unittest.mock import patch
 
 from text_fast import TextFastEngine, classify_text
@@ -247,7 +248,7 @@ class TextFastSafetyRegression(unittest.TestCase):
         self.assertEqual(self.engine.action_validator_calls,0)
 
     def test_current_repo_live_rollback_has_safe_action_gate(self):
-        s=json.loads(Path("CURRENT_LIVE_STATE.json").read_text(encoding="utf-8"))
+        s=json.loads((POSTLOAD / "CURRENT_LIVE_STATE.json").read_text(encoding="utf-8"))
         c=json.loads(Path("DECISION_CONTRACT.json").read_text(encoding="utf-8"))
         p=self.engine.plan("アイテムを使うべき？",
                            state=s,contract=c,boot_verified=True,
@@ -297,7 +298,7 @@ class TextFastSafetyRegression(unittest.TestCase):
         self.assertEqual(self.engine.action_validator_calls,0)
 
     def test_real_current_match_schedule_is_read_only_and_not_completed(self):
-        canonical=json.loads(Path("CURRENT_LIVE_STATE.json").read_text(encoding="utf-8"))
+        canonical=json.loads((POSTLOAD / "CURRENT_LIVE_STATE.json").read_text(encoding="utf-8"))
         p=self.route("今の試合予定を教えて",s=canonical)
         self.assertEqual(p["status"],"READ_ONLY_READY",p)
         obs=p["observation"]
@@ -310,7 +311,7 @@ class TextFastSafetyRegression(unittest.TestCase):
         self.assertTrue(obs["historical_results_are_not_current_guide"])
 
     def test_real_current_items_are_visible_slots_not_full_inventory(self):
-        canonical=json.loads(Path("CURRENT_LIVE_STATE.json").read_text(encoding="utf-8"))
+        canonical=json.loads((POSTLOAD / "CURRENT_LIVE_STATE.json").read_text(encoding="utf-8"))
         p=self.route("現在のアイテム所持数は？",s=canonical)
         obs=p["observation"]
         self.assertEqual(obs["topic"],"ITEMS")
@@ -324,7 +325,7 @@ class TextFastSafetyRegression(unittest.TestCase):
         self.assertFalse(obs["item_use_confirmed"])
 
     def test_resources_project_only_truly_present_canonical_fields(self):
-        canonical=json.loads(Path("CURRENT_LIVE_STATE.json").read_text(encoding="utf-8"))
+        canonical=json.loads((POSTLOAD / "CURRENT_LIVE_STATE.json").read_text(encoding="utf-8"))
         p=self.route("スポーツと研究ポイントの現在値は？",s=canonical)
         obs=p["observation"]
         self.assertEqual(obs["topic"],"RESOURCES")

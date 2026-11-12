@@ -5,7 +5,7 @@ from copy import deepcopy
 import hashlib
 import json
 from pathlib import Path
-import shutil
+from postload_fixture import copy_postload_authorities
 import subprocess
 import sys
 import tempfile
@@ -14,7 +14,9 @@ import unittest
 from check_reply import (canonical_state_sha256, check_reply,
                          make_local_verified_draft_packet)
 from current_observation import ROSTER_RECORD
-from live_state_engine import replay, validate_recommendation
+from live_state_engine import (OBSERVED_TRACKING, ObservationError, read_events,
+                               replay, training_count_status, validate_recommendation)
+from save_baseline_preflight import BaselinePreflightError, prepare_observed_tracking
 from navigator_step import navigator_step
 from next_action import next_action
 from project_bootstrap import BOOT_ORDER
@@ -54,11 +56,11 @@ class NextActionTests(unittest.TestCase):
         self.root = Path(temp.name)
         self.repo = self.root / "checkout"
         self.repo.mkdir()
-        for name in (*BOOT_ORDER, "AGENTS.md", "PROJECT_ENTRYPOINT.json", "LIVE_EVENTS.jsonl",
-                     "KNOWLEDGE_CLAIMS.json", "KNOWLEDGE_MANIFEST.json",
-                     "EVIDENCE_EVENTS.jsonl", "EVIDENCE_BACKUP_CHECKPOINTS.jsonl",
-                     "EXPERIMENT_TRIALS.jsonl", "NAV_TACTICS.json", ROSTER_RECORD):
-            shutil.copyfile(ROOT / name, self.repo / name)
+        copy_postload_authorities(self.repo, (
+            *BOOT_ORDER, "AGENTS.md", "PROJECT_ENTRYPOINT.json", "LIVE_EVENTS.jsonl",
+            "KNOWLEDGE_CLAIMS.json", "KNOWLEDGE_MANIFEST.json", "EVIDENCE_EVENTS.jsonl",
+            "EVIDENCE_BACKUP_CHECKPOINTS.jsonl", "EXPERIMENT_TRIALS.jsonl",
+            "NAV_TACTICS.json", ROSTER_RECORD))
         self.git("init", "-q")
         self.contract = json.loads((self.repo / "DECISION_CONTRACT.json").read_text(encoding="utf-8"))
 
@@ -236,6 +238,84 @@ class NextActionTests(unittest.TestCase):
             self.assertEqual(linked["save_history_status"], "ROLLBACK_CONFIRMED_SAVEPOINT_UNKNOWN")
             self.assertIn("過去の特訓総回数、保持スキルは未確定", linked["safe_reply"])
             self.assertNotIn("撮ったか確認", linked["safe_reply"])
+
+    def tracking_preview(self):
+        self.commit_fixture()
+        events = read_events(self.repo / "LIVE_EVENTS.jsonl")
+        ledger = json.loads((self.repo / "CURRENT_RUN_LEDGER.yaml").read_text(encoding="utf-8"))
+        observed = self.run_entry()["current_observation"]
+        context = {"roster_chronology": {
+            "verified_for_current_state": True, "source_event_seq": self.state["last_event_seq"],
+            "period": observed["period"], "branch": "ACCEPTED", "evidence_refs": ["ATTESTATION"],
+            "archive_sha256": observed["roster"]["archive_sha256"],
+            "after_world_event_id": observed["counter_source_event_id"],
+            "same_save_no_intervening_gameplay": True,
+        }}
+        def preview():
+            return prepare_observed_tracking(
+                self.state, events, ledger, root=self.repo, context=context,
+                evidence_sources=self.sources(context))
+        with self.assertRaisesRegex(BaselinePreflightError, "CURRENT_SAVE_NO_CHANGE_REPORT_REQUIRED"):
+            preview()
+        context["roster_chronology"]["unchanged_through_current_report"] = True
+        return events, preview()
+
+    def test_tracking_uses_same_roster_and_world_without_reinstating_history(self):
+        events, preview = self.tracking_preview()
+        self.assertEqual(read_events(self.repo / "LIVE_EVENTS.jsonl"), events)
+        event = preview["event_preview"]
+        self.commit_fixture([*events, event])
+        self.assertEqual(self.state, preview["state_preview"])
+        self.assertEqual(self.state["timeline_status"], OBSERVED_TRACKING)
+        self.assertEqual(self.state["observed_tracking"]["restored_save_checkpoint"], "UNKNOWN")
+        self.assertEqual(self.state["matches"], {})
+        self.assertEqual(self.state["skills"], [])
+        self.assertIsNone(training_count_status(self.state, "今井", "素振り")["exact_committed_count"])
+        report = self.run_entry("進めて")
+        self.assertEqual(report["status"], "CERTIFIED_NO_ACTION", report)
+        self.assertEqual(report["current_observation"]["counters"]["sports"], 28)
+        self.assertEqual(report["current_observation"]["roster"]["status"], "CURRENT_ROSTER_OBSERVATION")
+        self.assertEqual(report["current_observation"]["next_evidence"], "REVIEW_MATCH_EVIDENCE")
+        self.assertNotIn("撮ったか確認", report["safe_reply"])
+
+        context = context_for(self.state)
+        report = self.run_entry(SKILL, context=context, evidence_sources=self.sources(context))
+        self.assertEqual(report["status"], "CERTIFIED_TRAINING_DRAFT", report)
+        self.assertEqual(report["safe_reply_check"]["status"], "PASS")
+        self.assertIn("4回目の根拠は未確認", report["safe_reply"])
+
+    def test_tracking_counts_only_new_actions_and_expires_on_unknown_reload(self):
+        events, preview = self.tracking_preview()
+        marker = preview["event_preview"]
+        base = [*events, marker]
+        trial = {
+            "seq": marker["seq"] + 1, "event_id": "TRACK-TRIAL", "kind": "TRAINING",
+            "source": {"kind": "USER_REPORT", "locator": "test fixture"},
+            "period": marker["period"], "branch": "ACCEPTED", "drill": "素振り",
+            "participants": ["入江", "今井", "岡治"],
+        }
+        state = replay([*base, trial])
+        info = training_count_status(state, "今井", "素振り")
+        self.assertEqual(info["recorded_lower_bound"], 1)
+        self.assertIsNone(info["exact_committed_count"])
+        self.assertFalse(state["resources"]["fresh"])
+        checkpoint = {k: trial[k] for k in ("seq", "event_id", "period", "source")}
+        checkpoint.update(kind="SAVE_CHECKPOINT", event_id="TRACK-SAVE")
+        rollback = {k: trial[k] for k in ("period", "source")}
+        rollback.update(seq=trial["seq"] + 2, event_id="TRACK-LOAD", kind="ROLLBACK")
+        post_save_trial = dict(trial, seq=trial["seq"] + 1)
+        restored = replay([*base, checkpoint, post_save_trial,
+                           dict(rollback, to_checkpoint_id="TRACK-SAVE")])
+        self.assertEqual(restored["timeline_status"], OBSERVED_TRACKING)
+        self.assertEqual(restored["training_counts_by_player_drill"], {})
+        state = replay([*base, trial, dict(rollback, seq=trial["seq"] + 1)])
+        self.assertEqual(state["timeline_status"], "UNKNOWN_AFTER_ROLLBACK")
+        self.assertNotIn("observed_tracking", state)
+        self.assertIsNone(training_count_status(state, "今井", "素振り")["recorded_lower_bound"])
+        with self.assertRaisesRegex(ObservationError, "immediately follow"):
+            replay([*events, dict(trial, seq=marker["seq"]), dict(marker, seq=trial["seq"])])
+        with self.assertRaisesRegex(ObservationError, "predates"):
+            replay([*base, dict(trial, period={"year": 1, "month": 5})])
 
     def test_replay_mismatch_stops_before_comparison(self):
         self.commit_fixture(fixture_events())

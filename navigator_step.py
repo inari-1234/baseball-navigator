@@ -19,7 +19,7 @@ from knowledge_engine import (
     ACCEPTED, FOURTH, KnowledgeError, validate_knowledge,
     validate_skill_recommendation,
 )
-from live_state_engine import validate_recommendation, training_count_status
+from live_state_engine import validate_recommendation, training_count_status, has_current_lineage
 from strategy_policy import (
     OFFENSE_RULE, TRAINING_RULES, context_current as _context_current,
     load_tactics as _load_catalog, offense_pattern, training_cost,
@@ -166,7 +166,7 @@ def _match_candidates(state: dict[str, Any], context: dict[str, Any],
         if match.get("status") != "SCHEDULED":
             continue
         reasons = []
-        if state.get("timeline_status") != "TRUSTED":
+        if not has_current_lineage(state):
             reasons.append("CURRENT_SAVE_ANCHOR_UNVERIFIED")
         rules = list(RULE_BASE + RULE_MATCH) + ["DC-OFF-003"]
         rec = {"action_type": "MATCH", "based_on_event_seq": state["last_event_seq"],
@@ -193,7 +193,7 @@ def _recovery_candidate(state: dict[str, Any], context: dict[str, Any],
     player = recover.get("player") if verified else None
     item = recover.get("item") if verified else None
     reasons = []
-    if state.get("timeline_status") != "TRUSTED":
+    if not has_current_lineage(state):
         reasons.append("CURRENT_SAVE_ANCHOR_UNVERIFIED")
     if not verified or not isinstance(player, str) or not player or not isinstance(item, str) or not item:
         reasons.append("RECOVERY_TARGET_AND_ITEM_NOT_SOURCE_VERIFIED")
@@ -316,7 +316,7 @@ def navigator_step(message: str, *, state: dict, contract: dict,
         controlling += list(RULE_HP)
     else:
         controlling += ["DC-UNKNOWN-001"]
-    if state.get("timeline_status") != "TRUSTED":
+    if not has_current_lineage(state):
         controlling += ["DC-STATE-001", "DC-UNKNOWN-001"]
     result = {
         **base, "failure_mode": mode,
@@ -329,7 +329,7 @@ def navigator_step(message: str, *, state: dict, contract: dict,
         "ranking_is_expected_value_estimate": False,
         "ranking_basis": "EVIDENCE_SCOPED_FAILURE_MODE_PRIORITY_NO_INVENTED_UTILITY",
     }
-    if state.get("timeline_status") != "TRUSTED":
+    if not has_current_lineage(state):
         return {**result, "status": "BLOCKED_UNVERIFIED_TIMELINE",
                 "primary_next_step": "VERIFY_CURRENT_SAVE_ANCHOR",
                 "fallback": FALLBACK_SAVE,

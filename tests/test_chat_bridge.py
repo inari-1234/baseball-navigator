@@ -5,6 +5,7 @@ import copy
 import hashlib
 import json
 from pathlib import Path
+from postload_fixture import POSTLOAD, copy_postload_runtime
 import subprocess
 import sys
 import tempfile
@@ -32,12 +33,18 @@ def request(intent="SKILL", **overrides):
 
 
 class ChatBridgeTests(unittest.TestCase):
+    def setUp(self):
+        temp = tempfile.TemporaryDirectory()
+        self.addCleanup(temp.cleanup)
+        self.postload = Path(temp.name)
+        copy_postload_runtime(self.postload)
+
     def test_ordered_boot_present(self):
         verify_boot(ROOT)
         self.assertTrue(all((ROOT / p).exists() for p in BOOT_FILES))
 
     def test_skill_end_to_end_source_pinned_and_safe(self):
-        r = bridge_response(request(), root=ROOT, actual_main_sha=FAKE_SHA)
+        r = bridge_response(request(), root=self.postload, actual_main_sha=FAKE_SHA)
         self.assertEqual(r["intent"], "SKILL")
         self.assertEqual(r["source_commit_sha"], FAKE_SHA)
         self.assertEqual(r["state_event_seq"], 10)
@@ -65,7 +72,7 @@ class ChatBridgeTests(unittest.TestCase):
         self.assertTrue(r["source_is_current_only_at_this_commit"])
 
     def test_boot_intent_returns_full_verified_resume_capsule(self):
-        response=bridge_response(request(intent="BOOT"),root=ROOT,
+        response=bridge_response(request(intent="BOOT"),root=self.postload,
                                  actual_main_sha=FAKE_SHA)
         self.assertEqual(response["status"],"BOOT_VERIFIED_ACTIONS_BLOCKED")
         self.assertEqual(response["state_event_seq"],10)
@@ -85,12 +92,12 @@ class ChatBridgeTests(unittest.TestCase):
     def test_boot_intent_stale_event_seq_rejected(self):
         with self.assertRaisesRegex(ChatBridgeError,"STALE_EVENT_REVISION"):
             bridge_response(request(intent="BOOT",expected_event_seq=9),
-                            root=ROOT,actual_main_sha=FAKE_SHA)
+                            root=self.postload,actual_main_sha=FAKE_SHA)
 
     def test_all_intents_are_readonly(self):
         for intent in INTENTS:
             with self.subTest(intent=intent):
-                r = bridge_response(request(intent=intent), root=ROOT,
+                r = bridge_response(request(intent=intent), root=self.postload,
                                     actual_main_sha=FAKE_SHA)
                 self.assertEqual(r["intent"], intent)
                 self.assertFalse(r["action_authorized"])
@@ -101,11 +108,11 @@ class ChatBridgeTests(unittest.TestCase):
                 self.assertTrue(r["rule_ids"])
 
     def test_future_trusted_candidate_without_private_context_is_suppressed(self):
-        state=json.loads((ROOT/"CURRENT_LIVE_STATE.json").read_text(encoding="utf-8"))
+        state=json.loads((POSTLOAD/"CURRENT_LIVE_STATE.json").read_text(encoding="utf-8"))
         state["timeline_status"]="TRUSTED"
         contract=json.loads((ROOT/"DECISION_CONTRACT.json").read_text(encoding="utf-8"))
         from check_reply import canonical_state_sha256
-        packet=bridge_response(request(intent="SKILL"),root=ROOT,
+        packet=bridge_response(request(intent="SKILL"),root=self.postload,
                                actual_main_sha=FAKE_SHA)
         packet["timeline_status"]="TRUSTED"
         packet["state_structured_sha256"]=canonical_state_sha256(state)
@@ -123,7 +130,7 @@ class ChatBridgeTests(unittest.TestCase):
         result={"status":"VALIDATED_DRAFT_REVIEW"}
         final=finalize_reply_delivery(
             packet,result=result,state=state,contract=contract,
-            root=ROOT,main_sha=FAKE_SHA)
+            root=self.postload,main_sha=FAKE_SHA)
         self.assertEqual(final["status"],"REPLY_NOT_CERTIFIED")
         self.assertEqual(final["navigator_status"],"VALIDATED_DRAFT_REVIEW")
         self.assertEqual(final["reply_delivery_status"],"STOP_UNCERTIFIED")
@@ -141,7 +148,7 @@ class ChatBridgeTests(unittest.TestCase):
     def test_uncertified_public_action_intents_never_export_a_draft(self):
         for intent in ("GENERAL","MATCH","RECOVERY"):
             with self.subTest(intent=intent):
-                reply=bridge_response(request(intent=intent),root=ROOT,
+                reply=bridge_response(request(intent=intent),root=self.postload,
                                       actual_main_sha=FAKE_SHA)
                 self.assertEqual(reply["status"],"REPLY_NOT_CERTIFIED")
                 self.assertEqual(reply["reply_delivery_status"],"STOP_UNCERTIFIED")
@@ -151,7 +158,7 @@ class ChatBridgeTests(unittest.TestCase):
 
     def test_training_counts_intent_never_claims_exact_current_sessions(self):
         r = bridge_response(request(intent="TRAINING_COUNTS"),
-                            root=ROOT, actual_main_sha=FAKE_SHA)
+                            root=self.postload, actual_main_sha=FAKE_SHA)
         self.assertEqual(r["status"], "READ_ONLY_READY")
         self.assertIsNone(r["candidate"])
         obs = r["observation"]
@@ -164,7 +171,7 @@ class ChatBridgeTests(unittest.TestCase):
         self.assertIn("未確定", r["safe_reply"])
 
     def test_status_response_is_readonly_projection(self):
-        r=bridge_response(request(intent="STATUS"),root=ROOT,actual_main_sha=FAKE_SHA)
+        r=bridge_response(request(intent="STATUS"),root=self.postload,actual_main_sha=FAKE_SHA)
         self.assertEqual(r["status"], "READ_ONLY_READY")
         self.assertEqual(r["observation"]["source_event_seq"],10)
         self.assertEqual(r["observation"]["timeline_status"],
@@ -172,11 +179,11 @@ class ChatBridgeTests(unittest.TestCase):
 
     def test_changing_main_sha_rejected(self):
         with self.assertRaisesRegex(ChatBridgeError,"STALE_MAIN_SHA"):
-            bridge_response(request(),root=ROOT,actual_main_sha="b"*40)
+            bridge_response(request(),root=self.postload,actual_main_sha="b"*40)
 
     def test_changed_event_seq_rejected(self):
         with self.assertRaisesRegex(ChatBridgeError,"STALE_EVENT_REVISION"):
-            bridge_response(request(expected_event_seq=9),root=ROOT,
+            bridge_response(request(expected_event_seq=9),root=self.postload,
                             actual_main_sha=FAKE_SHA)
 
     def test_additional_free_text_not_sent_to_public_repo(self):
@@ -210,7 +217,7 @@ class ChatBridgeTests(unittest.TestCase):
             validate_request(request(schema_version="2.0"))
 
     def test_output_does_not_embed_private_file_ids_or_raw_images(self):
-        text=json.dumps(bridge_response(request(),root=ROOT,actual_main_sha=FAKE_SHA),
+        text=json.dumps(bridge_response(request(),root=self.postload,actual_main_sha=FAKE_SHA),
                         ensure_ascii=False)
         self.assertNotIn("libfile_",text)
         self.assertNotIn("data:image/",text)
@@ -222,13 +229,14 @@ class ChatBridgeTests(unittest.TestCase):
                "DECISION_CONTRACT.json", "KNOWLEDGE_CLAIMS.json",
                "CURRENT_HANDOFF.md")
         before={name:hashlib.sha256((ROOT/name).read_bytes()).hexdigest() for name in files}
-        bridge_response(request(),root=ROOT,actual_main_sha=FAKE_SHA)
+        bridge_response(request(),root=self.postload,actual_main_sha=FAKE_SHA)
         after={name:hashlib.sha256((ROOT/name).read_bytes()).hexdigest() for name in files}
         self.assertEqual(before,after)
 
     def test_cli_from_actual_checkout_writes_one_json_line(self):
         head=git_head(ROOT)
-        req=request(expected_main_sha=head)
+        state = json.loads((ROOT / "CURRENT_LIVE_STATE.json").read_text(encoding="utf-8"))
+        req = request(expected_main_sha=head, expected_event_seq=state["last_event_seq"])
         with tempfile.TemporaryDirectory() as tmp:
             file=Path(tmp)/"req.json"
             file.write_text(json.dumps(req),encoding="utf-8")

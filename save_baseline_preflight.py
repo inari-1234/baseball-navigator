@@ -159,16 +159,78 @@ def assess_current_capture(state: dict[str, Any],
     }
 
 
+def prepare_observed_tracking(state, events, ledger, *, root, context, evidence_sources):
+    """Dry-run the new segment from existing, independently reviewed sources."""
+    from check_reply import canonical_state_sha256, _verified_evidence_receipts
+    from current_observation import current_observations
+
+    preflight = assess_current_capture(state, events, ledger)
+    observation = current_observations(state, root, context, evidence_sources)
+    roster = observation.get("roster")
+    require(roster and roster["status"] == "CURRENT_ROSTER_OBSERVATION",
+            "ROSTER_CONTINUITY_REQUIRED")
+    claim = context["roster_chronology"]
+    require(claim.get("unchanged_through_current_report") is True,
+            "CURRENT_SAVE_NO_CHANGE_REPORT_REQUIRED")
+    receipts = _verified_evidence_receipts(
+        context, evidence_sources, state, root, claims=("roster_chronology",))
+    capture = next(event for event in events if event["event_id"] == preflight["capture_event_id"])
+    event = {
+        "seq": state["last_event_seq"] + 1,
+        "event_id": f"LIVE-OBSERVED-TRACKING-{state['last_event_seq'] + 1}",
+        "kind": "OBSERVED_TRACKING_START",
+        "period": capture["period"],
+        "branch": "ACCEPTED",
+        "source": {"kind": "USER_REPORT", "locator": "Reviewed current-SAVE continuity attestation"},
+        "world_event_id": capture["event_id"],
+        "rollback_report_event_id": state["rollback_report_event_id"],
+        "roster_archive_sha256": roster["archive_sha256"],
+        "same_save_no_intervening_gameplay": True,
+        "continuity_sha256": canonical_state_sha256(receipts),
+    }
+    projected = replay([*events, event])
+    return {
+        "status": "OBSERVED_TRACKING_PREVIEW",
+        "source_event_seq": state["last_event_seq"],
+        "event_preview": event,
+        "state_preview": projected,
+        "action_authorized": False,
+        "side_effects": False,
+    }
+
+
 def main() -> None:
     args = argparse.ArgumentParser(description="Read-only post-LOAD capture preflight")
     args.add_argument("--root", type=Path, default=Path("."))
+    args.add_argument("--expected-main-sha")
+    args.add_argument("--expected-event-seq", type=int)
+    args.add_argument("--private-context", type=Path)
+    args.add_argument("--private-evidence-index", type=Path)
     parsed = args.parse_args()
     root = parsed.root
     try:
         state = json.loads((root / "CURRENT_LIVE_STATE.json").read_text(encoding="utf-8"))
         ledger = json.loads((root / "CURRENT_RUN_LEDGER.yaml").read_text(encoding="utf-8"))
         events = read_events(root / "LIVE_EVENTS.jsonl")
-        result = assess_current_capture(state, events, ledger)
+        preview_args = (parsed.expected_main_sha, parsed.expected_event_seq,
+                        parsed.private_context, parsed.private_evidence_index)
+        if any(value is not None for value in preview_args):
+            from next_action import verify_checkout
+            from project_bootstrap import bootstrap_sources
+
+            require(all(value is not None for value in preview_args), "PREVIEW_INPUTS_REQUIRED")
+            verify_checkout(root, parsed.expected_main_sha)
+            _, pinned_state, _, _, _ = bootstrap_sources(
+                "野球部ものがたりの続き", root=root, expected_main_sha=parsed.expected_main_sha)
+            require(pinned_state == state and state["last_event_seq"] == parsed.expected_event_seq,
+                    "STALE_EVENT_SEQUENCE")
+            context = json.loads(parsed.private_context.read_text(encoding="utf-8"))
+            sources = json.loads(parsed.private_evidence_index.read_text(encoding="utf-8"))
+            result = prepare_observed_tracking(
+                state, events, ledger, root=root, context=context, evidence_sources=sources)
+            verify_checkout(root, parsed.expected_main_sha)
+        else:
+            result = assess_current_capture(state, events, ledger)
     except (OSError, ValueError, ObservationError, KeyError, TypeError) as exc:
         args.exit(2, "BASELINE_PREFLIGHT_STOP:" + str(exc) + "\n")
     print(json.dumps(result, ensure_ascii=False, sort_keys=True))

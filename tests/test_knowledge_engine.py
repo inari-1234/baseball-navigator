@@ -16,6 +16,8 @@ from text_fast import TextFastEngine, classify_text
 from test_navigator_step import context_for
 
 
+from postload_fixture import POSTLOAD
+
 ROOT = Path(__file__).resolve().parents[1]
 FIXTURES = (
     "EVIDENCE_EVENTS.jsonl", "EVIDENCE_BACKUP_CHECKPOINTS.jsonl",
@@ -26,7 +28,7 @@ FIXTURES = (
 
 
 def load_canonical():
-    state = json.loads((ROOT / "CURRENT_LIVE_STATE.json").read_text(encoding="utf-8"))
+    state = json.loads((POSTLOAD / "CURRENT_LIVE_STATE.json").read_text(encoding="utf-8"))
     contract = json.loads((ROOT / "DECISION_CONTRACT.json").read_text(encoding="utf-8"))
     return state, contract
 

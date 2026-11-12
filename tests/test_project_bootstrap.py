@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 from pathlib import Path
-import shutil
+from postload_fixture import copy_postload_authorities
 import subprocess
 import sys
 import tempfile
@@ -58,8 +58,7 @@ class Boot(unittest.TestCase):
         self.tmp=tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
         self.root=Path(self.tmp.name)
-        for f in FILES:
-            shutil.copyfile(ROOT/f,self.root/f)
+        copy_postload_authorities(self.root, FILES)
 
     def boot(self):
         return bootstrap("野球部ものがたりの続き",root=self.root,

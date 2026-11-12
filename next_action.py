@@ -52,6 +52,9 @@ def next_action(message, *, root=".", expected_main_sha, expected_event_seq,
         if type(expected_event_seq) is not int or expected_event_seq != state["last_event_seq"]:
             raise ResumeError("STALE_EVENT_REVISION")
 
+        # This explicit entry resolves the continuation request to next-action intent.
+        if isinstance(message, str) and message.strip() in {"進めて", "続けて"}:
+            message = "次は何をすべき？"
         compared = navigator_step(
             message, state=state, contract=contract, boot_verified=True,
             expected_event_seq=expected_event_seq, context=context, root=root)
@@ -61,6 +64,8 @@ def next_action(message, *, root=".", expected_main_sha, expected_event_seq,
         result["current_observation"] = current_observations(
             state, root, context, evidence_sources)
         result["save_history_status"] = state["timeline_status"]
+        if "observed_tracking" in state:
+            result["observed_tracking"] = state["observed_tracking"]
         draft = compared["action_draft"]
         packet = None
         result["strategy_validation"] = "NO_VALIDATED_CANDIDATE"

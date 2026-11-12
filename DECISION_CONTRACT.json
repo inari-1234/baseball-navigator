@@ -475,7 +475,7 @@
       "status": "ACTIVE",
       "type": "PROCESS",
       "layer": "HARD_CONSTRAINT",
-      "rule": "Derive current state from ordered live events. A schedule is not a completed match. Explicit user completion closes that period's scheduled matches even when scores are UNKNOWN. Preserve first-attempt branches separately from reset-assisted accepted branches. Invalidate stale resource counters after a later match or rollback. Known SAVE rollback removes discarded branch contributions from the active timeline; unknown save anchor remains blocked pending recapture. Retain rejected attempts as audit-only evidence. Only committed per-player special-training events contribute to observed training counts."
+      "rule": "Derive current state from ordered live events. A schedule is not a completed match. Explicit user completion closes that period's scheduled matches even when scores are UNKNOWN. Preserve first-attempt branches separately from reset-assisted accepted branches. Invalidate stale resource counters after a later match or rollback. Known SAVE rollback removes discarded branch contributions from the active timeline; unknown save anchor blocks actions until reconciled or an independently reviewed current-observation tracking start. A tracking start preserves the old ledger for audit, carries only sourced observations, leaves restored identity and prior counts/skills unknown, and never overrides action-specific evidence requirements. Retain rejected attempts as audit-only evidence. Only committed per-player special-training events contribute to observed training counts."
     },
     {
       "rule_id": "DC-ACTION-001",

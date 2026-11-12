@@ -59,6 +59,9 @@ Use `knowledge_engine.skill_guidance` and `validate_skill_recommendation` for sk
 ## Original image backup and public/private separation
 For evidence-grade screenshots, keep original bytes and a locator/verification manifest in the user's nonpublic Library workspace; do NOT copy raw screenshots, Library IDs or private locators into this public GitHub repository. A public `EVIDENCE_BACKUP_CHECKPOINTS.jsonl` record may contain source and readback SHA-256 values and verification timestamp, but this proves **only a verification at that checkpoint**, not that the Library object still exists now. Run `backup_verifier.py` against freshly materialized Library downloads at archive acceptance or explicit availability audits; GitHub CI cannot independently access the private Library. During normal gameplay, respond via TEXT FAST without waiting for a full archival audit; any missing original needed for a new material research conclusion must be marked UNKNOWN. See `docs/KNOWLEDGE_PROTOCOL.md`.
 
+### Start tracking from a reviewed current observation
+For the indexed post-LOAD case, use the dry-run transition in `save_baseline_preflight.py` after reviewing direct user continuity evidence for both the uploaded roster and current SAVE. The separate canonical event `OBSERVED_TRACKING_START` establishes `TRACKED_FROM_CURRENT_OBSERVATION` only. The original event ledger remains for audit; pre-origin matches, skill awards, items and training counts do not populate live state. The restored checkpoint stays UNKNOWN. Use only post-origin facts or independently sourced current observations for action eligibility, and the existing sprint strategy and exact reply gate for any recommendation. A subsequent unknown LOAD closes the action gate again. See `docs/SAVE_BASELINE_PREFLIGHT.md`.
+
 ## Navigator Step P3: next-action comparison
 
 ### P7-H user-facing next action

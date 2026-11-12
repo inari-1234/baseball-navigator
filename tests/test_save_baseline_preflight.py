@@ -4,6 +4,7 @@ import copy
 import json
 import unittest
 from pathlib import Path
+from postload_fixture import POSTLOAD
 
 from live_state_engine import read_events
 from save_baseline_preflight import assess_current_capture, BaselinePreflightError
@@ -13,9 +14,9 @@ ROOT = Path(__file__).resolve().parents[1]
 
 class CurrentSavePreflight(unittest.TestCase):
     def setUp(self):
-        self.state = json.loads((ROOT / "CURRENT_LIVE_STATE.json").read_text(encoding="utf-8"))
-        self.ledger = json.loads((ROOT / "CURRENT_RUN_LEDGER.yaml").read_text(encoding="utf-8"))
-        self.events = read_events(ROOT / "LIVE_EVENTS.jsonl")
+        self.state = json.loads((POSTLOAD / "CURRENT_LIVE_STATE.json").read_text(encoding="utf-8"))
+        self.ledger = json.loads((POSTLOAD / "CURRENT_RUN_LEDGER.yaml").read_text(encoding="utf-8"))
+        self.events = read_events(POSTLOAD / "LIVE_EVENTS.jsonl")
 
     def check(self, state=None, events=None, ledger=None):
         return assess_current_capture(

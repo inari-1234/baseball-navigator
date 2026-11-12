@@ -14,7 +14,7 @@ import subprocess
 import unicodedata
 
 from knowledge_engine import validate_knowledge, load_knowledge, KnowledgeError
-from live_state_engine import read_events, replay, ObservationError
+from live_state_engine import read_events, replay, ObservationError, has_current_lineage
 
 BOOT_ORDER = (
     "RUN_GUARD_POLICY.yaml", "DECISION_CONTRACT.json",
@@ -219,7 +219,7 @@ def bootstrap_sources(message, *, root=".", expected_main_sha=None,
         for mid, info in sorted(state.get("matches", {}).items())
         if info.get("status") == "SCHEDULED"
     ]
-    trusted = state.get("timeline_status") == "TRUSTED"
+    trusted = has_current_lineage(state)
     report = {
         "schema_version": "1.0",
         "project_id": registry["project_id"],
@@ -239,8 +239,10 @@ def bootstrap_sources(message, *, root=".", expected_main_sha=None,
             "clock": state.get("current_exact_time"),
             "timeline_status": state.get("timeline_status"),
             "resources": state.get("resources"),
-            "current_skills": (state.get("skills") if trusted else
-                               "UNVERIFIED_AFTER_ROLLBACK"),
+            "current_skills": (
+                "UNVERIFIED_BEFORE_OBSERVED_TRACKING" if "observed_tracking" in state
+                else state.get("skills") if trusted else "UNVERIFIED_AFTER_ROLLBACK"),
+            **({"observed_tracking": state["observed_tracking"]} if "observed_tracking" in state else {}),
             "current_training_counts": (
                 (state.get("training_counts_exact_by_player_drill") or
                  "UNKNOWN_WITHOUT_EXACT_BASELINE") if trusted else

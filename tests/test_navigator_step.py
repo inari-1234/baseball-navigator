@@ -9,6 +9,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from postload_fixture import POSTLOAD
 
 from navigator_step import navigator_step, _load_catalog
 from strategy_policy import PARTICIPANT_FACTORS
@@ -17,7 +18,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def canonical():
-    state = json.loads((ROOT / "CURRENT_LIVE_STATE.json").read_text(encoding="utf-8"))
+    state = json.loads((POSTLOAD / "CURRENT_LIVE_STATE.json").read_text(encoding="utf-8"))
     contract = json.loads((ROOT / "DECISION_CONTRACT.json").read_text(encoding="utf-8"))
     return state, contract
 
@@ -436,7 +437,8 @@ class NavigatorStepRegression(unittest.TestCase):
     def test_cli_real_snapshot_safe_and_deterministic(self):
         args = [sys.executable, "navigator_step.py",
                 "スキル獲得に向けて何をすべき？", "--boot-verified",
-                "--expected-event-seq", "10"]
+                "--expected-event-seq", "10",
+                "--state", str(POSTLOAD / "CURRENT_LIVE_STATE.json")]
         a = subprocess.run(args, cwd=ROOT, capture_output=True, text=True, check=True)
         b = subprocess.run(args, cwd=ROOT, capture_output=True, text=True, check=True)
         self.assertEqual(a.stdout, b.stdout)

@@ -5,6 +5,7 @@ import copy
 import hashlib
 import json
 from pathlib import Path
+from postload_fixture import POSTLOAD
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -20,8 +21,8 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def state_events():
-    state = json.loads((ROOT/"CURRENT_LIVE_STATE.json").read_text(encoding="utf-8"))
-    events = read_events(ROOT/"LIVE_EVENTS.jsonl")
+    state = json.loads((POSTLOAD/"CURRENT_LIVE_STATE.json").read_text(encoding="utf-8"))
+    events = read_events(POSTLOAD/"LIVE_EVENTS.jsonl")
     return state, events
 
 
@@ -338,7 +339,9 @@ class QuickImageSuite(unittest.TestCase):
         result=subprocess.run([
             sys.executable,str(ROOT/"navigator_step.py"),"画像を確認して",
             "--image",str(native),"--image-review",str(review),
-            "--boot-verified","--expected-event-seq","10"],
+            "--boot-verified","--expected-event-seq","10",
+            "--state",str(POSTLOAD/"CURRENT_LIVE_STATE.json"),
+            "--events",str(POSTLOAD/"LIVE_EVENTS.jsonl")],
             cwd=ROOT,capture_output=True,text=True,check=True)
         out=json.loads(result.stdout)
         self.assertEqual(out["status"],"UNCOMMITTED_IMAGE_EVENT_PREVIEW")

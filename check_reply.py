@@ -13,6 +13,8 @@ import json
 from pathlib import Path
 from typing import Any
 
+from live_state_engine import OBSERVED_TRACKING, has_current_lineage
+
 
 class ReplyGateError(ValueError):
     pass
@@ -93,7 +95,7 @@ def _verified_evidence_receipts(context, evidence_sources, state, root, *,
     _require(isinstance(context, dict) and isinstance(evidence_sources, dict),
              "LOCAL_EVIDENCE_INDEX_REQUIRED")
     observation_only = claims == ("roster_chronology",)
-    _require(observation_only or state.get("timeline_status") == "TRUSTED",
+    _require(observation_only or has_current_lineage(state),
              "EVIDENCE_BRANCH_UNTRUSTED")
     seq, period = state.get("last_event_seq"), state.get("period_floor")
     receipts, events = {}, None
@@ -211,7 +213,7 @@ def _count_reply(bridge: dict[str, Any], state: dict[str, Any],
             + line + "\n"
             + "Fallback: 現行セーブと選手・練習別の確定回数が確認されるまで、4回目とは認定しません。"
         )
-    _require(state["timeline_status"] == "TRUSTED",
+    _require(has_current_lineage(state),
              "UNSUPPORTED_TIMELINE_FOR_TEMPLATE")
     exact = observation.get("exact_current_counts_by_player_drill", {})
     refs = observation.get("exact_count_source_event_ids", {})
@@ -219,7 +221,11 @@ def _count_reply(bridge: dict[str, Any], state: dict[str, Any],
     _require(isinstance(exact, dict) and isinstance(refs, dict)
              and isinstance(logged, dict) and set(exact) == set(refs),
              "EXACT_COUNT_EVIDENCE_REQUIRED")
-    lines = ["現在のセーブは確認済みです。特訓回数は以下の範囲だけ確認できます。"]
+    lines = [
+        "観測起点以前の履歴は不明です。特訓回数は以下の範囲だけ確認できます。"
+        if state["timeline_status"] == OBSERVED_TRACKING else
+        "現在のセーブは確認済みです。特訓回数は以下の範囲だけ確認できます。"
+    ]
     for key in sorted(exact):
         player, drill = key.split("|")
         lines.append(f"{player}・{drill}：{exact[key]}回（現セーブで確定、根拠 {refs[key]}）")
@@ -414,7 +420,7 @@ def render_guarded_reply(bridge: dict[str, Any],
             + line + "\n"
             + "Fallback: 現行セーブと特訓履歴の証拠が揃わなければ、資源を消費する特訓を保留します。"
         )
-    _require(state["timeline_status"] == "TRUSTED",
+    _require(has_current_lineage(state),
              "UNSUPPORTED_TIMELINE_FOR_TEMPLATE")
     _no_action_fields(bridge)
     _require(bridge.get("context_source") == "NO_USER_CONTEXT_PUBLIC_REQUEST"
@@ -423,7 +429,9 @@ def render_guarded_reply(bridge: dict[str, Any],
                  "NEEDS_CANDIDATE"
              }, "UNSUPPORTED_TRUSTED_SKILL_STATE")
     return (
-        "現在のセーブは確認済みですが、スキル狙いの特訓条件はまだ検証済みではありません。"
+        ("現在の観測から追跡中です。復元元と観測起点以前の履歴は未確定です。"
+         if state["timeline_status"] == OBSERVED_TRACKING else "現在のセーブは確認済みですが、")
+        + "スキル狙いの特訓条件はまだ検証済みではありません。"
         "参加者・応援設定・費用を含む実行計画は提示しません。\n"
         + line + "\n"
         + "Fallback: 現在の選手準備状況、直近の試合内容、費用とスキル証拠を確認するまで実行を保留します。"
