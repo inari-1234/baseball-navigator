@@ -8,6 +8,12 @@ from pathlib import Path
 OFFENSE_RULE = {"CONTACT": "DC-OFF-001", "CONVERSION": "DC-OFF-002"}
 DRILL_PURPOSE = {"TRAIN_CONTACT": "CONTACT", "TRAIN_POWER": "CONVERSION"}
 TRAINING_RULES = ("DC-ACTION-001", "DC-TRAIN-001", "DC-TRAIN-002", "DC-CHEER-001")
+DEVELOPMENT_BASIS = "OCTOBER_CORE_DEVELOPMENT"
+DEVELOPMENT_ROLES = {"CONTACT": "GET_ON_BASE", "CONVERSION": "ADVANCE_RUNNERS_WITH_POWER"}
+DEVELOPMENT_CHEER = {
+    "ON": {"COMMIT_HIGH_VALUE_GROWTH"},
+    "OFF": {"PRESERVE_FOR_NAMED_SPRINT_USE", "PROGRESS_DRILL"},
+}
 PARTICIPANT_FACTORS = {
     "mandatory_core_need", "low_level_efficiency", "drill_fit_current_ability",
     "growth", "type_affinity_bonus", "Y1_October_lineup_contribution",
@@ -109,10 +115,11 @@ def offense_pattern(assessment, state):
             return None
         seen.add(mid)
         known = state.get("matches", {}).get(mid)
-        if known is not None and (
-                known.get("period") != state.get("period_floor")
+        if (not isinstance(known, dict) or known.get("status") != "PLAYED"
+                or known.get("period") != state.get("period_floor")
                 or not isinstance(known.get("first_attempt"), dict)
                 or known["first_attempt"] != known.get("accepted_attempt")
+                or known["first_attempt"].get("attempt") != 1
                 or known["first_attempt"].get("our_runs") != runs
                 or known.get("classification") == "RESET_ASSISTED_WIN"):
             return None
@@ -122,6 +129,70 @@ def offense_pattern(assessment, state):
     derived = ("CONTACT" if max(low_hits, heavy_strikeouts) >= 2 else
                "CONVERSION" if low_conversion >= 2 else None)
     return derived if derived == mode else None
+
+
+def development_plan_errors(plan, spec, rec, state, context, root):
+    """Review one October-core ability session at the current roster origin."""
+    from current_observation import tracked_roster
+
+    if not context_current(plan, state):
+        return ["CURRENT_OCTOBER_DEVELOPMENT_PLAN_REQUIRED"]
+    errors = []
+    assessment = context.get("failure_assessment")
+    if assessment is not None and (not isinstance(assessment, dict)
+            or assessment.get("mode") != "UNKNOWN" or assessment.get("match_samples")):
+        errors.append("DEVELOPMENT_REQUIRES_UNASSESSED_OFFENSE")
+    origin = state.get("observed_tracking", {})
+    roster = tracked_roster(state, root)
+    players = rec.get("participants")
+    target = plan.get("target_player")
+    lineup = {row["player"] for row in roster or [] if not row["bench"]}
+    names = {row["player"] for row in roster or []}
+    if (not roster or plan.get("roster_origin_event_id") != origin.get("start_event_id")
+            or plan.get("roster_archive_sha256") != origin.get("roster_archive_sha256")
+            or not isinstance(target, str) or target not in lineup
+            or not isinstance(players, list) or target not in players
+            or any(not isinstance(player, str) or player not in names for player in players)):
+        errors.append("CURRENT_OCTOBER_ROSTER_NOT_BOUND")
+    if (plan.get("drill") != spec["drill"] or plan.get("cheer") != rec.get("cheer")
+            or plan.get("october_role") != DEVELOPMENT_ROLES[spec["purpose"]]
+            or plan.get("target_role") != "CORE_DEVELOP"):
+        errors.append("OCTOBER_DEVELOPMENT_DRILL_FIT_UNVERIFIED")
+    player_observation = plan.get("player_observation")
+    image_refs = plan.get("roster_image_evidence_refs")
+    if (not isinstance(image_refs, list) or not image_refs
+            or any(not isinstance(ref, str) or ref not in plan["evidence_refs"] for ref in image_refs)
+            or not isinstance(player_observation, dict)
+            or player_observation.get("player") != target
+            or player_observation.get("evidence_ref") not in image_refs
+            or any(type(player_observation.get(stat)) is not int or player_observation[stat] < 0
+                   for stat in ("contact", "slugging"))):
+        errors.append("CURRENT_PLAYER_BATTING_OBSERVATION_REQUIRED")
+    reasons = plan.get("priority_review")
+    cheer = rec.get("cheer")
+    if (not isinstance(cheer, str) or not isinstance(reasons, dict)
+            or reasons.get("timing") != "LOW_LEVEL_CORE_BEFORE_MASS_MATCH_LEVELING"
+            or reasons.get("other_drill") != "DOES_NOT_SERVE_REVIEWED_OCTOBER_ROLE"
+            or not isinstance(reasons.get("cheer_tradeoff"), str)
+            or reasons["cheer_tradeoff"] not in DEVELOPMENT_CHEER.get(cheer, ())
+            or any(not isinstance(reasons.get(key), str) or not reasons[key].strip()
+                   for key in ("role_and_drill_fit", "why_before_alternatives", "cheer_reason"))):
+        errors.append("OCTOBER_PRIORITY_NOT_JUSTIFIED")
+    if (rec.get("skill_goal") is not None or rec.get("claimed_fourth_checkpoint") is not False
+            or rec.get("checkpoint_player") is not None):
+        errors.append("DEVELOPMENT_DOES_NOT_CERTIFY_SKILL_CHECKPOINT")
+    readiness = context.get("training_readiness")
+    menu_ref = readiness.get("menu_evidence_ref") if isinstance(readiness, dict) else None
+    selection = readiness.get("menu_selection") if isinstance(readiness, dict) else None
+    if (not context_current(readiness, state) or not isinstance(menu_ref, str)
+            or menu_ref not in readiness["evidence_refs"]
+            or not isinstance(selection, dict)
+            or selection.get("drill") != spec["drill"] or selection.get("cheer") != cheer
+            or selection.get("players") != players or selection.get("available_now") is not True):
+        errors.append("CURRENT_SPECIAL_TRAINING_MENU_EVIDENCE_REQUIRED")
+    elif "displayed_spend" in selection and selection["displayed_spend"] != rec.get("spend"):
+        errors.append("CURRENT_MENU_COST_MISMATCH")
+    return errors
 
 
 def training_cost(spec, cheer, readiness):
@@ -152,12 +223,19 @@ def training_strategy_errors(rec, state, context, root):
     errors = []
     mode = spec["purpose"]
     rules = rec.get("rule_ids")
+    development = rec.get("decision_basis") == DEVELOPMENT_BASIS
+    if not development and rec.get("decision_basis") is not None:
+        errors.append("TRAINING_DECISION_BASIS_UNSUPPORTED")
+    required_rule = "DC-ROSTER-001" if development else OFFENSE_RULE[mode]
     if (not isinstance(rules, list)
-            or not all(rule in rules for rule in (*TRAINING_RULES, OFFENSE_RULE[mode]))
-            or any(rule.startswith("DC-OFF-") and rule != OFFENSE_RULE[mode]
+            or not all(rule in rules for rule in (*TRAINING_RULES, required_rule))
+            or any(rule.startswith("DC-OFF-") and rule != required_rule
                    for rule in rules if isinstance(rule, str))):
         errors.append("TRAINING_STRATEGY_RULE_MISMATCH")
-    if offense_pattern(context.get("failure_assessment"), state) != mode:
+    if development:
+        errors.extend(development_plan_errors(
+            context.get("development_plan"), spec, rec, state, context, root))
+    elif offense_pattern(context.get("failure_assessment"), state) != mode:
         errors.append("TRAINING_FAILURE_MODE_NOT_SUPPORTED")
     readiness = context.get("training_readiness")
     if not context_current(readiness, state):
@@ -193,6 +271,17 @@ def training_strategy_errors(rec, state, context, root):
     if (not isinstance(purpose, str) or not isinstance(cheer, str)
             or purpose not in CHEER_PURPOSES.get(cheer, ())):
         errors.append("CHEER_STRATEGY_NOT_VERIFIED")
+    if development:
+        plan = context.get("development_plan")
+        review = plan.get("priority_review") if isinstance(plan, dict) else None
+        tradeoff = review.get("cheer_tradeoff") if isinstance(review, dict) else None
+        expected_purpose = {
+            "COMMIT_HIGH_VALUE_GROWTH": "HIGH_VALUE_COMMITTED_DEVELOPMENT",
+            "PRESERVE_FOR_NAMED_SPRINT_USE": "RESOURCE_PRESERVATION",
+            "PROGRESS_DRILL": "DRILL_PROGRESSION",
+        }
+        if not isinstance(tradeoff, str) or expected_purpose.get(tradeoff) != purpose:
+            errors.append("CHEER_PRIORITY_REVIEW_MISMATCH")
     cost, _, known = training_cost(spec, cheer, readiness)
     if not known:
         errors.append("EXACT_CHEER_ON_COST_UNVERIFIED")
@@ -203,7 +292,7 @@ def training_strategy_errors(rec, state, context, root):
     if set(rec) - {
         "action_type", "based_on_event_seq", "rule_ids", "participants", "drill",
         "cheer", "spend", "knowledge_refs", "skill_goal", "claimed_fourth_checkpoint",
-        "checkpoint_player", "hp_claims", "hp_min_by_player",
+        "checkpoint_player", "hp_claims", "hp_min_by_player", "decision_basis",
     }:
         errors.append("UNSUPPORTED_TRAINING_FIELDS")
     return errors

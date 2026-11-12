@@ -60,6 +60,7 @@ def next_action(message, *, root=".", expected_main_sha, expected_event_seq,
             expected_event_seq=expected_event_seq, context=context, root=root)
         result["navigator_status"] = compared["status"]
         result["candidates_compared"] = len(compared["candidates"])
+        result["action_comparison"] = compared.get("action_comparison", {})
         result["blocking_reasons"] = compared.get("blocking_reasons", compared["errors"])
         result["current_observation"] = current_observations(
             state, root, context, evidence_sources)
@@ -84,6 +85,9 @@ def next_action(message, *, root=".", expected_main_sha, expected_event_seq,
                         decision_message=message)
                 except ReplyGateError as exc:
                     result["blocking_reasons"] = [str(exc)]
+                    result["action_comparison"]["TRAIN"] = {
+                        "status": "EVIDENCE_INSUFFICIENT", "reasons": [str(exc)],
+                    }
             else:
                 result["blocking_reasons"] = ["UNSUPPORTED_ACTION_FOR_CERTIFIED_REPLY"]
 

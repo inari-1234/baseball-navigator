@@ -6,9 +6,39 @@ from pathlib import Path
 import re
 
 from live_state_engine import OBSERVED_TRACKING, has_current_lineage
-from strategy_policy import context_current, offense_pattern
+from strategy_policy import context_current
 
 ROSTER_RECORD = "ROSTER_SCREEN_CANDIDATE_20261111.json"
+
+
+def _roster_record(root):
+    path = Path(root) / ROSTER_RECORD
+    if not path.is_file():
+        return None
+    record = json.loads(path.read_text(encoding="utf-8"))
+    if (record.get("evidence_status") != "PENDING_CURRENT_SAVE_CHRONOLOGY"
+            or record.get("accepted_live_event") is not False
+            or not re.fullmatch(r"[0-9a-f]{64}", record["source_archive_sha256"])):
+        raise ValueError("ROSTER_RECORD_INVALID")
+    return record
+
+
+def tracked_roster_record(state, root):
+    tracking = state.get("observed_tracking")
+    resources = state["resources"]
+    if (state["timeline_status"] != OBSERVED_TRACKING or not resources["fresh"]
+            or not isinstance(tracking, dict)
+            or tracking["world_event_id"] != resources["last_observed"]):
+        return None
+    record = _roster_record(root)
+    if record and tracking["roster_archive_sha256"] == record["source_archive_sha256"]:
+        return record
+    return None
+
+
+def tracked_roster(state, root):
+    record = tracked_roster_record(state, root)
+    return record["roster"] if record else None
 
 
 def current_observations(state, root, context, evidence_sources):
@@ -24,25 +54,16 @@ def current_observations(state, root, context, evidence_sources):
         "roster": None,
         "next_evidence": None,
     }
-    path = Path(root) / ROSTER_RECORD
-    if path.is_file():
-        record = json.loads(path.read_text(encoding="utf-8"))
+    record = _roster_record(root)
+    if record:
         archive = record["source_archive_sha256"]
-        if (record.get("evidence_status") != "PENDING_CURRENT_SAVE_CHRONOLOGY"
-                or record.get("accepted_live_event") is not False
-                or not re.fullmatch(r"[0-9a-f]{64}", archive)):
-            raise ValueError("ROSTER_RECORD_INVALID")
         roster = {
             "archive_sha256": archive,
             "screens_recorded": record["image_count"],
             "status": "STALE_OR_UNLINKED",
         }
         observed["roster"] = roster
-        tracking = state.get("observed_tracking")
-        if (state["timeline_status"] == OBSERVED_TRACKING
-                and resources["fresh"]
-                and tracking["world_event_id"] == resources["last_observed"]
-                and tracking["roster_archive_sha256"] == archive):
+        if tracked_roster_record(state, root):
             roster["status"] = "CURRENT_ROSTER_OBSERVATION"
             roster["players"] = record["roster"]
         elif (resources["fresh"] and record.get("reference_live_event_seq") ==
@@ -69,13 +90,11 @@ def current_observations(state, root, context, evidence_sources):
             "RECONCILE_RESTORED_SAVE_ANCHOR" if resources["fresh"]
             else "CURRENT_WORLD_COUNTERS")
     elif state["timeline_status"] == OBSERVED_TRACKING:
-        assessment = context.get("failure_assessment") if isinstance(context, dict) else None
+        readiness = context.get("training_readiness") if isinstance(context, dict) else None
         if not resources["fresh"]:
             observed["next_evidence"] = "CURRENT_WORLD_COUNTERS"
-        elif not offense_pattern(assessment, state):
-            observed["next_evidence"] = "REVIEW_MATCH_EVIDENCE"
-        else:
-            observed["next_evidence"] = "REVIEW_TRAINING_READINESS"
+        elif not context_current(readiness, state) or not readiness.get("menu_selection"):
+            observed["next_evidence"] = "CURRENT_SPECIAL_TRAINING_SELECTION"
     return observed
 
 
@@ -103,8 +122,8 @@ def render_observation_stop(observed, state, line):
         "RECONCILE_RESTORED_SAVE_ANCHOR":
             "復元元を特定できる既存のSAVE記録を確認します。確認済みの画面や数値の再提出は不要です。",
         "CURRENT_WORLD_COUNTERS": "現在の時刻と資源カウンターを確認します。",
-        "REVIEW_MATCH_EVIDENCE": "比較できる初戦の安打数・得点を、既存記録から先に確認します。",
-        "REVIEW_TRAINING_READINESS": "候補の特訓メニューと対象選手の参加可否を確認します。",
+        "CURRENT_SPECIAL_TRAINING_SELECTION":
+            "次の確認は、現行SAVEの特訓画面で、入江ドコンジを含む3人を選べる特訓が今あるかです。",
         None: "候補に不足している根拠を確認するまで操作を保留します。",
     }[observed["next_evidence"]]
     return "\n".join([*lines, line, "Fallback: " + next_evidence])

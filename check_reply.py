@@ -176,6 +176,33 @@ def _verified_evidence_receipts(context, evidence_sources, state, root, *,
     return receipts
 
 
+def _training_receipts(projection, context, evidence_sources, state, root):
+    from current_observation import tracked_roster_record
+    from strategy_policy import DEVELOPMENT_BASIS
+
+    if projection["verified_action_draft"].get("decision_basis") != DEVELOPMENT_BASIS:
+        return _verified_evidence_receipts(context, evidence_sources, state, root)
+    receipts = _verified_evidence_receipts(
+        context, evidence_sources, state, root,
+        claims=("development_plan", "training_readiness"))
+    roster = tracked_roster_record(state, root)
+    refs = context["development_plan"].get("roster_image_evidence_refs")
+    _require(roster and isinstance(refs, list) and bool(refs),
+             "CURRENT_ROSTER_IMAGE_REVIEW_REQUIRED")
+    hashes = set(roster["image_sha256_in_lexicographic_archive_order"])
+    for ref in refs:
+        _require(isinstance(ref, str), "CURRENT_ROSTER_IMAGE_REVIEW_REQUIRED")
+        receipt = receipts.get("development_plan:" + ref, {})
+        _require(receipt.get("source_kind") == "LOCAL_FILE"
+                 and receipt.get("content_sha256") in hashes,
+                 "ROSTER_IMAGE_NOT_FROM_TRACKED_ARCHIVE")
+    menu = receipts.get("training_readiness:" + context["training_readiness"]["menu_evidence_ref"], {})
+    _require(menu.get("source_kind") == "LOCAL_FILE"
+             and menu.get("content_sha256") not in hashes,
+             "CURRENT_TRAINING_MENU_SOURCE_NOT_REVIEWED")
+    return receipts
+
+
 def _require(condition: bool, code: str) -> None:
     if not condition:
         raise ReplyGateError(code)
@@ -252,15 +279,19 @@ DECISION_MESSAGES = {
 
 
 def _training_projection(result):
+    from strategy_policy import DEVELOPMENT_BASIS
+
     _require(result.get("status") == "VALIDATED_DRAFT_REVIEW"
              and result.get("action_authorized") is False
              and result.get("side_effects") is False
-             and result.get("requires_manual_acceptance") is True
-             and result.get("failure_assessment_current") is True,
+             and result.get("requires_manual_acceptance") is True,
              "LOCAL_DRAFT_NOT_VALIDATED")
     draft = result.get("action_draft")
     _require(isinstance(draft, dict) and draft.get("action_type") == "TRAIN",
              "UNSUPPORTED_ACTION_FOR_CERTIFIED_REPLY")
+    _require(result.get("failure_assessment_current") is True
+             or draft.get("decision_basis") == DEVELOPMENT_BASIS,
+             "CURRENT_TRAINING_BASIS_REQUIRED")
     cid = result.get("selected_candidate")
     matches = [c for c in result["candidates"] if c.get("id") == cid]
     _require(len(matches) == 1 and matches[0].get("action_draft") == draft
@@ -286,7 +317,7 @@ def _training_projection(result):
             key: source[key] for key in (
                 "id", "ready", "blocking_reasons", "drill", "cheer", "participants",
                 "cost", "cost_fully_known", "cost_source", "accept_reload_plan",
-                "target_skill", "target_skill_at_this_drill_not_guaranteed",
+                "target_skill", "target_skill_at_this_drill_not_guaranteed", "development_target",
                 "training_readiness_evidence_refs", "participant_selection_evidence_refs",
             )
         },
@@ -299,8 +330,9 @@ def _verified_draft_reply(bridge: dict[str, Any], state: dict[str, Any], line: s
                           evidence_sources: dict[str, Any] | None) -> str:
     from live_state_engine import training_count_status
     from navigator_step import navigator_step
+    from strategy_policy import DEVELOPMENT_BASIS
     _require(isinstance(contract, dict), "DECISION_CONTRACT_REQUIRED")
-    receipts = _verified_evidence_receipts(context, evidence_sources, state, root)
+    receipts = _training_receipts(bridge, context, evidence_sources, state, root)
     _require(bridge.get("evidence_receipts") == receipts
              and bridge.get("evidence_receipts_sha256") == canonical_state_sha256(receipts)
              and bridge.get("reviewed_context_sha256") == canonical_state_sha256(context),
@@ -318,8 +350,14 @@ def _verified_draft_reply(bridge: dict[str, Any], state: dict[str, Any], line: s
 
     candidate, draft = expected["candidate"], expected["verified_action_draft"]
     drill, cheer, cost = candidate["drill"], candidate["cheer"], candidate["cost"]
+    development = None
     checkpoint = "4回目の根拠は未確認（習得保証なし）"
-    if draft["claimed_fourth_checkpoint"]:
+    if draft.get("decision_basis") == DEVELOPMENT_BASIS:
+        role = {"GET_ON_BASE": "出塁力", "ADVANCE_RUNNERS_WITH_POWER": "長打力"}[
+            context["development_plan"]["october_role"]]
+        development = f"育成目的：10月の打線の中核として{candidate['development_target']}の{role}を伸ばす。"
+        checkpoint = "試合診断と特訓回数は未確定。"
+    elif draft["claimed_fourth_checkpoint"]:
         player = draft["checkpoint_player"]
         info = training_count_status(state, player, drill)
         checkpoint = (f"{player}は現セーブで確定3回のため、次の特訓が4回目の候補"
@@ -347,6 +385,7 @@ def _verified_draft_reply(bridge: dict[str, Any], state: dict[str, Any], line: s
         f"次の1手の候補は{drill}の特訓です。手動承認前の下書きです。",
         "参加者：" + "・".join(candidate["participants"]),
         f"特訓：{drill}／応援{cheer}／消費予定：{expense}",
+        *([development] if development else []),
         "回数・スキル：" + checkpoint,
         "採用基準：" + accept[plan["accept_if"]],
         "再試行基準：" + reload[plan["reload_if"]],
@@ -460,7 +499,7 @@ def make_local_verified_draft_packet(
         boot_verified=True, expected_event_seq=state["last_event_seq"],
         context=context, root=root)
     _require(_training_projection(fresh) == requested, "NAVIGATOR_REVALIDATION_MISMATCH")
-    receipts = _verified_evidence_receipts(context, evidence_sources, state, root)
+    receipts = _training_receipts(requested, context, evidence_sources, state, root)
     packet = {
         **requested,
         "context_source": "VERIFIED_CURRENT_RUN_CONTEXT",

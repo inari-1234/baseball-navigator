@@ -13,7 +13,7 @@ from knowledge_engine import (
     validate_skill_recommendation, FOURTH, ACCEPTED,
 )
 from text_fast import TextFastEngine, classify_text
-from test_navigator_step import context_for
+from test_navigator_step import context_for, synthetic_match_results
 
 
 from postload_fixture import POSTLOAD
@@ -290,6 +290,7 @@ class NavigationGate(unittest.TestCase):
         self.assertTrue(out["is_fourth_checkpoint"])
         self.assertEqual(out["next_ordinal"],4)
         rec = draft()
+        s["matches"].update(synthetic_match_results(s))
         context = context_for(s)
         context["training_readiness"]["preferred_participant_groups"]["素振り"]["players"] = rec["participants"]
         self.assertEqual(validate_skill_recommendation(

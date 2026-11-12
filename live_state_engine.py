@@ -230,6 +230,8 @@ def replay(events):
     prior_first={}
     tracking_seq = max((event["seq"] for event in corrected
                         if event["kind"] == "OBSERVED_TRACKING_START"), default=0)
+    audit_match_ids = {event.get("match_id") for event in corrected
+                       if event["kind"] == "MATCH_ATTEMPT" and event["seq"] < tracking_seq}
     for e in corrected:
         if e["seq"] > tracking_seq and e["kind"]=="MATCH_ATTEMPT" and e.get("attempt")==1 and e.get("match_id") not in prior_first:
             prior_first[e["match_id"]]={"attempt":1,"our_runs":e.get("our_runs"),
@@ -382,6 +384,8 @@ def replay(events):
                 mid=item.get("match_id");opp=item.get("opponent")
                 if not isinstance(mid,str) or not mid or not isinstance(opp,str) or not opp or mid in matches:
                     raise ObservationError(f"{eid}: duplicate/invalid schedule entry")
+                if e["seq"] > tracking_seq and mid in audit_match_ids:
+                    raise ObservationError(f"{eid}: pre-tracking match ID is audit-only")
                 matches[mid]={"opponent":opp,"period":pk,
                     "status":"COMPLETED_SCORE_UNKNOWN" if pk in closed else "SCHEDULED",
                     "first_attempt":None,"accepted_attempt":None,"classification":None}
@@ -389,6 +393,8 @@ def replay(events):
             mid=e.get("match_id");n=e.get("attempt");a=e.get("our_runs");b=e.get("their_runs")
             if not isinstance(mid,str) or not mid or type(n) is not int or n<1 or any(type(v) is not int or v<0 for v in (a,b)):
                 raise ObservationError(f"{eid}: invalid match/attempt/score")
+            if e["seq"] > tracking_seq and mid in audit_match_ids:
+                raise ObservationError(f"{eid}: pre-tracking match ID is audit-only")
             if e.get("branch") not in BRANCHES:raise ObservationError(f"{eid}: branch required")
             if mid not in matches:
                 if not e.get("opponent"):raise ObservationError(f"{eid}: unscheduled match needs opponent")

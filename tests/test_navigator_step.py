@@ -45,6 +45,17 @@ def match_samples(ref, failure):
     ]
 
 
+def synthetic_match_results(state):
+    return {
+        sample["match_id"]: {
+            "period": state["period_floor"], "status": "PLAYED", "classification": "LOSS",
+            "first_attempt": {"attempt": 1, "our_runs": 0},
+            "accepted_attempt": {"attempt": 1, "our_runs": 0},
+        }
+        for sample in match_samples("TEST", "CONTACT")
+    }
+
+
 def group_selection(players, refs, basis="CURRENT_OCTOBER_LINEUP_SCORING_NEED"):
     return {"players": players, "basis": basis, "evidence_refs": refs,
             "factors_reviewed": sorted(PARTICIPANT_FACTORS),
@@ -84,6 +95,7 @@ class NavigatorStepRegression(unittest.TestCase):
     def trusted(self):
         s = copy.deepcopy(self.state)
         s["timeline_status"] = "TRUSTED"
+        s["matches"].update(synthetic_match_results(s))
         return s
 
     def test_canonical_rollback_emits_conditional_target_not_paid_action(self):

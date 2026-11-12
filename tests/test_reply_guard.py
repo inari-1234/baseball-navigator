@@ -15,7 +15,7 @@ from navigator_step import navigator_step
 from live_state_engine import replay
 from text_fast import _read_only_projection
 
-from test_navigator_step import context_for
+from test_navigator_step import context_for, synthetic_match_results
 
 ROOT=Path(__file__).resolve().parents[1]
 SHA="a"*40
@@ -200,6 +200,7 @@ class GuardedReplyRegression(unittest.TestCase):
         state=copy.deepcopy(self.state)
         state["timeline_status"]="TRUSTED"
         contract=json.loads((ROOT/"DECISION_CONTRACT.json").read_text(encoding="utf-8"))
+        state["matches"].update(synthetic_match_results(state))
         context=context_for(state)
         decision=navigator_step(
             "スキル獲得に向けて何をすべき？",state=state,
@@ -504,6 +505,7 @@ class GuardedReplyRegression(unittest.TestCase):
             "event_id":"TEST-EXACT-IMAI","source_kind":"USER_REPORT",
             "scope":"EXACT_CURRENT_ACCEPTED_SAVE"}}
         contract=json.loads((ROOT/"DECISION_CONTRACT.json").read_text(encoding="utf-8"))
+        state["matches"].update(synthetic_match_results(state))
         context=context_for(state)
         result=navigator_step("スキル獲得に向けて何をすべき？",
                               state=state,contract=contract,boot_verified=True,

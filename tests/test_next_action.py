@@ -20,7 +20,8 @@ from save_baseline_preflight import BaselinePreflightError, prepare_observed_tra
 from navigator_step import navigator_step
 from next_action import next_action
 from project_bootstrap import BOOT_ORDER
-from test_navigator_step import context_for
+from strategy_policy import offense_pattern
+from test_navigator_step import attested, context_for, group_selection
 
 ROOT = Path(__file__).resolve().parents[1]
 ASK = "次は何をすべき？"
@@ -90,7 +91,8 @@ class NextActionTests(unittest.TestCase):
         for name, claim in context.items():
             for ref in claim["evidence_refs"]:
                 path = self.root / (ref + ".json")
-                path.write_text(json.dumps(context, ensure_ascii=False), encoding="utf-8")
+                path.write_text(json.dumps({"ref": ref, "context": context}, ensure_ascii=False),
+                                encoding="utf-8")
                 record = sources.setdefault(ref, {
                     "kind": "LOCAL_FILE", "path": str(path),
                     "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
@@ -275,14 +277,124 @@ class NextActionTests(unittest.TestCase):
         self.assertEqual(report["status"], "CERTIFIED_NO_ACTION", report)
         self.assertEqual(report["current_observation"]["counters"]["sports"], 28)
         self.assertEqual(report["current_observation"]["roster"]["status"], "CURRENT_ROSTER_OBSERVATION")
-        self.assertEqual(report["current_observation"]["next_evidence"], "REVIEW_MATCH_EVIDENCE")
+        self.assertEqual(report["current_observation"]["next_evidence"], "CURRENT_SPECIAL_TRAINING_SELECTION")
         self.assertNotIn("撮ったか確認", report["safe_reply"])
 
         context = context_for(self.state)
         report = self.run_entry(SKILL, context=context, evidence_sources=self.sources(context))
+        self.assertEqual(report["status"], "CERTIFIED_NO_ACTION", report)
+        self.assertEqual(report["navigator_status"], "NEEDS_GROUNDED_FAILURE_ASSESSMENT")
+
+    def test_audit_matches_cannot_diagnose_offense_or_be_readded(self):
+        events, preview = self.tracking_preview()
+        base = [*events, preview["event_preview"]]
+        self.commit_fixture(base)
+        context = context_for(self.state)
+        assessment = context["failure_assessment"]
+        for sample, mid in zip(assessment["match_samples"], ("Y1-JUN-SEINAN", "Y1-JUN-HANASAKA")):
+            sample["match_id"] = mid
+        self.assertIsNone(offense_pattern(assessment, self.state))
+        report = self.run_entry(context=context, evidence_sources=self.sources(context))
+        self.assertEqual(report["status"], "CERTIFIED_NO_ACTION")
+        self.assertEqual(report["action_comparison"]["TRAIN"]["status"], "EVIDENCE_INSUFFICIENT")
+        for original in (base[1], base[3]):
+            with self.subTest(mid=original["match_id"]):
+                readded = dict(original, seq=12, event_id="READDED", branch="ACCEPTED")
+                with self.assertRaisesRegex(ObservationError, "audit-only"):
+                    replay([*base, readded])
+
+    def development_fixture(self):
+        events, preview = self.tracking_preview()
+        base = [*events, preview["event_preview"]]
+        self.state = replay(base)
+        tracking = self.state["observed_tracking"]
+        players = ["入江ドコンジ", "今井タッツ", "芦田はじめ"]
+        context = {
+            "development_plan": attested(
+                self.state, evidence_refs=["ROSTER-IMAGE", "MENU"],
+                roster_origin_event_id=tracking["start_event_id"],
+                roster_archive_sha256=tracking["roster_archive_sha256"],
+                roster_image_evidence_refs=["ROSTER-IMAGE"],
+                target_player=players[0], target_role="CORE_DEVELOP",
+                player_observation={"player": players[0], "contact": 27, "slugging": 34,
+                                    "evidence_ref": "ROSTER-IMAGE"},
+                october_role="ADVANCE_RUNNERS_WITH_POWER", drill="ダンベル", cheer="OFF",
+                priority_review={
+                    "timing": "LOW_LEVEL_CORE_BEFORE_MASS_MATCH_LEVELING",
+                    "other_drill": "DOES_NOT_SERVE_REVIEWED_OCTOBER_ROLE",
+                    "cheer_tradeoff": "PRESERVE_FOR_NAMED_SPRINT_USE",
+                    "role_and_drill_fit": "Synthetic: support extra-base production in the middle of the order.",
+                    "why_before_alternatives": "Synthetic: develop the current core before match leveling.",
+                    "cheer_reason": "Synthetic: reserve Cheer for the next reviewed pitching-core drill.",
+                }),
+            "training_readiness": attested(
+                self.state, evidence_refs=["MENU"], menu_evidence_ref="MENU",
+                available_drills=["ダンベル"], ready_players=players,
+                menu_selection={"drill": "ダンベル", "players": players, "cheer": "OFF",
+                                "available_now": True, "displayed_spend": {"sports": 7}},
+                preferred_participant_groups={"ダンベル": group_selection(players, ["MENU"])},
+                cheer_purposes={"ダンベル": {"OFF": "RESOURCE_PRESERVATION"}}),
+        }
+        sources = self.sources(context)
+        # The synthetic reviewed bytes stand in for an archive image only inside this fixture.
+        manifest_path = self.repo / ROSTER_RECORD
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        manifest["image_sha256_in_lexicographic_archive_order"][0] = sources["ROSTER-IMAGE"]["sha256"]
+        manifest_path.write_text(json.dumps(manifest, ensure_ascii=False), encoding="utf-8")
+        self.commit_fixture(base)
+        return context, sources
+
+    def test_october_core_training_certifies_without_diagnosis_or_fourth_session(self):
+        context, sources = self.development_fixture()
+        report = self.run_entry(context=context, evidence_sources=sources)
         self.assertEqual(report["status"], "CERTIFIED_TRAINING_DRAFT", report)
         self.assertEqual(report["safe_reply_check"]["status"], "PASS")
-        self.assertIn("4回目の根拠は未確認", report["safe_reply"])
+        self.assertEqual(report["action_comparison"]["TRAIN"]["status"], "EVIDENCE_READY")
+        for action in ("MATCH", "ACTIVITY", "RECOVERY"):
+            self.assertEqual(report["action_comparison"][action]["status"], "EVIDENCE_INSUFFICIENT")
+        self.assertIn("入江ドコンジの長打力", report["safe_reply"])
+        self.assertIn("ダンベル／応援OFF／消費予定：スポーツ7", report["safe_reply"])
+        self.assertNotIn("4回目", report["safe_reply"])
+        self.assertNotIn("DC-OFF-", report["safe_reply"])
+        appended = self.run_entry(context=context, evidence_sources=sources,
+                                  proposed_reply=report["safe_reply"] + "\n" + DENIED)
+        self.assertIsNone(appended["safe_reply"])
+        self.assertEqual(appended["safe_reply_check"]["error_codes"], ["REPLY_NOT_CANONICAL"])
+
+    def test_october_plan_rejects_unsourced_priority_readiness_and_changed_cost(self):
+        context, _ = self.development_fixture()
+        for key, value, expected in (
+                ("priority_review", {"timing": "CHEAPEST"}, "OCTOBER_PRIORITY_NOT_JUSTIFIED"),
+                ("ready_players", [], "CURRENT_PLAYER_HP_OR_ELIGIBILITY_UNVERIFIED"),
+                ("menu_selection", None, "CURRENT_SPECIAL_TRAINING_MENU_EVIDENCE_REQUIRED")):
+            with self.subTest(key=key):
+                modified = deepcopy(context)
+                claim = "development_plan" if key == "priority_review" else "training_readiness"
+                modified[claim][key] = value
+                report = self.run_entry(context=modified, evidence_sources=self.sources(modified))
+                self.assertEqual(report["status"], "CERTIFIED_NO_ACTION")
+                self.assertIn(expected, report["blocking_reasons"])
+        modified = deepcopy(context)
+        modified["training_readiness"]["menu_selection"]["displayed_spend"] = {"sports": 1}
+        report = self.run_entry(context=modified, evidence_sources=self.sources(modified))
+        self.assertIn("CURRENT_MENU_COST_MISMATCH", report["blocking_reasons"])
+        self.assertEqual(report["status"], "CERTIFIED_NO_ACTION")
+        decision = navigator_step(ASK, state=self.state, contract=self.contract, root=self.repo,
+                                  boot_verified=True, context=context)
+        draft = dict(decision["action_draft"], spend={"sports": 1})
+        self.assertIn("CATALOG_TRAINING_COST_MISMATCH", validate_recommendation(
+            draft, self.state, self.contract, context=context, root=self.repo))
+
+    def test_reviewed_but_unsupported_activity_is_not_treated_as_missing_evidence(self):
+        context, _ = self.development_fixture()
+        context["activity"] = attested(
+            self.state, evidence_refs=["ACTIVITY"], name="Synthetic", available_now=True,
+            cost_verified=True, spend={"study": 2},
+            october_use="RESOURCE_CONVERSION_FOR_NAMED_SPRINT_ACTION", unlocks="Synthetic drill")
+        report = self.run_entry(context=context, evidence_sources=self.sources(context))
+        self.assertEqual(report["action_comparison"]["ACTIVITY"]["status"], "RENDERING_UNSUPPORTED")
+        self.assertEqual(report["status"], "CERTIFIED_NO_ACTION")
+        self.assertIn("COMPETING_ACTION_PRIORITY_NOT_RESOLVED", report["blocking_reasons"])
 
     def test_tracking_counts_only_new_actions_and_expires_on_unknown_reload(self):
         events, preview = self.tracking_preview()
