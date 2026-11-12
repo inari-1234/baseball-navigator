@@ -341,7 +341,6 @@ class NextActionTests(unittest.TestCase):
                 }),
             "training_readiness": attested(
                 self.state, evidence_refs=["MENU"], menu_evidence_ref="MENU",
-                available_drills=[drill], ready_players=players,
                 menu_selection={"drill": drill, "players": players, "cheer": cheer,
                                 "available_now": True, "displayed_spend": spend,
                                 "current_balances": dict(spend),
@@ -484,7 +483,7 @@ class NextActionTests(unittest.TestCase):
                  "period": period, "source": {"kind": "USER_REPORT", "locator": "test fixture"}}
         for mutation in (
                 dict(event, kind="TRAINING", branch="ACCEPTED", drill="素振り",
-                     participants=context["training_readiness"]["ready_players"]),
+                     participants=context["training_readiness"]["menu_selection"]["players"]),
                 dict(event, kind="ROLLBACK")):
             with self.subTest(kind=mutation["kind"]):
                 self.commit_fixture([*base, mutation])
@@ -502,7 +501,6 @@ class NextActionTests(unittest.TestCase):
         context, _ = self.development_fixture()
         for key, value, expected in (
                 ("priority_review", {"timing": "CHEAPEST"}, "OCTOBER_PRIORITY_NOT_JUSTIFIED"),
-                ("ready_players", [], "CURRENT_PLAYER_HP_OR_ELIGIBILITY_UNVERIFIED"),
                 ("menu_selection", None, "CURRENT_SPECIAL_TRAINING_MENU_EVIDENCE_REQUIRED")):
             with self.subTest(key=key):
                 modified = deepcopy(context)
@@ -511,6 +509,13 @@ class NextActionTests(unittest.TestCase):
                 report = self.run_entry(context=modified, evidence_sources=self.sources(modified))
                 self.assertEqual(report["status"], "CERTIFIED_NO_ACTION")
                 self.assertIn(expected, report["blocking_reasons"])
+        modified = deepcopy(context)
+        selection = modified["training_readiness"]["menu_selection"]
+        selection["players"] = list(reversed(selection["players"]))
+        report = self.run_entry(context=modified, evidence_sources=self.sources(modified))
+        self.assertEqual(report["status"], "CERTIFIED_NO_ACTION")
+        self.assertIn("CURRENT_SPECIAL_TRAINING_MENU_EVIDENCE_REQUIRED", report["blocking_reasons"])
+
         modified = deepcopy(context)
         modified["training_readiness"]["menu_selection"]["displayed_spend"] = {"sports": 1}
         report = self.run_entry(context=modified, evidence_sources=self.sources(modified))

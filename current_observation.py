@@ -134,7 +134,7 @@ def render_observation_stop(observed, state, line):
         "REVIEW_CHANGED_ROSTER_CONTEXT":
             "記録された状態変更以降の選手情報を確認します。",
         "CURRENT_SPECIAL_TRAINING_SELECTION":
-            "実行を押さず、現行SAVEの素振り候補の選択画面で、入江ドコンジを含む3人の参加可否、応援設定、消費する資源の残高を確認します。",
+            "実行を押さず、現行SAVEの素振り候補の選択画面で、選択中の特訓名と3人の名前、応援設定、消費するポイントの残高を確認します。",
         None: "候補に不足している根拠を確認するまで操作を保留します。",
     }[observed["next_evidence"]]
     return "\n".join([*lines, line, "Fallback: " + next_evidence])

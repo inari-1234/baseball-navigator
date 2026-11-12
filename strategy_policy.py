@@ -250,13 +250,15 @@ def training_strategy_errors(rec, state, context, root):
     if not context_current(readiness, state):
         return errors + ["CURRENT_TRAINING_READINESS_SOURCE_MISSING_OR_STALE"]
     drill, cheer = spec["drill"], rec.get("cheer")
-    drills, ready_players = readiness.get("available_drills"), readiness.get("ready_players")
     players = rec.get("participants")
-    if not isinstance(drills, list) or drill not in drills:
-        errors.append("DRILL_AVAILABILITY_UNVERIFIED")
-    if (not isinstance(players, list) or not isinstance(ready_players, list)
-            or any(player not in ready_players for player in players)):
-        errors.append("CURRENT_PLAYER_HP_OR_ELIGIBILITY_UNVERIFIED")
+    if not development:
+        drills = readiness.get("available_drills")
+        ready_players = readiness.get("ready_players")
+        if not isinstance(drills, list) or drill not in drills:
+            errors.append("DRILL_AVAILABILITY_UNVERIFIED")
+        if (not isinstance(players, list) or not isinstance(ready_players, list)
+                or any(player not in ready_players for player in players)):
+            errors.append("CURRENT_PLAYER_HP_OR_ELIGIBILITY_UNVERIFIED")
     if (not isinstance(players, list)
             or not all(isinstance(player, str) and player.isprintable() and player.strip()
                        for player in players)):

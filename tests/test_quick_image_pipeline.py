@@ -4,6 +4,7 @@ from __future__ import annotations
 import copy
 import hashlib
 import json
+import os
 from pathlib import Path
 from postload_fixture import POSTLOAD
 import tempfile
@@ -132,7 +133,12 @@ class QuickImageSuite(unittest.TestCase):
 
     def test_symlink_image_rejected(self):
         link=self.root/"link.png"
-        link.symlink_to(self.path)
+        try:
+            link.symlink_to(self.path)
+        except OSError as exc:
+            if os.name == "nt" and getattr(exc, "winerror", None) == 1314:
+                self.skipTest("Windows does not grant symbolic link creation privilege")
+            raise
         with self.assertRaisesRegex(QuickImageError, "IMAGE_MISSING_OR_SYMLINK"):
             QuickImageSession().inspect(link)
 
