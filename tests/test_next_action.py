@@ -278,6 +278,8 @@ class NextActionTests(unittest.TestCase):
         self.assertEqual(report["current_observation"]["counters"]["sports"], 28)
         self.assertEqual(report["current_observation"]["roster"]["status"], "CURRENT_ROSTER_OBSERVATION")
         self.assertEqual(report["current_observation"]["next_evidence"], "CURRENT_SPECIAL_TRAINING_SELECTION")
+        self.assertEqual(report["action_comparison"]["TRAIN"]["reasons"],
+                         ["CURRENT_OCTOBER_DEVELOPMENT_PLAN_REQUIRED"])
         self.assertNotIn("撮ったか確認", report["safe_reply"])
 
         context = context_for(self.state)

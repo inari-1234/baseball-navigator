@@ -19,7 +19,9 @@ from knowledge_engine import (
     ACCEPTED, FOURTH, KnowledgeError, validate_knowledge,
     validate_skill_recommendation,
 )
-from live_state_engine import validate_recommendation, training_count_status, has_current_lineage
+from live_state_engine import (
+    OBSERVED_TRACKING, has_current_lineage, training_count_status, validate_recommendation,
+)
 from strategy_policy import (
     DEVELOPMENT_BASIS, OFFENSE_RULE, TRAINING_RULES, context_current as _context_current,
     load_tactics as _load_catalog, offense_pattern, training_cost,
@@ -355,7 +357,6 @@ def navigator_step(message: str, *, state: dict, contract: dict,
     candidate_list = train + matches + [recovery]
     all_by_id = {c["id"]: c for c in candidate_list}
     activity = _activity_comparison(state, context, active)
-    comparison = _comparison_summary(train, matches, recovery, activity)
     preferred = {
         "CONTACT": ["TRAIN_CONTACT_ON", "TRAIN_CONTACT_OFF"],
         "CONVERSION": ["TRAIN_POWER_ON", "TRAIN_POWER_OFF"],
@@ -366,6 +367,14 @@ def navigator_step(message: str, *, state: dict, contract: dict,
     if use_development:
         preferred = [c["id"] for c in train
                      if c["drill"] == plan.get("drill") and c["cheer"] == plan.get("cheer")]
+    compared_training = [all_by_id[cid] for cid in preferred] if use_development else train
+    comparison = _comparison_summary(compared_training, matches, recovery, activity)
+    if (mode == "UNKNOWN" and state["timeline_status"] == OBSERVED_TRACKING
+            and goal != "SKILL" and not preferred):
+        comparison["TRAIN"] = {
+            "status": "EVIDENCE_INSUFFICIENT",
+            "reasons": ["CURRENT_OCTOBER_DEVELOPMENT_PLAN_REQUIRED"],
+        }
     if goal == "SKILL":
         # The only positive skill-pool example is with Cheer ON.
         preferred = [x for x in preferred if not x.endswith("_OFF")]
