@@ -20,12 +20,15 @@ from knowledge_engine import (
     validate_skill_recommendation,
 )
 from live_state_engine import (
-    OBSERVED_TRACKING, has_current_lineage, training_count_status, validate_recommendation,
+    OBSERVED_TRACKING, has_current_lineage, prioritize_item_use_drafts,
+    training_count_status, validate_recommendation,
 )
 from strategy_policy import (
     DEVELOPMENT_BASIS, OFFENSE_RULE, TRAINING_RULES, context_current as _context_current,
-    load_tactics as _load_catalog, offense_pattern, training_cost,
+    development_context_for, load_tactics as _load_catalog, october_training_value,
+    offense_pattern, training_cost,
 )
+from current_observation import tracked_roster
 from text_fast import TextFastEngine
 
 FAILURE_MODES = {"CONTACT", "CONVERSION", "ADEQUATE", "RECOVERY_REQUIRED", "UNKNOWN"}
@@ -36,6 +39,7 @@ RULE_HP = ("DC-HP-001", "DC-ITEM-001")
 FALLBACK_SAVE = "RECONCILE_ACTIVE_SAVE_ANCHOR_WITH_CURRENT_LIVE_EVIDENCE"
 FALLBACK_REVIEW = "INGEST_FRESH_CURRENT_BRANCH_EVIDENCE"
 FALLBACK_TRAIN = "STOP_IF_RESOURCES_HP_OR_SAVE_BRANCH_CHANGE"
+FALLBACK_DEVELOPMENT = "STOP_IF_TRAINING_SELECTION_POINTS_OR_SAVE_CHANGE"
 FALLBACK_MATCH = "STOP_IF_MATCH_DATE_OR_ELIGIBILITY_CHANGES"
 FALLBACK_RECOVERY = "STOP_IF_ITEM_INVENTORY_OR_TARGET_HP_CHANGES"
 
@@ -89,9 +93,8 @@ def _train_candidate(drill: dict, cheer: str, state: dict[str, Any],
         drill, cheer, readiness if ready_source else {})
     rules = list(RULE_BASE + RULE_TRAIN) + [
         "DC-ROSTER-001" if development else OFFENSE_RULE[drill["purpose"]]]
-    skill_aim = not development and cheer == "ON"
-    info = {} if development else {
-        player: _skills_for(player, drill["drill"], state) for player in players}
+    legacy_skill_aim = not development and cheer == "ON"
+    info = {player: _skills_for(player, drill["drill"], state) for player in players}
     fourth_player = next((p for p in info if info[p]["fourth_checkpoint"]), None)
     recommendation = {
         "action_type": "TRAIN",
@@ -101,13 +104,27 @@ def _train_candidate(drill: dict, cheer: str, state: dict[str, Any],
         "drill": drill["drill"],
         "cheer": cheer,
         "spend": cost,
-        "knowledge_refs": [FOURTH] if skill_aim else [],
-        "skill_goal": "ACQUIRE" if skill_aim else None,
-        "claimed_fourth_checkpoint": bool(skill_aim and fourth_player),
-        "checkpoint_player": fourth_player if skill_aim else None,
+        "knowledge_refs": [FOURTH] if legacy_skill_aim else [],
+        "skill_goal": "ACQUIRE" if legacy_skill_aim else None,
+        "claimed_fourth_checkpoint": bool(legacy_skill_aim and fourth_player),
+        "checkpoint_player": fourth_player if legacy_skill_aim else None,
     }
+    value = {}
     if development:
         recommendation["decision_basis"] = DEVELOPMENT_BASIS
+        value = october_training_value(drill, recommendation, state, context)
+        if value:
+            roster = tracked_roster(state, context["_knowledge_root"]) or []
+            value["immediate"]["levels"] = {
+                row["player"]: row["level"] for row in roster if row["player"] in players}
+        stage = value.get("skill", {}).get("stage")
+        if stage in {"FOURTH_IN_REACH", "PROGRESS_IN_REACH"}:
+            fourth = stage == "FOURTH_IN_REACH"
+            recommendation.update(
+                knowledge_refs=[FOURTH], skill_goal="IMPROVE_ACQUISITION_OPPORTUNITY",
+                claimed_fourth_checkpoint=fourth,
+                checkpoint_player=context["development_plan"]["target_player"] if fourth else None)
+    skill_aim = recommendation["skill_goal"] is not None
     if skill_aim:
         errors = validate_skill_recommendation(
             recommendation, state, contract, root=context["_knowledge_root"],
@@ -117,13 +134,14 @@ def _train_candidate(drill: dict, cheer: str, state: dict[str, Any],
             recommendation, state, contract, root=context["_knowledge_root"],
             context=context)
     blocked = sorted(set(errors))
-    targeted_reroll = (skill_aim and fourth_player
+    targeted_reroll = (legacy_skill_aim and fourth_player
                        and drill["supports_skill_popup_with_cheer_on"] is True)
     return {
         "id": drill["id"] + "_" + cheer,
         "action_type": "TRAIN",
         "development_target": (context["development_plan"].get("target_player")
                                if development else None),
+        "october_training_value": value,
         "goal": drill["purpose"],
         "drill": drill["drill"],
         "cheer": cheer,
@@ -148,9 +166,11 @@ def _train_candidate(drill: dict, cheer: str, state: dict[str, Any],
         "skill_popup_evidence": (drill["supports_skill_popup_with_cheer_on"]
                                  if cheer == "ON" else "UNKNOWN"),
         "accept_reload_plan": {
-            "accept_if": ("TARGET_OR_HIGH_VALUE_SKILL_ACQUIRED"
-                          if skill_aim and drill["supports_skill_popup_with_cheer_on"] is True
-                          else "ABILITY_GAIN_MEETS_DEVELOPMENT_GOAL"),
+            "accept_if": (
+                "ABILITY_GAIN_OR_USEFUL_SKILL" if development and skill_aim else
+                "TARGET_OR_HIGH_VALUE_SKILL_ACQUIRED"
+                if legacy_skill_aim and drill["supports_skill_popup_with_cheer_on"] is True else
+                "ABILITY_GAIN_MEETS_DEVELOPMENT_GOAL"),
             "reload_if": (
                 "OPTIONAL_TARGETED_FOURTH_REROLL_WHEN_SAVE_AND_BUDGET_VERIFIED"
                 if targeted_reroll else "NO_VERIFIED_SKILL_REROLL_TARGET"),
@@ -162,7 +182,7 @@ def _train_candidate(drill: dict, cheer: str, state: dict[str, Any],
         "ready": not blocked,
         "blocking_reasons": blocked,
         "action_draft": recommendation if not blocked else None,
-        "fallback": FALLBACK_TRAIN,
+        "fallback": FALLBACK_DEVELOPMENT if development else FALLBACK_TRAIN,
         "note": drill.get("historical_notes", ""),
     }
 
@@ -210,6 +230,7 @@ def _recovery_candidate(state: dict[str, Any], context: dict[str, Any],
                         contract: dict[str, Any]) -> dict:
     recover = context.get("recovery")
     verified = _context_current(recover, state)
+    spend = recover.get("spend") if verified else None
     player = recover.get("player") if verified else None
     item = recover.get("item") if verified else None
     reasons = []
@@ -234,8 +255,11 @@ def _recovery_candidate(state: dict[str, Any], context: dict[str, Any],
     rules = list(RULE_BASE + RULE_HP)
     rec = {"action_type": "ITEM", "based_on_event_seq": state["last_event_seq"],
            "rule_ids": rules, "items": [{"item": item, "quantity": 1}],
-           "spend": {}, "target_player": player}
+           "spend": spend if isinstance(spend, dict) else {}, "target_player": player}
     reasons += validate_recommendation(rec, state, contract)
+    comparison_reasons = list(reasons)
+    if not verified or recover.get("cost_verified") is not True or not isinstance(spend, dict):
+        comparison_reasons.append("CURRENT_RECOVERY_COST_UNVERIFIED")
     reasons = sorted(set(reasons))
     return {
         "id": "RECOVERY", "action_type": "ITEM", "target_player": player,
@@ -243,6 +267,7 @@ def _recovery_candidate(state: dict[str, Any], context: dict[str, Any],
         "ready": not reasons, "blocking_reasons": reasons,
         "action_draft": rec if not reasons else None,
         "fallback": FALLBACK_RECOVERY,
+        "comparison_blocking_reasons": sorted(set(comparison_reasons)),
         "note": "Only verified target HP, inventory and player-stated need; no item effect is inferred.",
     }
 
@@ -271,7 +296,40 @@ def _activity_comparison(state, context, active):
     return reasons
 
 
-def _comparison_summary(train, matches, recovery, activity):
+def _ability_items(state, context, contract):
+    claim = context.get("ability_items")
+    if not _context_current(claim, state) or not isinstance(claim.get("options"), list):
+        return {"status": "EVIDENCE_INSUFFICIENT", "reasons": ["CURRENT_ABILITY_ITEM_REVIEW_REQUIRED"]}
+    options = [option for option in claim["options"]
+               if isinstance(option, dict) and option.get("category") == "ABILITY"
+               and option.get("source_evidence_id") in claim["evidence_refs"]]
+    review = prioritize_item_use_drafts(state, contract, options)
+    return {"status": "RENDERING_UNSUPPORTED" if review["candidates"] else "EVIDENCE_INSUFFICIENT",
+            "reasons": review["errors"]}
+
+
+def _development_order(train, primary):
+    """Keep the reviewed core priority. Upgrade the same session only on grounded value."""
+    first = next((candidate for candidate in train
+                  if (candidate["drill"], candidate["cheer"]) ==
+                  (primary.get("drill"), primary.get("cheer"))), None)
+    if first is None:
+        return []
+    rest = [candidate for candidate in train if candidate is not first]
+    review = primary.get("priority_review")
+    if (first["cheer"] == "OFF" and isinstance(review, dict)
+            and review.get("cheer_tradeoff") == "PROGRESS_DRILL"):
+        for candidate in rest:
+            value = candidate["october_training_value"]
+            if (candidate["ready"] and candidate["drill"] == first["drill"]
+                    and candidate["participants"] == first["participants"]
+                    and candidate["development_target"] == first["development_target"]
+                    and value.get("skill", {}).get("stage") == "FOURTH_IN_REACH"):
+                return [candidate, first, *(other for other in rest if other is not candidate)]
+    return [first, *rest]
+
+
+def _comparison_summary(train, matches, recovery, activity, items):
     def summarize(candidates, missing, *, supported=False):
         blockers = [c.get("comparison_blocking_reasons", c["blocking_reasons"]) for c in candidates]
         if any(not row for row in blockers):
@@ -284,6 +342,7 @@ def _comparison_summary(train, matches, recovery, activity):
         "TRAIN": summarize(train, "CURRENT_TRAINING_EVIDENCE_REQUIRED", supported=True),
         "MATCH": summarize(matches, "NO_CURRENT_MATCH_ELIGIBILITY_RECORDED"),
         "RECOVERY": summarize([recovery], "CURRENT_RECOVERY_EVIDENCE_REQUIRED"),
+        "ITEM": items,
         "ACTIVITY": {"status": "EVIDENCE_INSUFFICIENT" if activity else "RENDERING_UNSUPPORTED",
                      "reasons": activity},
     }
@@ -345,13 +404,17 @@ def navigator_step(message: str, *, state: dict, contract: dict,
             else "OFFENSE" if any(x in message for x in ("得点", "打撃", "長打", "ミート"))
             else "GENERAL")
     plan = context.get("development_plan")
-    use_development = mode == "UNKNOWN" and goal != "SKILL" and isinstance(plan, dict)
-    drills = catalog["drills"]
-    train = [_train_candidate(
-        d, cheer, state, context, contract,
-        development=use_development and plan.get("drill") == d["drill"]
-        and plan.get("cheer") == cheer)
-             for d in drills for cheer in ("ON", "OFF")]
+    use_development = mode == "UNKNOWN" and isinstance(plan, dict)
+    train, development_train = [], []
+    for drill in catalog["drills"]:
+        for cheer in ("ON", "OFF"):
+            reviewed = (development_context_for(context, drill["drill"], cheer)
+                        if use_development else None)
+            candidate = _train_candidate(drill, cheer, state, reviewed or context, contract,
+                                         development=reviewed is not None)
+            train.append(candidate)
+            if reviewed is not None:
+                development_train.append(candidate)
     matches = _match_candidates(state, context, contract)
     recovery = _recovery_candidate(state, context, contract)
     candidate_list = train + matches + [recovery]
@@ -365,17 +428,17 @@ def navigator_step(message: str, *, state: dict, contract: dict,
         "UNKNOWN": [],
     }[mode]
     if use_development:
-        preferred = [c["id"] for c in train
-                     if c["drill"] == plan.get("drill") and c["cheer"] == plan.get("cheer")]
-    compared_training = [all_by_id[cid] for cid in preferred] if use_development else train
-    comparison = _comparison_summary(compared_training, matches, recovery, activity)
+        preferred = [c["id"] for c in _development_order(development_train, plan)]
+    compared_training = development_train if use_development else train
+    items = _ability_items(state, context, contract)
+    comparison = _comparison_summary(compared_training, matches, recovery, activity, items)
     if (mode == "UNKNOWN" and state["timeline_status"] == OBSERVED_TRACKING
             and goal != "SKILL" and not preferred):
         comparison["TRAIN"] = {
             "status": "EVIDENCE_INSUFFICIENT",
             "reasons": ["CURRENT_OCTOBER_DEVELOPMENT_PLAN_REQUIRED"],
         }
-    if goal == "SKILL":
+    if goal == "SKILL" and not use_development:
         # The only positive skill-pool example is with Cheer ON.
         preferred = [x for x in preferred if not x.endswith("_OFF")]
         if mode == "UNKNOWN":
@@ -409,6 +472,10 @@ def navigator_step(message: str, *, state: dict, contract: dict,
         "rule_ids": sorted(active.intersection(set(controlling))),
         "decision_goal": goal,
         "ranking_is_expected_value_estimate": False,
+        "development_selection_basis": (
+            "AFFORDABLE_CERTIFIED_FOURTH_WITH_USABLE_SKILL"
+            if use_development and preferred and all_by_id[preferred[0]]["cheer"] != plan.get("cheer")
+            else "REVIEWED_OCTOBER_CORE_PRIORITY" if use_development and preferred else None),
         "ranking_basis": (DEVELOPMENT_BASIS if use_development else
                           "EVIDENCE_SCOPED_FAILURE_MODE_PRIORITY_NO_INVENTED_UTILITY"),
     }
@@ -434,12 +501,13 @@ def navigator_step(message: str, *, state: dict, contract: dict,
                 "primary_next_step": "CHECK_VERIFIED_AVAILABLE_ACTIONS",
                 "fallback": FALLBACK_REVIEW}
     if use_development and any(comparison[kind]["status"] == "RENDERING_UNSUPPORTED"
-                               for kind in ("MATCH", "ACTIVITY", "RECOVERY")):
+                               for kind in ("MATCH", "ACTIVITY", "RECOVERY", "ITEM")):
         return {**result, "status": "BLOCKED_CANDIDATE",
                 "primary_next_step": "REVIEW_COMPETING_ACTION",
                 "blocking_reasons": ["COMPETING_ACTION_PRIORITY_NOT_RESOLVED"],
                 "fallback": FALLBACK_REVIEW}
-    candidate = next((all_by_id[i] for i in preferred if all_by_id[i]["ready"]), None)
+    selectable = preferred[:1] if use_development else preferred
+    candidate = next((all_by_id[i] for i in selectable if all_by_id[i]["ready"]), None)
     if candidate is None:
         primary = all_by_id[preferred[0]]
         return {**result, "status": "BLOCKED_CANDIDATE",

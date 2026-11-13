@@ -550,7 +550,8 @@ def training_count_status(state,player,drill):
     }
 
 def validate_recommendation(rec, state, contract, *, context=None, root=None):
-    from strategy_policy import DEVELOPMENT_BASIS, context_current, training_strategy_errors
+    from strategy_policy import (DEVELOPMENT_BASIS, context_current, development_context_for,
+                                 training_strategy_errors)
 
     if not isinstance(rec, dict):
         return ["RECOMMENDATION_OBJECT_REQUIRED"]
@@ -565,6 +566,9 @@ def validate_recommendation(rec, state, contract, *, context=None, root=None):
     if not isinstance(ids,list) or not ids or any(not isinstance(r,str) or r not in active for r in ids):
         errors.append("INVALID_RULE_ID")
     action_type=rec.get("action_type")
+    if (action_type == "TRAIN" and rec.get("decision_basis") == DEVELOPMENT_BASIS
+            and isinstance(context, dict) and "development_alternatives" in context):
+        context = development_context_for(context, rec.get("drill"), rec.get("cheer"))
     if action_type not in ("MATCH", "TRAIN", "ITEM", "ACTIVITY", "OTHER"):
         errors.append("ACTION_TYPE_REQUIRED")
     if (action_type == "ACTIVITY" or (action_type == "OTHER" and

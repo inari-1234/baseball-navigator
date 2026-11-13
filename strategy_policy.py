@@ -131,6 +131,147 @@ def offense_pattern(assessment, state):
     return derived if derived == mode else None
 
 
+# Scope from the reviewed Authority v1.3 extracts in CURRENT_HANDOFF.md.
+# Historical samples and public equipped effects remain distinct from live gains.
+HISTORICAL_CONTACT_GAINS = {"入江ドコンジ": [12], "今井タッツ": [7, 8], "芦田はじめ": [9, 10]}
+PUBLIC_EQUIPPED_EFFECT = {
+    "ミート力アップ": ("contact", 30), "ジャストミート": ("contact", 100),
+    "長打力アップ": ("slugging", 30), "スーパーパワー": ("slugging", 100),
+}
+REVIEWED_AFFINITY_ARCHIVE = "6ec60a855270aa1243c25ccb9ca6d0ed90a00d7073b3f7572fe9026f1686945e"
+CONTACT_AFFINITIES = {
+    frozenset(("たき翼", "岡治和彦", "今井タッツ")): ("協力プレイ", 45),
+    frozenset(("芦田はじめ", "岡治和彦", "今井タッツ")): ("パーティピープル", 30),
+}
+
+
+def development_contexts(context):
+    """A primary review plus independently reviewed drill/Cheer alternatives."""
+    yield context
+    alternatives = context.get("development_alternatives")
+    if isinstance(alternatives, list):
+        for option in alternatives:
+            if isinstance(option, dict):
+                yield {**context, "development_plan": option.get("development_plan"),
+                       "training_readiness": option.get("training_readiness")}
+
+
+def development_context_for(context, drill, cheer):
+    matches = [option for option in development_contexts(context)
+               if isinstance(option.get("development_plan"), dict)
+               and option["development_plan"].get("drill") == drill
+               and option["development_plan"].get("cheer") == cheer]
+    if len(matches) != 1:
+        return None
+    return {key: value for key, value in matches[0].items()
+            if key != "development_alternatives"}
+
+
+def october_training_value(spec, rec, state, context):
+    """Compare scoped evidence without adding public skill values to observed stat deltas."""
+    from live_state_engine import training_count_status
+
+    plan = context.get("development_plan")
+    if not context_current(plan, state):
+        return {}
+    target = plan.get("target_player")
+    players = rec.get("participants")
+    if (not isinstance(target, str) or not isinstance(players, list)
+            or target not in players or not all(isinstance(p, str) for p in players)):
+        return {}
+    drill, cheer = spec["drill"], rec.get("cheer")
+    contact = spec["purpose"] == "CONTACT"
+    metric = "contact" if contact else "slugging"
+    observation = plan.get("player_observation")
+    readiness = context.get("training_readiness")
+    selection = readiness.get("menu_selection") if isinstance(readiness, dict) else None
+    selected_level = selection.get("drill_level") if isinstance(selection, dict) else None
+    immediate = {
+        "metric": metric,
+        "current_stat": observation.get(metric) if isinstance(observation, dict) else None,
+        "historical_lv1_cheer_on_deltas": {
+            player: HISTORICAL_CONTACT_GAINS[player] for player in players
+            if contact and cheer == "ON" and player in HISTORICAL_CONTACT_GAINS},
+        "current_gain": "UNKNOWN",
+        "current_drill_level": selected_level if type(selected_level) is int and selected_level > 0 else None,
+        "drill_unlock_threshold": "UNKNOWN",
+    }
+    archive = state.get("observed_tracking", {}).get("roster_archive_sha256")
+    match = CONTACT_AFFINITIES.get(frozenset(players)) if contact else None
+    affinity = {"activation": "UNKNOWN", "table_match": "UNKNOWN"}
+    if archive == REVIEWED_AFFINITY_ARCHIVE:
+        affinity["table_match"] = "MATCH" if match else "NO_MATCH_IN_REVIEWED_TABLE"
+        if match:
+            affinity.update(name=match[0], historical_family_percent=match[1])
+    affinity_review = plan.get("affinity_review")
+    if (isinstance(affinity_review, dict)
+            and affinity_review.get("evidence_ref") in plan["evidence_refs"]
+            and affinity_review.get("drill") == drill
+            and affinity_review.get("players") == players):
+        percent = affinity_review.get("applied_percent")
+        if type(percent) is int and 0 <= percent <= 100:
+            affinity.update(activation="OBSERVED", applied_percent=percent)
+    skill = spec["skill_chain_candidates"][0]
+    count = training_count_status(state, target, drill)
+    exact = count["exact_committed_count"]
+    remaining = None if exact is None or exact >= 4 else 4 - exact
+    review = plan.get("skill_review")
+    balances = selection.get("current_balances") if isinstance(selection, dict) else None
+    spend = rec.get("spend")
+    observed_path = spec["supports_skill_popup_with_cheer_on"] is True and cheer == "ON"
+    total = ({key: cost * remaining for key, cost in spend.items()}
+             if observed_path and remaining and isinstance(spend, dict)
+             and set(spend) == {"sports", "cheer"}
+             and all(type(cost) is int and cost > 0 for cost in spend.values()) else {})
+    period = state.get("period_floor")
+    months = (10 - int(period[3:]) if isinstance(period, str)
+              and len(period) == 5 and period.startswith("Y1-") and period[3:].isascii()
+              and period[3:].isdigit() and 1 <= int(period[3:]) <= 12 else None)
+    effect = PUBLIC_EQUIPPED_EFFECT.get(skill)
+    if effect and effect[0] != metric:
+        effect = None
+    equipment = "UNKNOWN"
+    sessions = None
+    menu_ref = readiness.get("menu_evidence_ref") if isinstance(readiness, dict) else None
+    roster_refs = plan.get("roster_image_evidence_refs")
+    if (isinstance(review, dict) and review.get("evidence_ref") in plan["evidence_refs"]
+            and isinstance(roster_refs, list) and review["evidence_ref"] not in roster_refs
+            and review["evidence_ref"] != menu_ref):
+        equipped = review.get("equipped_skills")
+        sessions = review.get("sessions_fit_before_october")
+        if (isinstance(equipped, list) and len(equipped) <= 4
+                and all(isinstance(name, str) and name.strip() for name in equipped)
+                and len(set(equipped)) == len(equipped)):
+            if skill in equipped or any(
+                    row.get("player") == target and row.get("skill") == skill
+                    for row in state.get("skills", [])):
+                equipment = "ALREADY_OWNED"
+            elif len(equipped) == 4:
+                equipment = "FOUR_SLOTS_FILLED"
+            elif review.get("target_skill_already_learned") is False:
+                equipment = "FREE_SLOT"
+    affordable = bool(total and isinstance(balances, dict)
+                      and all(type(balances.get(key)) is int and balances[key] >= amount
+                              for key, amount in total.items()))
+    fits = (months is not None and months >= 0 and remaining is not None
+            and type(sessions) is int and remaining <= sessions <= 4)
+    valued = bool(observed_path and effect and equipment == "FREE_SLOT" and affordable and fits)
+    stage = ("DRILL_OR_CHEER_UNVERIFIED" if not observed_path else
+             "COUNT_UNKNOWN" if exact is None else
+             "PAST_OBSERVED_FOURTH" if remaining is None else
+             "FOURTH_IN_REACH" if valued and remaining == 1 else
+             "PROGRESS_IN_REACH" if valued else "PATH_UNVERIFIED_OR_UNAFFORDABLE")
+    return {
+        "immediate": immediate, "affinity": affinity, "months_to_october": months,
+        "skill": {"stage": stage, "target": skill if observed_path else None,
+                  "public_equipped_effect": effect, "equipment": equipment,
+                  "exact_count": exact, "count_evidence": count["certification_event_id"],
+                  "sessions_through_fourth": remaining, "points_through_fourth": total or None,
+                  "historical_fourth_pattern": "SKILL-4TH-PATTERN",
+                  "skill_guaranteed": False},
+    }
+
+
 def development_plan_errors(plan, spec, rec, state, context, root):
     """Review one October-core ability session at the current roster origin."""
     from current_observation import tracked_roster
@@ -179,9 +320,19 @@ def development_plan_errors(plan, spec, rec, state, context, root):
             or any(not isinstance(reasons.get(key), str) or not reasons[key].strip()
                    for key in ("role_and_drill_fit", "why_before_alternatives", "cheer_reason"))):
         errors.append("OCTOBER_PRIORITY_NOT_JUSTIFIED")
-    if (rec.get("skill_goal") is not None or rec.get("claimed_fourth_checkpoint") is not False
-            or rec.get("checkpoint_player") is not None):
-        errors.append("DEVELOPMENT_DOES_NOT_CERTIFY_SKILL_CHECKPOINT")
+    skill = october_training_value(spec, rec, state, context).get("skill", {})
+    stage = skill.get("stage")
+    if rec.get("skill_goal") is None:
+        valid_skill = (rec.get("claimed_fourth_checkpoint") is False
+                       and rec.get("checkpoint_player") is None)
+    else:
+        fourth = stage == "FOURTH_IN_REACH"
+        valid_skill = (rec.get("skill_goal") == "IMPROVE_ACQUISITION_OPPORTUNITY"
+                       and stage in {"FOURTH_IN_REACH", "PROGRESS_IN_REACH"}
+                       and rec.get("claimed_fourth_checkpoint") is fourth
+                       and rec.get("checkpoint_player") == (target if fourth else None))
+    if not valid_skill:
+        errors.append("OCTOBER_SKILL_OPPORTUNITY_NOT_VERIFIED")
     readiness = context.get("training_readiness")
     menu_ref = readiness.get("menu_evidence_ref") if isinstance(readiness, dict) else None
     selection = readiness.get("menu_selection") if isinstance(readiness, dict) else None

@@ -346,6 +346,25 @@ class NavigatorStepRegression(unittest.TestCase):
         self.assertEqual(state["training_counts_by_player_drill"], {})
         self.assertEqual(out["action_draft"]["claimed_fourth_checkpoint"], False)
 
+    def test_ability_item_comparison_needs_stock_cost_and_attributable_effect(self):
+        state = self.trusted()
+        state["inventory"] = {"fresh": True, "items": {"バナナ": 1}}
+        option = {"category": "ABILITY", "item": "バナナ", "player": "入江", "quantity": 1,
+                  "effect_metric": "contact", "source_evidence_id": "ITEM-REVIEW",
+                  "october_core_verified": True, "low_level_verified": True,
+                  "based_on_event_seq": state["last_event_seq"], "spend_verified": True, "spend": {}}
+        context = {"ability_items": attested(state, evidence_refs=["ITEM-REVIEW"], options=[option])}
+        decision = self.navigate(state=state, context=context)
+        self.assertEqual(decision["action_comparison"]["ITEM"]["status"], "EVIDENCE_INSUFFICIENT")
+        state["item_effects"] = [{"event_id": "ITEM-SAMPLE", "effect_deltas": {"contact": 3},
+                                  "item_bundle": [{"item": "バナナ", "quantity": 1}]}]
+        decision = self.navigate(state=state, context=context)
+        self.assertEqual(decision["action_comparison"]["ITEM"]["status"], "RENDERING_UNSUPPORTED")
+        self.assertIsNone(decision["action_draft"])
+        option["spend"] = {"sports": state["resources"]["values"]["sports"] + 1}
+        decision = self.navigate(state=state, context=context)
+        self.assertEqual(decision["action_comparison"]["ITEM"]["status"], "EVIDENCE_INSUFFICIENT")
+
     def test_recovery_requires_verified_inventory_and_target_hp(self):
         state = self.trusted()
         ctx = context_for(state, "RECOVERY_REQUIRED")

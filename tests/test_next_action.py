@@ -89,10 +89,13 @@ class NextActionTests(unittest.TestCase):
 
     def sources(self, context):
         sources = {}
-        for name, claim in context.items():
+        claims = [context, *context.get("development_alternatives", [])]
+        for name, claim in ((name, claim) for option in claims for name, claim in option.items()
+                            if name != "development_alternatives"):
             for ref in claim["evidence_refs"]:
                 path = self.root / (ref + ".json")
-                content = {"ref": ref} if ref == "ROSTER-IMAGE" else {"ref": ref, "context": context}
+                content = ({"ref": "ROSTER-IMAGE"} if ref in {"ROSTER-IMAGE", "ROSTER-IMAGE-ON"}
+                           else {"ref": ref, "context": context})
                 path.write_text(json.dumps(content, ensure_ascii=False), encoding="utf-8")
                 record = sources.setdefault(ref, {
                     "kind": "LOCAL_FILE", "path": str(path),
@@ -308,9 +311,18 @@ class NextActionTests(unittest.TestCase):
                 with self.assertRaisesRegex(ObservationError, "audit-only"):
                     replay([*base, readded])
 
-    def development_fixture(self, *, contact=False):
+    def development_fixture(self, *, contact=False, exact_count=None):
         events, preview = self.tracking_preview()
         base = [*events, preview["event_preview"]]
+        if exact_count is not None:
+            base.append({
+                "seq": base[-1]["seq"] + 1, "event_id": "SYNTHETIC-EXACT-COUNT",
+                "kind": "TRAINING_COUNT_BASELINE", "period": base[-1]["period"],
+                "branch": "ACCEPTED", "source": {"kind": "USER_REPORT", "locator": "fixture"},
+                "after_event_id": base[-1]["event_id"], "confirmed_current_save": True,
+                "count_scope": "EXACT_CURRENT_ACCEPTED_SAVE",
+                "counts": {"入江ドコンジ|素振り": exact_count},
+            })
         self.state = replay(base)
         tracking = self.state["observed_tracking"]
         players = ["芦田はじめ", "入江ドコンジ", "今井タッツ"]
@@ -400,6 +412,101 @@ class NextActionTests(unittest.TestCase):
         self.assertEqual(sources, original_sources)
         self.assertEqual((self.repo / "CURRENT_LIVE_STATE.json").read_bytes(), canonical_state)
         self.assertEqual((self.repo / "LIVE_EVENTS.jsonl").read_bytes(), ledger)
+
+    def october_cheer_options(self, exact_count):
+        context, _ = self.development_fixture(contact=True, exact_count=exact_count)
+        on = deepcopy(context)
+        context["development_alternatives"] = [on]
+        plan, ready = context["development_plan"], context["training_readiness"]
+        plan["cheer"] = "OFF"
+        plan["priority_review"]["cheer_tradeoff"] = "PROGRESS_DRILL"
+        ready["menu_selection"].update(cheer="OFF", displayed_spend={"sports": 6},
+                                       current_balances={"sports": 24})
+        ready["cheer_purposes"]["素振り"] = {"OFF": "DRILL_PROGRESSION"}
+
+        plan, ready = on["development_plan"], on["training_readiness"]
+        plan["evidence_refs"] = ["ROSTER-IMAGE-ON", "MENU-ON", "EQUIPMENT-AND-CALENDAR"]
+        plan["roster_image_evidence_refs"] = ["ROSTER-IMAGE-ON"]
+        plan["player_observation"]["evidence_ref"] = "ROSTER-IMAGE-ON"
+        plan["skill_review"] = {"evidence_ref": "EQUIPMENT-AND-CALENDAR",
+                                "equipped_skills": ["選球眼"],
+                                "target_skill_already_learned": False,
+                                "sessions_fit_before_october": 2}
+        ready["evidence_refs"] = ["MENU-ON"]
+        ready["menu_evidence_ref"] = "MENU-ON"
+        ready["preferred_participant_groups"]["素振り"]["evidence_refs"] = ["MENU-ON"]
+        ready["menu_selection"]["current_balances"] = {"sports": 24, "cheer": 80}
+        return context
+
+    def assert_october_cheer_selection(self, context, cheer, stage):
+        decision = navigator_step(ASK, state=self.state, contract=self.contract,
+                                  root=self.repo, boot_verified=True, context=context)
+        self.assertEqual(decision["action_draft"]["cheer"], cheer)
+        self.assertEqual(decision["development_selection_basis"],
+                         "AFFORDABLE_CERTIFIED_FOURTH_WITH_USABLE_SKILL" if cheer == "ON"
+                         else "REVIEWED_OCTOBER_CORE_PRIORITY")
+        on = next(c for c in decision["candidates"] if c["id"] == "TRAIN_CONTACT_ON")
+        value = on["october_training_value"]
+        self.assertEqual(value["skill"]["stage"], stage)
+        self.assertEqual(value["skill"]["public_equipped_effect"], ("contact", 30))
+        self.assertEqual(value["immediate"]["historical_lv1_cheer_on_deltas"]["入江ドコンジ"], [12])
+        self.assertEqual(value["affinity"]["activation"], "UNKNOWN")
+        report = self.run_entry(context=context, evidence_sources=self.sources(context))
+        self.assertEqual(report["status"], "CERTIFIED_TRAINING_DRAFT", report)
+        self.assertEqual(report["safe_reply_check"]["status"], "PASS")
+        self.assertIn(f"応援{cheer}", report["safe_reply"])
+        return report
+
+    def test_october_unknown_count_keeps_ability_progression(self):
+        self.assert_october_cheer_selection(self.october_cheer_options(None), "OFF", "COUNT_UNKNOWN")
+
+    def test_october_exact_two_values_future_progress_without_cheer_upgrade(self):
+        self.assert_october_cheer_selection(self.october_cheer_options(2), "OFF", "PROGRESS_IN_REACH")
+
+    def test_october_certified_fourth_changes_cheer_choice_and_rechecks_sources(self):
+        context = self.october_cheer_options(3)
+        report = self.assert_october_cheer_selection(context, "ON", "FOURTH_IN_REACH")
+        self.assertIn("次の特訓が4回目の候補", report["safe_reply"])
+        self.assertIn("習得保証なし", report["safe_reply"])
+        self.assertIn("スキル目的の再試行は保留", report["safe_reply"])
+        sources = self.sources(context)
+        del sources["EQUIPMENT-AND-CALENDAR"]
+        blocked = self.run_entry(context=context, evidence_sources=sources)
+        self.assertEqual(blocked["status"], "CERTIFIED_NO_ACTION")
+        self.assertIn("EVIDENCE_REF_UNRESOLVED_OR_STALE", blocked["blocking_reasons"])
+
+    def test_october_affinity_lookup_does_not_override_the_reviewed_core(self):
+        context = self.october_cheer_options(3)
+        on = context["development_alternatives"][0]
+        group = ["たき翼", "岡治和彦", "今井タッツ"]
+        on["training_readiness"]["menu_selection"]["players"] = group
+        on["training_readiness"]["preferred_participant_groups"]["素振り"]["players"] = group
+        plan = on["development_plan"]
+        plan["target_player"] = plan["player_observation"]["player"] = "今井タッツ"
+        decision = navigator_step(ASK, state=self.state, contract=self.contract,
+                                  root=self.repo, boot_verified=True, context=context)
+        candidate = next(c for c in decision["candidates"] if c["id"] == "TRAIN_CONTACT_ON")
+        self.assertEqual(candidate["october_training_value"]["affinity"]["historical_family_percent"], 45)
+        self.assertEqual(candidate["october_training_value"]["affinity"]["activation"], "UNKNOWN")
+        self.assertEqual(decision["action_draft"]["cheer"], "OFF")
+        self.assertIn("入江ドコンジ", decision["action_draft"]["participants"])
+
+    def test_october_unaffordable_or_unusable_skill_never_displaces_drill_progress(self):
+        context = self.october_cheer_options(3)
+        on = context["development_alternatives"][0]
+        for field, value in (("equipped_skills", ["甲", "乙", "丙", "丁"]),
+                             ("target_skill_already_learned", True),
+                             ("sessions_fit_before_october", 0)):
+            with self.subTest(field=field):
+                updated = deepcopy(context)
+                updated["development_alternatives"][0]["development_plan"]["skill_review"][field] = value
+                report = self.run_entry(context=updated, evidence_sources=self.sources(updated))
+                self.assertEqual(report["status"], "CERTIFIED_TRAINING_DRAFT", report)
+                self.assertIn("応援OFF", report["safe_reply"])
+        on["training_readiness"]["menu_selection"]["current_balances"]["cheer"] = 19
+        report = self.run_entry(context=context, evidence_sources=self.sources(context))
+        self.assertEqual(report["status"], "CERTIFIED_TRAINING_DRAFT", report)
+        self.assertIn("応援OFF", report["safe_reply"])
 
     def test_october_visible_cost_fields_can_be_partial(self):
         context, _ = self.development_fixture(contact=True)

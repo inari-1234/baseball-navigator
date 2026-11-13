@@ -142,6 +142,8 @@ def _verified_evidence_receipts(context, evidence_sources, state, root, *,
                 except OSError as exc:
                     raise ReplyGateError("LOCAL_EVIDENCE_FILE_NOT_ACCESSIBLE") from exc
             elif kind == "LIVE_EVENT":
+                _require(claim in {"failure_assessment", "training_readiness"},
+                         "LOCAL_EVIDENCE_FILE_REQUIRED")
                 _require(record.get("event_id") == ref,
                          "LEDGER_EVIDENCE_ID_MISMATCH")
                 if events is None:
@@ -183,11 +185,25 @@ def _verified_evidence_receipts(context, evidence_sources, state, root, *,
 
 
 def _training_receipts(projection, context, evidence_sources, state, root):
-    from current_observation import tracked_roster_record
-    from strategy_policy import DEVELOPMENT_BASIS
+    from strategy_policy import DEVELOPMENT_BASIS, development_context_for
 
-    if projection["verified_action_draft"].get("decision_basis") != DEVELOPMENT_BASIS:
+    draft = projection["verified_action_draft"]
+    if draft.get("decision_basis") != DEVELOPMENT_BASIS:
         return _verified_evidence_receipts(context, evidence_sources, state, root)
+    _require(isinstance(context, dict), "LOCAL_EVIDENCE_INDEX_REQUIRED")
+    selected = development_context_for(context, draft["drill"], draft["cheer"])
+    _require(selected is not None, "CURRENT_OCTOBER_DEVELOPMENT_PLAN_REQUIRED")
+    receipts = _development_receipts(selected, evidence_sources, state, root)
+    # A selected alternative can displace the primary only with source review of both.
+    if selected["development_plan"] != context["development_plan"]:
+        receipts.update({"primary:" + key: receipt for key, receipt in
+                         _development_receipts(context, evidence_sources, state, root).items()})
+    return receipts
+
+
+def _development_receipts(context, evidence_sources, state, root):
+    from current_observation import tracked_roster_record
+
     receipts = _verified_evidence_receipts(
         context, evidence_sources, state, root,
         claims=("development_plan", "training_readiness"))
@@ -327,6 +343,7 @@ def _training_projection(result):
                 "cost", "cost_fully_known", "cost_source", "accept_reload_plan",
                 "target_skill", "target_skill_at_this_drill_not_guaranteed", "development_target",
                 "training_readiness_evidence_refs", "participant_selection_evidence_refs",
+                "october_training_value",
             )
         },
     }
@@ -338,7 +355,7 @@ def _verified_draft_reply(bridge: dict[str, Any], state: dict[str, Any], line: s
                           evidence_sources: dict[str, Any] | None) -> str:
     from live_state_engine import training_count_status
     from navigator_step import navigator_step
-    from strategy_policy import DEVELOPMENT_BASIS
+    from strategy_policy import DEVELOPMENT_BASIS, development_context_for
     _require(isinstance(contract, dict), "DECISION_CONTRACT_REQUIRED")
     receipts = _training_receipts(bridge, context, evidence_sources, state, root)
     _require(bridge.get("evidence_receipts") == receipts
@@ -361,11 +378,18 @@ def _verified_draft_reply(bridge: dict[str, Any], state: dict[str, Any], line: s
     development = None
     checkpoint = "4回目の根拠は未確認（習得保証なし）"
     if draft.get("decision_basis") == DEVELOPMENT_BASIS:
+        selected = development_context_for(context, drill, cheer)
         role = {"GET_ON_BASE": "出塁力", "ADVANCE_RUNNERS_WITH_POWER": "長打力"}[
-            context["development_plan"]["october_role"]]
+            selected["development_plan"]["october_role"]]
         development = f"育成目的：10月の打線の中核として{candidate['development_target']}の{role}を伸ばす。"
-        checkpoint = "試合診断と特訓回数は未確定。"
-    elif draft["claimed_fourth_checkpoint"]:
+        skill = candidate["october_training_value"]["skill"]
+        if skill["stage"] == "COUNT_UNKNOWN" or skill["exact_count"] is None:
+            checkpoint = "試合診断と特訓回数は未確定。"
+        else:
+            checkpoint = f"現セーブで確定{skill['exact_count']}回。習得機会は条件次第です。"
+        if skill["stage"] == "PROGRESS_IN_REACH":
+            checkpoint += f"観測上の4回目まで今回を含め{skill['sessions_through_fourth']}回（習得保証なし）。"
+    if draft["claimed_fourth_checkpoint"]:
         player = draft["checkpoint_player"]
         info = training_count_status(state, player, drill)
         checkpoint = (f"{player}は現セーブで確定3回のため、次の特訓が4回目の候補"
@@ -377,6 +401,7 @@ def _verified_draft_reply(bridge: dict[str, Any], state: dict[str, Any], line: s
     accept = {
         "TARGET_OR_HIGH_VALUE_SKILL_ACQUIRED": "目標または高価値のスキルを確認した場合",
         "ABILITY_GAIN_MEETS_DEVELOPMENT_GOAL": "能力上昇が育成目標に合った場合",
+        "ABILITY_GAIN_OR_USEFUL_SKILL": "能力上昇が育成目標に合うか、起用に役立つスキルを確認した場合",
     }
     reload = {
         "OPTIONAL_TARGETED_FOURTH_REROLL_WHEN_SAVE_AND_BUDGET_VERIFIED":
@@ -386,6 +411,8 @@ def _verified_draft_reply(bridge: dict[str, Any], state: dict[str, Any], line: s
     fallback = {
         "STOP_IF_RESOURCES_HP_OR_SAVE_BRANCH_CHANGE":
             "実行前の状態変化、費用の不一致、候補選手の準備不足があれば実行せず再検証します。",
+        "STOP_IF_TRAINING_SELECTION_POINTS_OR_SAVE_CHANGE":
+            "選択中の特訓名・3人・応援設定、必要ポイントと残高、またはSAVEの状態が変わったら再検証します。",
     }[expected["fallback"]]
     expense = f"スポーツ{cost['sports']}" + (
         f"、応援{cost['cheer']}" if cheer == "ON" else "")
