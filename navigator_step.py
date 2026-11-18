@@ -20,7 +20,8 @@ from knowledge_engine import (
     validate_skill_recommendation,
 )
 from live_state_engine import (
-    OBSERVED_TRACKING, has_current_lineage, training_count_status, validate_recommendation,
+    OBSERVED_TRACKING, PRACTICE_MATCH_BASIS, has_current_lineage, training_count_status,
+    validate_recommendation,
 )
 from strategy_policy import (
     DEVELOPMENT_BASIS, OFFENSE_RULE, TRAINING_RULES, context_current as _context_current,
@@ -210,7 +211,51 @@ def _match_candidates(state: dict[str, Any], context: dict[str, Any],
             "fallback": FALLBACK_MATCH,
             "note": "Scheduled does not mean playable now; match-day readiness is required.",
         })
+    practice = _practice_match_candidate(state, readiness, contract, context)
+    if practice is not None and all(c["id"] != practice["id"] for c in candidates):
+        candidates.append(practice)
     return candidates
+
+
+def _practice_match_candidate(state, readiness, contract, context):
+    """P7-J: an optional match chosen from the reviewed current opponent menu."""
+    if not _context_current(readiness, state) or readiness.get("practice") is not True:
+        return None
+    mid, opponent = readiness.get("match_id"), readiness.get("opponent")
+    if not isinstance(mid, str) or not mid.strip():
+        return None
+    verified_cost = (readiness.get("cost_verified") is True
+                     and isinstance(readiness.get("spend"), dict))
+    rules = list(RULE_BASE + RULE_MATCH)
+    rec = {"action_type": "MATCH", "based_on_event_seq": state["last_event_seq"],
+           "rule_ids": rules, "target_match_id": mid, "opponent": opponent,
+           "target_period": state.get("period_floor"),
+           "match_basis": PRACTICE_MATCH_BASIS,
+           "spend": readiness["spend"] if verified_cost else {}}
+    reasons = []
+    if not has_current_lineage(state):
+        reasons.append("CURRENT_SAVE_ANCHOR_UNVERIFIED")
+    if not verified_cost:
+        reasons.append("CURRENT_MATCH_COST_UNVERIFIED")
+    if readiness.get("ready") is not True:
+        reasons.append("MATCH_DAY_OR_ROSTER_READINESS_NOT_VERIFIED")
+    menu_ref = readiness.get("menu_evidence_ref")
+    if not isinstance(menu_ref, str) or menu_ref not in readiness.get("evidence_refs", []):
+        reasons.append("CURRENT_OPPONENT_MENU_EVIDENCE_REQUIRED")
+    reasons += validate_recommendation(rec, state, contract, context=context)
+    reasons = sorted(set(reasons))
+    return {
+        "id": "MATCH:" + mid, "action_type": "MATCH", "match_basis": PRACTICE_MATCH_BASIS,
+        "target_match_id": mid, "opponent": opponent,
+        "beatability_basis": readiness.get("beatability_basis"),
+        "period": state.get("period_floor"), "rule_ids": rules, "knowledge_refs": [],
+        "cost": rec["spend"],
+        "ready": not reasons, "blocking_reasons": reasons,
+        "comparison_blocking_reasons": reasons,
+        "action_draft": rec if not reasons else None,
+        "fallback": FALLBACK_MATCH,
+        "note": "Optional non-official match; official tournaments stay a human decision.",
+    }
 
 
 def _recovery_candidate(state: dict[str, Any], context: dict[str, Any],
@@ -289,7 +334,7 @@ def _comparison_summary(train, matches, recovery, activity):
 
     return {
         "TRAIN": summarize(train, "CURRENT_TRAINING_EVIDENCE_REQUIRED", supported=True),
-        "MATCH": summarize(matches, "NO_CURRENT_MATCH_ELIGIBILITY_RECORDED"),
+        "MATCH": summarize(matches, "NO_CURRENT_MATCH_ELIGIBILITY_RECORDED", supported=True),
         "RECOVERY": summarize([recovery], "CURRENT_RECOVERY_EVIDENCE_REQUIRED"),
         "ACTIVITY": {"status": "EVIDENCE_INSUFFICIENT" if activity else "RENDERING_UNSUPPORTED",
                      "reasons": activity},
@@ -374,6 +419,12 @@ def navigator_step(message: str, *, state: dict, contract: dict,
     if use_development:
         preferred = [c["id"] for c in train
                      if c["drill"] == plan.get("drill") and c["cheer"] == plan.get("cheer")]
+    practice_ids = [c["id"] for c in matches if c.get("match_basis") == PRACTICE_MATCH_BASIS]
+    if mode == "UNKNOWN" and goal != "SKILL":
+        # P7-J: undiagnosed offense. Train while the reviewed plan is affordable;
+        # otherwise a reliably beatable practice match keeps the run moving and
+        # produces the current-branch samples a later diagnosis needs.
+        preferred = preferred + practice_ids
     compared_training = [all_by_id[cid] for cid in preferred] if use_development else train
     comparison = _comparison_summary(compared_training, matches, recovery, activity)
     if (mode == "UNKNOWN" and state["timeline_status"] == OBSERVED_TRACKING
@@ -425,7 +476,8 @@ def navigator_step(message: str, *, state: dict, contract: dict,
                 "fallback": FALLBACK_SAVE,
                 "errors": ["ROLLBACK_SAVEPOINT_UNKNOWN_OR_UNTRUSTED_TIMELINE"],
                 "provisional_target": preferred[0] if preferred else None}
-    if mode == "UNKNOWN" and not use_development:
+    practice_ready = any(all_by_id[i]["ready"] for i in practice_ids)
+    if mode == "UNKNOWN" and not use_development and not practice_ready:
         assessment = context.get("failure_assessment")
         claimed_mode = assessment.get("mode") if isinstance(assessment, dict) else None
         reasons = (["OFFENSE_ASSESSMENT_NOT_SUPPORTED_BY_CURRENT_MATCHES"]
@@ -440,13 +492,17 @@ def navigator_step(message: str, *, state: dict, contract: dict,
         return {**result, "status": "NEEDS_CANDIDATE",
                 "primary_next_step": "CHECK_VERIFIED_AVAILABLE_ACTIONS",
                 "fallback": FALLBACK_REVIEW}
-    if use_development and any(comparison[kind]["status"] == "RENDERING_UNSUPPORTED"
-                               for kind in ("MATCH", "ACTIVITY", "RECOVERY")):
-        return {**result, "status": "BLOCKED_CANDIDATE",
-                "primary_next_step": "REVIEW_COMPETING_ACTION",
-                "blocking_reasons": ["COMPETING_ACTION_PRIORITY_NOT_RESOLVED"],
-                "fallback": FALLBACK_REVIEW}
     candidate = next((all_by_id[i] for i in preferred if all_by_id[i]["ready"]), None)
+    # P7-J: a fully evidenced alternative no longer stops the reply. It is
+    # disclosed beside the chosen step and re-compared after the next result.
+    alternatives = sorted(
+        [{"kind": "MATCH", "id": c["id"], "opponent": c.get("opponent")}
+         for c in matches if c["ready"] and (candidate is None or c["id"] != candidate["id"])],
+        key=lambda x: x["id"])
+    alternatives += [{"kind": kind, "id": kind, "opponent": None}
+                     for kind in ("ACTIVITY", "RECOVERY")
+                     if comparison[kind]["status"] == "RENDERING_UNSUPPORTED"]
+    result["deferred_alternatives"] = alternatives
     if candidate is None:
         primary = all_by_id[preferred[0]]
         return {**result, "status": "BLOCKED_CANDIDATE",

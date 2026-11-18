@@ -77,7 +77,9 @@ def next_action(message, *, root=".", expected_main_sha, expected_event_seq,
             if errors:
                 raise ReplyGateError("STRATEGY_VALIDATION_FAILED:" + ",".join(errors))
             result["strategy_validation"] = "PASS"
-            if draft["action_type"] == "TRAIN":
+            if draft["action_type"] == "TRAIN" or (
+                    draft["action_type"] == "MATCH"
+                    and draft.get("match_basis") == "PRACTICE_RELIABLY_BEATABLE"):
                 try:
                     packet = make_local_verified_draft_packet(
                         compared, state, source_commit_sha=expected_main_sha, contract=contract,
@@ -85,7 +87,8 @@ def next_action(message, *, root=".", expected_main_sha, expected_event_seq,
                         decision_message=message)
                 except ReplyGateError as exc:
                     result["blocking_reasons"] = [str(exc)]
-                    result["action_comparison"]["TRAIN"] = {
+                    result["action_comparison"][
+                        "MATCH" if draft["action_type"] == "MATCH" else "TRAIN"] = {
                         "status": "EVIDENCE_INSUFFICIENT", "reasons": [str(exc)],
                     }
             else:
@@ -114,7 +117,9 @@ def next_action(message, *, root=".", expected_main_sha, expected_event_seq,
         verify_checkout(root, expected_main_sha)
         result["safe_reply_check"] = verdict
         if verdict["status"] == "PASS":
-            result["status"] = ("CERTIFIED_TRAINING_DRAFT" if training_reply
+            kind = packet.get("verified_action_draft", {}).get("action_type")
+            result["status"] = (("CERTIFIED_MATCH_DRAFT" if kind == "MATCH"
+                                 else "CERTIFIED_TRAINING_DRAFT") if training_reply
                                 else "CERTIFIED_NO_ACTION")
             result["safe_reply"] = reply
         else:

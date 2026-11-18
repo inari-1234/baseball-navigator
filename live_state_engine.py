@@ -577,6 +577,53 @@ def training_count_status(state,player,drill):
         "certification_event_id":proof["event_id"] if certified else None,
     }
 
+PRACTICE_MATCH_BASIS = "PRACTICE_RELIABLY_BEATABLE"
+BEATABILITY_BASES = ("CURRENT_BRANCH_STABLE_WIN", "USER_REPORTED_RELIABLY_BEATABLE")
+MIN_ADEQUACY_SAMPLES = 2
+
+
+def adequacy_samples_bound(assessment, state):
+    """At least two distinct played, first-attempt-recorded current matches."""
+    samples = assessment.get("match_samples")
+    if not isinstance(samples, list) or len(samples) < MIN_ADEQUACY_SAMPLES:
+        return False
+    ids = [s.get("match_id") for s in samples if isinstance(s, dict)]
+    if len(ids) != len(samples) or len(set(ids)) != len(ids):
+        return False
+    matches = state.get("matches", {})
+    return all(isinstance(mid, str) and matches.get(mid, {}).get("status") == "PLAYED"
+               and matches[mid].get("first_attempt") is not None for mid in ids)
+
+
+def practice_match_errors(rec, state, readiness):
+    """P7-J: an optional non-official match against a reliably beatable opponent.
+
+    DC-MATCH-001 is the controlling rule. Official tournament matches and their
+    reload policy are material decisions and are not certified here.
+    """
+    from strategy_policy import context_current
+    errors = []
+    mid = rec.get("target_match_id")
+    if (not context_current(readiness, state) or readiness.get("match_id") != mid
+            or readiness.get("practice") is not True or readiness.get("official") is not False):
+        errors.append("PRACTICE_MATCH_NOT_VERIFIED")
+        return errors
+    opponent = readiness.get("opponent")
+    if not isinstance(opponent, str) or not opponent.strip() or rec.get("opponent") != opponent:
+        errors.append("PRACTICE_OPPONENT_NOT_VERIFIED")
+    existing = state.get("matches", {}).get(mid)
+    if existing is not None and existing.get("status") != "SCHEDULED":
+        errors.append("PRACTICE_MATCH_ALREADY_RECORDED")
+    basis = readiness.get("beatability_basis")
+    if basis not in BEATABILITY_BASES:
+        errors.append("MATCH_VALUE_OR_BEATABILITY_NOT_VERIFIED")
+    elif basis == "CURRENT_BRANCH_STABLE_WIN" and not any(
+            m.get("opponent") == opponent and m.get("classification") == "STABLE_WIN"
+            for m in state.get("matches", {}).values()):
+        errors.append("NO_CURRENT_STABLE_WIN_AGAINST_OPPONENT")
+    return errors
+
+
 def validate_recommendation(rec, state, contract, *, context=None, root=None):
     from strategy_policy import DEVELOPMENT_BASIS, context_current, training_strategy_errors
 
@@ -611,7 +658,9 @@ def validate_recommendation(rec, state, contract, *, context=None, root=None):
             "ROLLBACK_CONFIRMED_SAVEPOINT_UNKNOWN"}:
         errors.append("TIMELINE_NOT_TRUSTED")
     if action_type=="MATCH":
-        if not isinstance(ids, list) or not {"DC-MATCH-001", "DC-OFF-003"}.issubset(
+        practice = rec.get("match_basis") == PRACTICE_MATCH_BASIS
+        required_rules = {"DC-MATCH-001"} if practice else {"DC-MATCH-001", "DC-OFF-003"}
+        if not isinstance(ids, list) or not required_rules.issubset(
                 r for r in ids if isinstance(r, str)):
             errors.append("MATCH_STRATEGY_RULE_MISMATCH")
         if rec.get("target_period") != state.get("period_floor"):
@@ -621,7 +670,11 @@ def validate_recommendation(rec, state, contract, *, context=None, root=None):
             errors.append("MATCH_ID_REQUIRED")
         assessment = context.get("failure_assessment") if isinstance(context, dict) else None
         readiness = context.get("match_readiness") if isinstance(context, dict) else None
-        if not context_current(assessment, state) or assessment.get("mode") != "ADEQUATE":
+        if practice:
+            errors += practice_match_errors(rec, state, readiness)
+        elif (not context_current(assessment, state) or assessment.get("mode") != "ADEQUATE"
+                or not adequacy_samples_bound(assessment, state)):
+            # P7-J: "scoring is adequate" must rest on played current-branch games.
             errors.append("MATCH_SCORING_ADEQUACY_NOT_VERIFIED")
         if (not context_current(readiness, state) or readiness.get("match_id") != mid
                 or readiness.get("ready") is not True):
@@ -712,7 +765,10 @@ def validate_recommendation(rec, state, contract, *, context=None, root=None):
     mid=rec.get("target_match_id")
     if isinstance(mid, str) and mid:
         m=state["matches"].get(mid)
-        if m is None:errors.append("UNKNOWN_MATCH")
+        # A practice match comes from the reviewed opponent menu and is recorded
+        # only once played; practice_match_errors rejects an already played ID.
+        if m is None:
+            if rec.get("match_basis")!=PRACTICE_MATCH_BASIS:errors.append("UNKNOWN_MATCH")
         elif m["status"]!="SCHEDULED" or m["period"] in state["completed_match_periods"]:
             errors.append("ALREADY_COMPLETED_MATCH")
         else:

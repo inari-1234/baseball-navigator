@@ -13,7 +13,7 @@ import json
 from pathlib import Path, PureWindowsPath
 from typing import Any
 
-from live_state_engine import OBSERVED_TRACKING, has_current_lineage
+from live_state_engine import OBSERVED_TRACKING, PRACTICE_MATCH_BASIS, has_current_lineage
 
 
 class ReplyGateError(ValueError):
@@ -320,6 +320,9 @@ def _training_projection(result):
              and result.get("requires_manual_acceptance") is True,
              "LOCAL_DRAFT_NOT_VALIDATED")
     draft = result.get("action_draft")
+    if (isinstance(draft, dict) and draft.get("action_type") == "MATCH"
+            and draft.get("match_basis") == PRACTICE_MATCH_BASIS):
+        return _match_projection(result, draft)
     _require(isinstance(draft, dict) and draft.get("action_type") == "TRAIN",
              "UNSUPPORTED_ACTION_FOR_CERTIFIED_REPLY")
     _require(result.get("failure_assessment_current") is True
@@ -346,6 +349,7 @@ def _training_projection(result):
         "provisional_target": None,
         "fallback": result["fallback"],
         "verified_action_draft": draft,
+        "deferred_alternatives": result.get("deferred_alternatives", []),
         "candidate": {
             key: source[key] for key in (
                 "id", "ready", "blocking_reasons", "drill", "cheer", "participants",
@@ -358,6 +362,94 @@ def _training_projection(result):
     }
 
 
+def _match_projection(result, draft):
+    """P7-J: certified projection of an optional practice match."""
+    cid = result.get("selected_candidate")
+    matches = [c for c in result["candidates"] if c.get("id") == cid]
+    _require(len(matches) == 1 and matches[0].get("action_draft") == draft
+             and matches[0].get("ready") is True
+             and matches[0].get("blocking_reasons") == [],
+             "LOCAL_DRAFT_NOT_READY")
+    source = matches[0]
+    return {
+        "intent": "GENERAL",
+        "decision_goal": result["decision_goal"],
+        "status": result["status"],
+        "requires_manual_acceptance": result["requires_manual_acceptance"],
+        "rule_ids": result["rule_ids"],
+        "knowledge_refs": result["knowledge_refs"],
+        "primary_next_step": result["primary_next_step"],
+        "selected_candidate": cid,
+        "provisional_target": None,
+        "fallback": result["fallback"],
+        "verified_action_draft": draft,
+        "deferred_alternatives": result.get("deferred_alternatives", []),
+        "candidate": {key: source[key] for key in (
+            "id", "ready", "blocking_reasons", "action_type", "match_basis",
+            "target_match_id", "opponent", "beatability_basis", "period", "cost")},
+    }
+
+
+RESOURCE_LABELS = {"study": "勉強", "sports": "スポーツ", "play": "遊び",
+                   "nature": "自然", "cheer": "応援"}
+
+
+def _alternatives_line(alternatives):
+    if not alternatives:
+        return []
+    labels = []
+    for alt in alternatives:
+        if alt["kind"] == "MATCH":
+            labels.append(f"練習試合（{alt['opponent']}）")
+        else:
+            labels.append({"ACTIVITY": "校内活動", "RECOVERY": "回復"}[alt["kind"]]
+                          + "（案内文は未対応）")
+    return ["比較した別候補：" + "、".join(labels) + "。今回は選ばず、結果を取り込んだ後に再比較します。"]
+
+
+def _match_receipts(context, evidence_sources, state, root):
+    receipts = _verified_evidence_receipts(
+        context, evidence_sources, state, root, claims=("match_readiness",))
+    menu_ref = context["match_readiness"].get("menu_evidence_ref")
+    menu = receipts.get("match_readiness:" + str(menu_ref), {})
+    _require(menu.get("source_kind") == "LOCAL_FILE"
+             and evidence_sources[menu_ref].get("capture_scope") == "CURRENT_PRE_EXECUTION",
+             "CURRENT_OPPONENT_MENU_SOURCE_NOT_REVIEWED")
+    _require_fresh_capture(evidence_sources[menu_ref], menu)
+    return receipts
+
+
+def _draft_receipts(projection, context, evidence_sources, state, root):
+    if projection["verified_action_draft"].get("action_type") == "MATCH":
+        return _match_receipts(context, evidence_sources, state, root)
+    return _training_receipts(projection, context, evidence_sources, state, root)
+
+
+def _match_reply(expected, line):
+    candidate = expected["candidate"]
+    basis = {
+        "CURRENT_BRANCH_STABLE_WIN": "現在の本線でこの相手に安定勝利の記録あり",
+        "USER_REPORTED_RELIABLY_BEATABLE": "確実に勝てる相手というプレイヤー報告あり",
+    }[candidate["beatability_basis"]]
+    cost = candidate["cost"]
+    spend = ("、".join(f"{RESOURCE_LABELS[k]}{v}" for k, v in sorted(cost.items()))
+             if cost else "なし")
+    fallback = {
+        "STOP_IF_MATCH_DATE_OR_ELIGIBILITY_CHANGES":
+            "対戦相手・日時・メンバーの状態が画面と変わった場合は実行せず再検証します。",
+    }[expected["fallback"]]
+    return "\n".join([
+        "次の1手の候補は練習試合です。手動承認前の下書きです。",
+        f"対戦相手：{candidate['opponent']}（公式戦ではありません）",
+        f"根拠：{basis}",
+        f"消費予定：{spend}",
+        *_alternatives_line(expected["deferred_alternatives"]),
+        "試合後に送るもの：試合結果の画面と、試合後のホーム画面1枚。",
+        line,
+        "Fallback: " + fallback,
+    ])
+
+
 def _verified_draft_reply(bridge: dict[str, Any], state: dict[str, Any], line: str,
                           *, contract: dict[str, Any] | None, root: str | Path,
                           context: dict[str, Any] | None,
@@ -366,7 +458,7 @@ def _verified_draft_reply(bridge: dict[str, Any], state: dict[str, Any], line: s
     from navigator_step import navigator_step
     from strategy_policy import DEVELOPMENT_BASIS
     _require(isinstance(contract, dict), "DECISION_CONTRACT_REQUIRED")
-    receipts = _training_receipts(bridge, context, evidence_sources, state, root)
+    receipts = _draft_receipts(bridge, context, evidence_sources, state, root)
     _require(bridge.get("evidence_receipts") == receipts
              and bridge.get("evidence_receipts_sha256") == canonical_state_sha256(receipts)
              and bridge.get("reviewed_context_sha256") == canonical_state_sha256(context),
@@ -381,6 +473,8 @@ def _verified_draft_reply(bridge: dict[str, Any], state: dict[str, Any], line: s
     expected = _training_projection(fresh)
     _require(all(bridge.get(key) == value for key, value in expected.items()),
              "NAVIGATOR_REVALIDATION_MISMATCH")
+    if expected["verified_action_draft"]["action_type"] == "MATCH":
+        return _match_reply(expected, line)
 
     candidate, draft = expected["candidate"], expected["verified_action_draft"]
     drill, cheer, cost = candidate["drill"], candidate["cheer"], candidate["cost"]
@@ -446,6 +540,7 @@ def _verified_draft_reply(bridge: dict[str, Any], state: dict[str, Any], line: s
         skill_reference_line,
         "採用基準：" + accept[plan["accept_if"]],
         "再試行基準：" + reload[plan["reload_if"]],
+        *_alternatives_line(expected["deferred_alternatives"]),
         line,
         "Fallback: " + fallback,
     ])
@@ -556,7 +651,7 @@ def make_local_verified_draft_packet(
         boot_verified=True, expected_event_seq=state["last_event_seq"],
         context=context, root=root)
     _require(_training_projection(fresh) == requested, "NAVIGATOR_REVALIDATION_MISMATCH")
-    receipts = _training_receipts(requested, context, evidence_sources, state, root)
+    receipts = _draft_receipts(requested, context, evidence_sources, state, root)
     packet = {
         **requested,
         "context_source": "VERIFIED_CURRENT_RUN_CONTEXT",

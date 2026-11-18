@@ -112,7 +112,8 @@ class NextActionTests(unittest.TestCase):
                 })
                 if captured is not None and "captured_at" not in record:
                     record["captured_at"] = captured.isoformat()
-                if name == "training_readiness" and ref == claim.get("menu_evidence_ref"):
+                if (name in ("training_readiness", "match_readiness")
+                        and ref == claim.get("menu_evidence_ref")):
                     record["capture_scope"] = "CURRENT_PRE_EXECUTION"
                 record["reviewed_claim_sha256"][name] = canonical_state_sha256(claim)
         return sources
@@ -121,7 +122,8 @@ class NextActionTests(unittest.TestCase):
     def fresh_capture_refs(context):
         readiness = context.get("training_readiness") or {}
         plan = context.get("development_plan") or {}
-        return {readiness.get("menu_evidence_ref"),
+        match = context.get("match_readiness") or {}
+        return {readiness.get("menu_evidence_ref"), match.get("menu_evidence_ref"),
                 *(plan.get("current_ability_evidence_refs") or [])} - {None}
 
     def run_entry(self, message=ASK, **kwargs):
@@ -225,6 +227,8 @@ class NextActionTests(unittest.TestCase):
                        "entries": [{"match_id": "SCHEDULED", "opponent": "テスト校3"}]})
         self.commit_fixture(events)
         context = context_for(self.state, "ADEQUATE")
+        context["failure_assessment"]["match_samples"] = [
+            {"match_id": f"SYNTHETIC-MATCH-{i}", "evidence_ref": "EV-CURRENT"} for i in (1, 2)]
         context["match_readiness"] = {
             **context["failure_assessment"], "ready": True, "match_id": "SCHEDULED",
             "reliably_beatable": True,
@@ -628,8 +632,9 @@ class NextActionTests(unittest.TestCase):
             october_use="RESOURCE_CONVERSION_FOR_NAMED_SPRINT_ACTION", unlocks="Synthetic drill")
         report = self.run_entry(context=context, evidence_sources=self.sources(context))
         self.assertEqual(report["action_comparison"]["ACTIVITY"]["status"], "RENDERING_UNSUPPORTED")
-        self.assertEqual(report["status"], "CERTIFIED_NO_ACTION")
-        self.assertIn("COMPETING_ACTION_PRIORITY_NOT_RESOLVED", report["blocking_reasons"])
+        # P7-J: the evidenced alternative is disclosed instead of stopping the reply.
+        self.assertEqual(report["status"], "CERTIFIED_TRAINING_DRAFT", report)
+        self.assertIn("比較した別候補：校内活動（案内文は未対応）", report["safe_reply"])
 
     def test_tracking_counts_only_new_actions_and_expires_on_unknown_reload(self):
         events, preview = self.tracking_preview()

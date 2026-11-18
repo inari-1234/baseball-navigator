@@ -400,6 +400,12 @@ class NavigatorStepRegression(unittest.TestCase):
         ctx = context_for(state, "ADEQUATE")
         ctx["match_readiness"] = attested(
             state, match_id="Y1-JUL-MANRUI", ready=True, reliably_beatable=True)
+        # P7-J: an adequacy claim without played current matches is rejected.
+        out = self.navigate(state=state, context=ctx)
+        self.assertEqual(out["status"], "BLOCKED_CANDIDATE")
+        self.assertIn("MATCH_SCORING_ADEQUACY_NOT_VERIFIED", out["blocking_reasons"])
+        ctx["failure_assessment"]["match_samples"] = [
+            {"match_id": f"SYNTHETIC-MATCH-{i}", "evidence_ref": "EV-CURRENT"} for i in (1, 2)]
         out = self.navigate(state=state, context=ctx)
         self.assertEqual(out["status"], "VALIDATED_DRAFT_REVIEW")
         self.assertEqual(out["selected_candidate"], "MATCH:Y1-JUL-MANRUI")
