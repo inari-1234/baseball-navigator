@@ -131,6 +131,23 @@ def offense_pattern(assessment, state):
     return derived if derived == mode else None
 
 
+def skill_path_status(state, players, drill):
+    """Evidence-qualified progress, never an acquisition probability or fabricated count."""
+    from live_state_engine import training_count_status
+
+    if not isinstance(players, list) or len(players) != 3 or not drill:
+        return "CURRENT_COUNTS_UNKNOWN"
+    counts = [training_count_status(state, player, drill)["exact_committed_count"]
+              for player in players]
+    if any(count == 3 for count in counts if count is not None):
+        return "CERTIFIED_FOURTH_CANDIDATE"
+    if any(count is not None and count < 3 for count in counts):
+        return "CERTIFIED_PROGRESS_TOWARD_FOURTH"
+    if all(count is not None and count > 3 for count in counts):
+        return "ALL_CERTIFIED_BEYOND_OBSERVED_FOURTH"
+    return "CURRENT_COUNTS_UNKNOWN"
+
+
 def development_plan_errors(plan, spec, rec, state, context, root):
     """Review one October-core ability session at the current roster origin."""
     from current_observation import tracked_roster
@@ -179,9 +196,18 @@ def development_plan_errors(plan, spec, rec, state, context, root):
             or any(not isinstance(reasons.get(key), str) or not reasons[key].strip()
                    for key in ("role_and_drill_fit", "why_before_alternatives", "cheer_reason"))):
         errors.append("OCTOBER_PRIORITY_NOT_JUSTIFIED")
-    if (rec.get("skill_goal") is not None or rec.get("claimed_fourth_checkpoint") is not False
-            or rec.get("checkpoint_player") is not None):
-        errors.append("DEVELOPMENT_DOES_NOT_CERTIFY_SKILL_CHECKPOINT")
+    # Ability development and skill opportunity are simultaneous objectives.
+    # Exact fourth status remains a separate current-save source certification.
+    expected_skill_path = skill_path_status(state, players, spec["drill"])
+    if (not isinstance(reasons, dict)
+            or reasons.get("skill_path_status") != expected_skill_path):
+        errors.append("OCTOBER_SKILL_TRADEOFF_NOT_REVIEWED")
+    if rec.get("cheer") == "ON":
+        if (rec.get("skill_goal") != "IMPROVE_ACQUISITION_OPPORTUNITY"
+                or "SKILL-4TH-PATTERN" not in rec.get("knowledge_refs", [])):
+            errors.append("OCTOBER_SKILL_OPPORTUNITY_NOT_REVIEWED")
+    elif rec.get("skill_goal") is not None:
+        errors.append("UNSUPPORTED_OFF_CHEER_SKILL_CLAIM")
     readiness = context.get("training_readiness")
     menu_ref = readiness.get("menu_evidence_ref") if isinstance(readiness, dict) else None
     selection = readiness.get("menu_selection") if isinstance(readiness, dict) else None
