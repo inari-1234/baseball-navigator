@@ -381,6 +381,36 @@ class NextActionTests(unittest.TestCase):
         self.assertIn("4回目かどうかは未認証", report["safe_reply"])
         self.assertNotIn("現セーブで確定3回", report["safe_reply"])
 
+    def test_exact_fourth_on_october_ability_route_is_visible(self):
+        context, _ = self.development_fixture(contact=True)
+        events = read_events(self.repo / "LIVE_EVENTS.jsonl")
+        last = events[-1]
+        self.assertEqual(last["kind"], "OBSERVED_TRACKING_START")
+        baseline = {
+            "seq": last["seq"] + 1, "event_id": "TEST-EXACT-TRACKED",
+            "kind": "TRAINING_COUNT_BASELINE", "period": last["period"],
+            "branch": "ACCEPTED",
+            "source": {"kind": "USER_REPORT", "locator": "synthetic attestation"},
+            "after_event_id": last["event_id"],
+            "confirmed_current_save": True,
+            "count_scope": "EXACT_CURRENT_ACCEPTED_SAVE",
+            "counts": {"今井タッツ|素振り": 3},
+        }
+        self.commit_fixture([*events, baseline])
+        for claim in context.values():
+            claim["source_event_seq"] = self.state["last_event_seq"]
+        plan = context["development_plan"]
+        plan["priority_review"]["skill_path_status"] = skill_path_status(
+            self.state, context["training_readiness"]["menu_selection"]["players"], "素振り")
+        self.assertEqual(plan["priority_review"]["skill_path_status"],
+                         "CERTIFIED_FOURTH_CANDIDATE")
+        report = self.run_entry(context=context, evidence_sources=self.sources(context))
+        self.assertEqual(report["status"], "CERTIFIED_TRAINING_DRAFT", report)
+        self.assertEqual(report["safe_reply_check"]["status"], "PASS")
+        self.assertIn("今井タッツは現セーブで確定3回", report["safe_reply"])
+        self.assertIn("次の特訓が4回目の候補", report["safe_reply"])
+        self.assertIn("習得保証なし", report["safe_reply"])
+
     def test_october_development_rejects_forged_skill_progress(self):
         context, _ = self.development_fixture(contact=True)
         context["development_plan"]["priority_review"]["skill_path_status"] = (
