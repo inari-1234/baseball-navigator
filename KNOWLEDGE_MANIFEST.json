@@ -62,7 +62,22 @@
         "岡治",
         "今井",
         "たき"
-      ]
+      ],
+      "public_skill_effect_reference": {
+        "source": "ARCHIVED_JP_WIKI_SKILL_EFFECT_UNVERIFIED_CURRENT_IOS",
+        "effects": {
+          "ミート力アップ": {
+            "contact": 30
+          },
+          "ジャストミート": {
+            "contact": 100
+          },
+          "安打製造機": {
+            "contact": 150,
+            "slugging": -30
+          }
+        }
+      }
     },
     "TRAIN_POWER": {
       "drill": "ダンベル",
@@ -72,7 +87,18 @@
         "芦田",
         "今井",
         "入江"
-      ]
+      ],
+      "public_skill_effect_reference": {
+        "source": "ARCHIVED_JP_WIKI_SKILL_EFFECT_UNVERIFIED_CURRENT_IOS",
+        "effects": {
+          "長打力アップ": {
+            "slugging": 30
+          },
+          "スーパーパワー": {
+            "slugging": 100
+          }
+        }
+      }
     }
   },
   "required_navigation_engine": "navigator_step.py",
