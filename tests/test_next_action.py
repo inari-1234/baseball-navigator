@@ -330,6 +330,7 @@ class NextActionTests(unittest.TestCase):
                 october_role=role, drill=drill, cheer=cheer,
                 priority_review={
                     "skill_path_status": skill_path_status(self.state, players, drill),
+                    "skill_effect_review": "PUBLIC_EFFECT_POTENTIAL_NOT_CURRENT_ACQUISITION",
                     "timing": "LOW_LEVEL_CORE_BEFORE_MASS_MATCH_LEVELING",
                     "other_drill": "LOWER_PRIORITY_FOR_REVIEWED_OCTOBER_ROLE",
                     "cheer_tradeoff": ("COMMIT_HIGH_VALUE_GROWTH" if contact
@@ -373,6 +374,10 @@ class NextActionTests(unittest.TestCase):
         c = next(c for c in decision["candidates"] if c["id"] == "TRAIN_CONTACT_ON")
         self.assertEqual(c["skill_path_status"], "CURRENT_COUNTS_UNKNOWN")
         self.assertTrue(c["skill_effect_not_guaranteed"])
+        self.assertEqual(c["public_skill_effect_reference"]["effects"]["ジャストミート"],
+                         {"contact": 100})
+        self.assertIn("ジャストミート 打撃+100", report["safe_reply"])
+        self.assertIn("今回の習得・現在の装備効果・確率は未確認", report["safe_reply"])
         self.assertIn("4回目かどうかは未認証", report["safe_reply"])
         self.assertNotIn("現セーブで確定3回", report["safe_reply"])
 
