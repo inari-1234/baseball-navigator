@@ -21,7 +21,7 @@ from save_baseline_preflight import BaselinePreflightError, prepare_observed_tra
 from navigator_step import navigator_step
 from next_action import next_action
 from project_bootstrap import BOOT_ORDER
-from strategy_policy import offense_pattern
+from strategy_policy import offense_pattern, skill_path_status
 from test_navigator_step import attested, context_for, group_selection
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -329,6 +329,7 @@ class NextActionTests(unittest.TestCase):
                                     "evidence_ref": "ROSTER-IMAGE"},
                 october_role=role, drill=drill, cheer=cheer,
                 priority_review={
+                    "skill_path_status": skill_path_status(self.state, players, drill),
                     "timing": "LOW_LEVEL_CORE_BEFORE_MASS_MATCH_LEVELING",
                     "other_drill": "LOWER_PRIORITY_FOR_REVIEWED_OCTOBER_ROLE",
                     "cheer_tradeoff": ("COMMIT_HIGH_VALUE_GROWTH" if contact
@@ -358,6 +359,45 @@ class NextActionTests(unittest.TestCase):
         manifest_path.write_text(json.dumps(manifest, ensure_ascii=False), encoding="utf-8")
         self.commit_fixture(base)
         return context, sources
+
+    def test_skill_opportunity_survives_ordinary_october_development(self):
+        context, sources = self.development_fixture(contact=True)
+        report = self.run_entry(context=context, evidence_sources=sources)
+        self.assertEqual(report["status"], "CERTIFIED_TRAINING_DRAFT", report)
+        self.assertEqual(report["safe_reply_check"]["status"], "PASS")
+        decision = navigator_step(ASK, state=self.state, contract=self.contract,
+                                  root=self.repo, boot_verified=True, context=context)
+        draft = decision["action_draft"]
+        self.assertEqual(draft["skill_goal"], "IMPROVE_ACQUISITION_OPPORTUNITY")
+        self.assertFalse(draft["claimed_fourth_checkpoint"])
+        c = next(c for c in decision["candidates"] if c["id"] == "TRAIN_CONTACT_ON")
+        self.assertEqual(c["skill_path_status"], "CURRENT_COUNTS_UNKNOWN")
+        self.assertTrue(c["skill_effect_not_guaranteed"])
+        self.assertIn("4回目かどうかは未認証", report["safe_reply"])
+        self.assertNotIn("現セーブで確定3回", report["safe_reply"])
+
+    def test_october_development_rejects_forged_skill_progress(self):
+        context, _ = self.development_fixture(contact=True)
+        context["development_plan"]["priority_review"]["skill_path_status"] = (
+            "CERTIFIED_FOURTH_CANDIDATE")
+        report = self.run_entry(context=context, evidence_sources=self.sources(context))
+        self.assertEqual(report["status"], "CERTIFIED_NO_ACTION", report)
+        self.assertIn("OCTOBER_SKILL_TRADEOFF_NOT_REVIEWED", report["blocking_reasons"])
+
+    def test_skill_path_requires_exact_current_save_certificate(self):
+        context, _ = self.development_fixture(contact=True)
+        players = context["training_readiness"]["menu_selection"]["players"]
+        key = "今井タッツ|素振り"
+        self.state["training_counts_by_player_drill"] = {key: 3}
+        self.assertEqual(skill_path_status(self.state, players, "素振り"),
+                         "CURRENT_COUNTS_UNKNOWN")
+        self.state["training_counts_exact_by_player_drill"] = {key: 3}
+        self.state["training_count_certifications"] = {key: {
+            "event_id": "TEST-EXACT-IMAI",
+            "source_kind": "USER_REPORT",
+            "scope": "EXACT_CURRENT_ACCEPTED_SAVE"}}
+        self.assertEqual(skill_path_status(self.state, players, "素振り"),
+                         "CERTIFIED_FOURTH_CANDIDATE")
 
     def test_october_core_training_certifies_without_diagnosis_or_fourth_session(self):
         context, sources = self.development_fixture()
