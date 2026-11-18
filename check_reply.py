@@ -326,6 +326,7 @@ def _training_projection(result):
                 "id", "ready", "blocking_reasons", "drill", "cheer", "participants",
                 "cost", "cost_fully_known", "cost_source", "accept_reload_plan",
                 "target_skill", "target_skill_at_this_drill_not_guaranteed", "development_target",
+                "public_skill_effect_reference", "skill_path_status", "skill_opportunity_scoring",
                 "training_readiness_evidence_refs", "participant_selection_evidence_refs",
             )
         },
@@ -400,12 +401,24 @@ def _verified_draft_reply(bridge: dict[str, Any], state: dict[str, Any], line: s
     }[expected["fallback"]]
     expense = f"スポーツ{cost['sports']}" + (
         f"、応援{cost['cheer']}" if cheer == "ON" else "")
+    ref = candidate["public_skill_effect_reference"]
+    labels = {"contact": "打撃", "slugging": "長打", "control": "制球"}
+    effect_examples = [
+        skill + " " + "・".join(
+            labels[key] + (f"+{value}" if value > 0 else str(value))
+            for key, value in bonuses.items())
+        for skill, bonuses in ref["effects"].items()
+    ]
+    skill_reference_line = (
+        "将来のスキル候補の公開参考値（今回の習得・現在の装備効果・確率は未確認）："
+        + "、".join(effect_examples))
     return "\n".join([
         f"次の1手の候補は{drill}の特訓です。手動承認前の下書きです。",
         "参加者：" + "・".join(candidate["participants"]),
         f"特訓：{drill}／応援{cheer}／消費予定：{expense}",
         *([development] if development else []),
         "回数・スキル：" + checkpoint,
+        skill_reference_line,
         "採用基準：" + accept[plan["accept_if"]],
         "再試行基準：" + reload[plan["reload_if"]],
         line,
