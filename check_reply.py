@@ -364,7 +364,18 @@ def _verified_draft_reply(bridge: dict[str, Any], state: dict[str, Any], line: s
         role = {"GET_ON_BASE": "出塁力", "ADVANCE_RUNNERS_WITH_POWER": "長打力"}[
             context["development_plan"]["october_role"]]
         development = f"育成目的：10月の打線の中核として{candidate['development_target']}の{role}を伸ばす。"
-        checkpoint = "試合診断と特訓回数は未確定。"
+        # The same development session retains the skill path.  Only an
+        # active exact-count certificate can promote a fourth-session claim.
+        if draft["claimed_fourth_checkpoint"]:
+            player = draft["checkpoint_player"]
+            info = training_count_status(state, player, drill)
+            checkpoint = (f"{player}は現セーブで確定3回のため、次の特訓が4回目の候補"
+                          f"（習得保証なし、根拠 {info['certification_event_id']}）")
+        elif cheer == "ON":
+            checkpoint = ("特訓回数は確定できる範囲だけ評価。"
+                          "4回目かどうかは未認証（習得保証なし）。")
+        else:
+            checkpoint = "試合診断と特訓回数は未確定。"
     elif draft["claimed_fourth_checkpoint"]:
         player = draft["checkpoint_player"]
         info = training_count_status(state, player, drill)
