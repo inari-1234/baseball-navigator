@@ -67,6 +67,22 @@ def load_tactics(root):
                 or not isinstance(entry.get("group_basis"), str)
                 or entry.get("supports_skill_popup_with_cheer_on") not in (True, "UNKNOWN")):
             raise ValueError("NAV_TACTICS_INVALID_DRILL")
+        # Numeric bonus is a historical *equipped effect* reference only.
+        # It is not a drop rate, a current skill, or a verified Lv1 skill pool.
+        reference = entry.get("public_skill_effect_reference")
+        effects = reference.get("effects") if isinstance(reference, dict) else None
+        if (not isinstance(reference, dict)
+                or reference.get("source") !=
+                "ARCHIVED_JP_WIKI_SKILL_EFFECT_UNVERIFIED_CURRENT_IOS"
+                or not isinstance(effects, dict) or not effects
+                or not set(effects).issubset(set(entry["skill_chain_candidates"]))):
+            raise ValueError("NAV_TACTICS_SKILL_REFERENCE_INVALID")
+        for effect in effects.values():
+            if (not isinstance(effect, dict) or not effect
+                    or not set(effect).issubset({"contact", "slugging", "control"})
+                    or any(type(v) is not int or v == 0 or abs(v) > 500
+                           for v in effect.values())):
+                raise ValueError("NAV_TACTICS_SKILL_REFERENCE_INVALID")
         cheer = entry.get("cheer_on_cost")
         if cheer is not None and (type(cheer) is not int or cheer <= 0):
             raise ValueError("NAV_TACTICS_INVALID_CHEER_COST")
@@ -200,7 +216,9 @@ def development_plan_errors(plan, spec, rec, state, context, root):
     # Exact fourth status remains a separate current-save source certification.
     expected_skill_path = skill_path_status(state, players, spec["drill"])
     if (not isinstance(reasons, dict)
-            or reasons.get("skill_path_status") != expected_skill_path):
+            or reasons.get("skill_path_status") != expected_skill_path
+            or reasons.get("skill_effect_review") !=
+            "PUBLIC_EFFECT_POTENTIAL_NOT_CURRENT_ACQUISITION"):
         errors.append("OCTOBER_SKILL_TRADEOFF_NOT_REVIEWED")
     if rec.get("cheer") == "ON":
         if (rec.get("skill_goal") != "IMPROVE_ACQUISITION_OPPORTUNITY"
