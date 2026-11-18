@@ -89,9 +89,9 @@ def _train_candidate(drill: dict, cheer: str, state: dict[str, Any],
         drill, cheer, readiness if ready_source else {})
     rules = list(RULE_BASE + RULE_TRAIN) + [
         "DC-ROSTER-001" if development else OFFENSE_RULE[drill["purpose"]]]
-    skill_aim = not development and cheer == "ON"
-    info = {} if development else {
-        player: _skills_for(player, drill["drill"], state) for player in players}
+    # Every session may progress the skill route; keep count certainty separate.
+    skill_aim = cheer == "ON"
+    info = {player: _skills_for(player, drill["drill"], state) for player in players}
     fourth_player = next((p for p in info if info[p]["fourth_checkpoint"]), None)
     recommendation = {
         "action_type": "TRAIN",
@@ -102,7 +102,8 @@ def _train_candidate(drill: dict, cheer: str, state: dict[str, Any],
         "cheer": cheer,
         "spend": cost,
         "knowledge_refs": [FOURTH] if skill_aim else [],
-        "skill_goal": "ACQUIRE" if skill_aim else None,
+        "skill_goal": (("IMPROVE_ACQUISITION_OPPORTUNITY" if development else "ACQUIRE")
+                       if skill_aim else None),
         "claimed_fourth_checkpoint": bool(skill_aim and fourth_player),
         "checkpoint_player": fourth_player if skill_aim else None,
     }
@@ -157,6 +158,10 @@ def _train_candidate(drill: dict, cheer: str, state: dict[str, Any],
             "not_a_guaranteed_reward": True,
         },
         "training_observed_counts": info,
+        "skill_path_status": skill_path_status(state, players, drill["drill"]),
+        "skill_path_basis": "SKILL-4TH-PATTERN",
+        "skill_effect_status": "HISTORICAL_POTENTIAL_NOT_CURRENT_EQUIPPED_EFFECT",
+        "skill_effect_not_guaranteed": True,
         "knowledge_refs": [FOURTH, ACCEPTED],
         "rule_ids": rules,
         "ready": not blocked,
