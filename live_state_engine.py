@@ -33,6 +33,18 @@ def period(e):
 def label(p):
     return f"Y{p[0]}-{p[1]:02d}"
 
+# In-game calendar: new members join in April (every school year changes) and
+# third-years retire in July. April always requires a new roster reading; a July
+# crossing is recorded so roster consumers can expire rosters with third-years.
+def months_crossed(start, end):
+    y, m = start
+    while (y, m) < end:
+        y, m = (y + 1, 1) if m == 12 else (y, m + 1)
+        yield m
+
+def roster_membership_may_change(start, end):
+    return 4 in months_crossed(start, end)
+
 def clock_minutes(s):
     if not isinstance(s,str):return None
     m=re.fullmatch(r"(AM|PM)\s*(1[0-2]|[1-9]):([0-5][0-9])",s.strip(),re.I)
@@ -256,8 +268,20 @@ def replay(events):
         tracking=state.get("observed_tracking")
         if tracking is not None:
             tracking.setdefault("roster_invalidated_by_event_id",event_id)
-    def invalidate(event_id):
-        invalidate_roster(event_id)
+    def stale_roster_stats(event_id,players=None):
+        # P7-J: gameplay changes abilities, not identity. Keep names, types and
+        # order; expire archived ability values for the affected players only.
+        tracking=state.get("observed_tracking")
+        if tracking is None or "roster_invalidated_by_event_id" in tracking:
+            return
+        stale=tracking.setdefault("roster_stats_stale",{})
+        if players is None:
+            stale["*"]=event_id
+        else:
+            for player in players:stale[player]=event_id
+    def invalidate(event_id,stale_players=None,identity=False):
+        if identity:invalidate_roster(event_id)
+        else:stale_roster_stats(event_id,stale_players)
         state["resources"]["fresh"]=False
         state["resources"]["values"]=None
         state["inventory"]["fresh"]=False
@@ -299,13 +323,15 @@ def replay(events):
             if e.get("rollback_report_event_id"):
                 # A reported LOAD invalidates the earlier state even if the
                 # restored clock and counters happen to look the same.
-                invalidate(e["rollback_report_event_id"])
+                invalidate(e["rollback_report_event_id"],identity=True)
                 state["timeline_status"]="ROLLBACK_CONFIRMED_SAVEPOINT_UNKNOWN"
                 state["rollback_report_event_id"]=e["rollback_report_event_id"]
             elif clock_regressed:
                 state["timeline_status"]="UNRESOLVED_CAPTURE_CHRONOLOGY"
             if floor is not None and p>floor:
-                invalidate_roster(eid)
+                if roster_membership_may_change(floor,p):invalidate_roster(eid)
+                elif 7 in months_crossed(floor,p) and state.get("observed_tracking") is not None:
+                    state["observed_tracking"].setdefault("july_retirement_crossed_by_event_id",eid)
             state["last_seen_screen_period"]=pk
             state["resources"]={"fresh":True,"values":{k:vals[k] for k in COUNTERS},"last_observed":eid}
             slots=e.get("visible_item_slots")
@@ -380,7 +406,9 @@ def replay(events):
                 state["observations_ignored_as_stale"].append(eid)
                 continue
             if floor is not None and p>floor:
-                invalidate_roster(eid)
+                if roster_membership_may_change(floor,p):invalidate_roster(eid)
+                elif 7 in months_crossed(floor,p) and state.get("observed_tracking") is not None:
+                    state["observed_tracking"].setdefault("july_retirement_crossed_by_event_id",eid)
             for player,result in parsed.items():
                 state["hp_by_player"][player]={**result,"fresh":True,"event_id":eid,"period":pk,
                     "source_locator":e["source"]["locator"],"hp_corrected_by_event_id":e.get("hp_corrected_by_event_id")}
@@ -487,7 +515,7 @@ def replay(events):
             state["training_history"].append({"event_id":eid,"drill":drill,"participants":list(players),
                 "drill_level":e.get("drill_level"),"cheer":e.get("cheer")})
             if not historical:
-                invalidate(eid);state["current_exact_time"]="UNKNOWN";last_mutation_id=eid;last_context_event_id=eid
+                invalidate(eid,stale_players=players);state["current_exact_time"]="UNKNOWN";last_mutation_id=eid;last_context_event_id=eid
                 floor=max(floor,p) if floor else p
         elif kind=="ITEM_USE":
             if e.get("branch")!="ACCEPTED":continue
@@ -507,7 +535,7 @@ def replay(events):
                 invalidate(eid);state["current_exact_time"]="UNKNOWN";last_mutation_id=eid;last_context_event_id=eid
                 floor=max(floor,p) if floor else p
         elif kind=="ROLLBACK":
-            invalidate(eid);state["current_exact_time"]="UNKNOWN";last_mutation_id=eid;last_context_event_id=eid
+            invalidate(eid,identity=True);state["current_exact_time"]="UNKNOWN";last_mutation_id=eid;last_context_event_id=eid
             last_screen_clock=None;last_screen_period=None
         elif kind=="SAVE_CHECKPOINT":
             pass

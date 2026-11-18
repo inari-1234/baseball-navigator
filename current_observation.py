@@ -35,8 +35,17 @@ def tracked_roster_record(state, root):
         return None
     record = _roster_record(root)
     if record and tracking["roster_archive_sha256"] == record["source_archive_sha256"]:
+        if ("july_retirement_crossed_by_event_id" in tracking
+                and any(row.get("school_year") == 3 for row in record["roster"])):
+            return None
         return record
     return None
+
+
+def stale_roster_stats(state, player):
+    """Event ID that expired this player's archived ability values, if any."""
+    stale = (state.get("observed_tracking") or {}).get("roster_stats_stale") or {}
+    return stale.get(player) or stale.get("*")
 
 
 def tracked_roster(state, root):

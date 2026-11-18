@@ -1,8 +1,10 @@
 import json
 from pathlib import Path
+import tempfile
 import unittest
 
-from current_observation import ROSTER_RECORD, tracked_roster_record
+from copy import deepcopy
+from current_observation import ROSTER_RECORD, stale_roster_stats, tracked_roster_record
 from live_state_engine import (OBSERVED_TRACKING, ObservationError, replay,
                                training_count_status, validate_recommendation)
 
@@ -831,25 +833,44 @@ class TrackedRosterContinuityRegression(unittest.TestCase):
         self.assertEqual(state["resources"]["values"]["sports"], 28)
         self.assertEqual(tracked_roster_record(state, self.root), self.roster)
 
-    def test_current_screen_after_mutation_does_not_refresh_roster(self):
-        for change in (
-            e(4, "TRAINING", drill="素振り", participants=["芦田", "入江", "今井"], branch="ACCEPTED"),
-            e(4, "ITEM_USE", items=[{"item": "チョコレート", "quantity": 1}], branch="ACCEPTED"),
-            e(4, "MATCH_ATTEMPT", match_id="M1", opponent="生南", attempt=1,
-              our_runs=2, their_runs=0, branch="ACCEPTED"),
-            e(4, "MATCHES_COMPLETED"),
+    def test_gameplay_keeps_roster_identity_and_expires_only_changed_abilities(self):
+        # P7-J: a training/match/item changes abilities, not who is on the team.
+        for change, stale in (
+            (e(4, "TRAINING", drill="素振り", participants=["芦田", "入江", "今井"], branch="ACCEPTED"),
+             {"芦田": "E4", "入江": "E4", "今井": "E4"}),
+            (e(4, "ITEM_USE", items=[{"item": "チョコレート", "quantity": 1}], branch="ACCEPTED"),
+             {"*": "E4"}),
+            (e(4, "MATCH_ATTEMPT", match_id="M1", opponent="生南", attempt=1,
+               our_runs=2, their_runs=0, branch="ACCEPTED"), {"*": "E4"}),
+            (e(4, "MATCHES_COMPLETED"), {"*": "E4"}),
         ):
             with self.subTest(kind=change["kind"]):
                 later = dict(screen(5), clock="PM 5:30", after_event_id="E4")
                 state = replay([*self.events, change, later])
                 self.assertTrue(state["resources"]["fresh"])
-                self.assertEqual(state["observed_tracking"]["roster_invalidated_by_event_id"], "E4")
-                self.assertIsNone(tracked_roster_record(state, self.root))
+                self.assertNotIn("roster_invalidated_by_event_id", state["observed_tracking"])
+                self.assertEqual(state["observed_tracking"]["roster_stats_stale"], stale)
+                self.assertEqual(tracked_roster_record(state, self.root), self.roster)
+                self.assertEqual(stale_roster_stats(state, "芦田"), "E4")
+                expected_other = None if change["kind"] == "TRAINING" else "E4"
+                self.assertEqual(stale_roster_stats(state, "岡治"), expected_other)
 
-    def test_new_game_period_requires_new_roster_evidence(self):
+    def test_month_change_keeps_roster_without_third_years_but_april_rereads(self):
         state = replay([*self.events, screen(4, month=7)])
         self.assertEqual(state["period_floor"], "Y1-07")
-        self.assertIsNone(tracked_roster_record(state, self.root))
+        self.assertEqual(state["observed_tracking"]["july_retirement_crossed_by_event_id"], "E4")
+        self.assertEqual(tracked_roster_record(state, self.root), self.roster)
+        with_third = deepcopy(self.roster)
+        with_third["roster"][0]["school_year"] = 3
+        with tempfile.TemporaryDirectory() as temp:
+            (Path(temp) / ROSTER_RECORD).write_text(
+                json.dumps(with_third, ensure_ascii=False), encoding="utf-8")
+            self.assertIsNone(tracked_roster_record(state, temp))
+        april = e(4, "SCREEN", 4, branch="ACCEPTED",
+                  resources={"study": 4, "sports": 28, "play": 25, "nature": 18, "cheer": 100})
+        april["period"] = {"year": 2, "month": 4}
+        state = replay([*self.events, april])
+        self.assertEqual(state["observed_tracking"]["roster_invalidated_by_event_id"], "E4")
 
     def test_known_load_invalidates_roster_even_after_counter_refresh(self):
         checkpoint = e(4, "SAVE_CHECKPOINT")

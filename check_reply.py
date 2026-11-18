@@ -208,7 +208,32 @@ def _training_receipts(projection, context, evidence_sources, state, root):
              and evidence_sources[menu_ref].get("capture_scope") == "CURRENT_PRE_EXECUTION"
              and menu.get("content_sha256") not in hashes,
              "CURRENT_TRAINING_MENU_SOURCE_NOT_REVIEWED")
+    _require_fresh_capture(evidence_sources[menu_ref], menu)
+    # P7-J: after a change, a stale target's abilities need a new capture.
+    plan = context["development_plan"]
+    from current_observation import stale_roster_stats
+    if stale_roster_stats(state, plan.get("target_player")):
+        for ref in plan.get("current_ability_evidence_refs") or []:
+            receipt = receipts.get("development_plan:" + ref, {})
+            _require(receipt.get("source_kind") == "LOCAL_FILE"
+                     and receipt.get("content_sha256") not in hashes,
+                     "CURRENT_PLAYER_ABILITY_RECAPTURE_REQUIRED")
+            _require_fresh_capture(evidence_sources[ref], receipt)
     return receipts
+
+
+def _require_fresh_capture(record, receipt):
+    """The recorded capture time must match the bytes and be recent."""
+    from capture_time import CaptureTimeError, verify_fresh_capture
+    try:
+        data = Path(record["path"]).read_bytes()
+        _require(sha256(data).hexdigest() == receipt.get("content_sha256"),
+                 "EVIDENCE_CONTENT_HASH_MISMATCH")
+        verify_fresh_capture(data, record.get("captured_at"))
+    except CaptureTimeError as exc:
+        raise ReplyGateError(str(exc)) from exc
+    except OSError as exc:
+        raise ReplyGateError("LOCAL_EVIDENCE_FILE_NOT_ACCESSIBLE") from exc
 
 
 def _require(condition: bool, code: str) -> None:

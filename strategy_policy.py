@@ -166,7 +166,7 @@ def skill_path_status(state, players, drill):
 
 def development_plan_errors(plan, spec, rec, state, context, root):
     """Review one October-core ability session at the current roster origin."""
-    from current_observation import tracked_roster
+    from current_observation import stale_roster_stats, tracked_roster
 
     if not context_current(plan, state):
         return ["CURRENT_OCTOBER_DEVELOPMENT_PLAN_REQUIRED"]
@@ -201,6 +201,13 @@ def development_plan_errors(plan, spec, rec, state, context, root):
             or any(type(player_observation.get(stat)) is not int or player_observation[stat] < 0
                    for stat in ("contact", "slugging"))):
         errors.append("CURRENT_PLAYER_BATTING_OBSERVATION_REQUIRED")
+    elif isinstance(target, str) and stale_roster_stats(state, target):
+        # The archive still proves identity, but its ability values predate a change.
+        ability_refs = plan.get("current_ability_evidence_refs")
+        if (not isinstance(ability_refs, list)
+                or player_observation.get("ability_evidence_ref") not in ability_refs
+                or any(ref in image_refs or ref not in plan["evidence_refs"] for ref in ability_refs)):
+            errors.append("CURRENT_PLAYER_ABILITY_RECAPTURE_REQUIRED")
     reasons = plan.get("priority_review")
     cheer = rec.get("cheer")
     if (not isinstance(cheer, str) or not isinstance(reasons, dict)

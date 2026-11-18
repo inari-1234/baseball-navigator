@@ -6,6 +6,7 @@ import hashlib
 import json
 from pathlib import Path
 from postload_fixture import copy_postload_authorities
+from capture_fixture import exif_png, fresh_capture
 import subprocess
 import sys
 import tempfile
@@ -91,9 +92,17 @@ class NextActionTests(unittest.TestCase):
         sources = {}
         for name, claim in context.items():
             for ref in claim["evidence_refs"]:
-                path = self.root / (ref + ".json")
                 content = {"ref": ref} if ref == "ROSTER-IMAGE" else {"ref": ref, "context": context}
-                path.write_text(json.dumps(content, ensure_ascii=False), encoding="utf-8")
+                payload = json.dumps(content, ensure_ascii=False).encode("utf-8")
+                captured = None
+                if ref in self.fresh_capture_refs(context):
+                    # P7-J: current screenshots carry a recent device capture time.
+                    path = self.root / (ref + ".png")
+                    captured = fresh_capture()
+                    path.write_bytes(exif_png(payload, captured))
+                else:
+                    path = self.root / (ref + ".json")
+                    path.write_bytes(payload)
                 record = sources.setdefault(ref, {
                     "kind": "LOCAL_FILE", "path": str(path),
                     "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
@@ -101,10 +110,19 @@ class NextActionTests(unittest.TestCase):
                     "period": self.state["period_floor"], "branch": "ACCEPTED",
                     "reviewed_for_current_state": True, "reviewed_claim_sha256": {},
                 })
+                if captured is not None and "captured_at" not in record:
+                    record["captured_at"] = captured.isoformat()
                 if name == "training_readiness" and ref == claim.get("menu_evidence_ref"):
                     record["capture_scope"] = "CURRENT_PRE_EXECUTION"
                 record["reviewed_claim_sha256"][name] = canonical_state_sha256(claim)
         return sources
+
+    @staticmethod
+    def fresh_capture_refs(context):
+        readiness = context.get("training_readiness") or {}
+        plan = context.get("development_plan") or {}
+        return {readiness.get("menu_evidence_ref"),
+                *(plan.get("current_ability_evidence_refs") or [])} - {None}
 
     def run_entry(self, message=ASK, **kwargs):
         return next_action(message, root=self.repo, expected_main_sha=self.sha,
