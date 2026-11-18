@@ -24,7 +24,7 @@ from live_state_engine import (
 )
 from strategy_policy import (
     DEVELOPMENT_BASIS, OFFENSE_RULE, TRAINING_RULES, context_current as _context_current,
-    load_tactics as _load_catalog, offense_pattern, training_cost,
+    load_tactics as _load_catalog, offense_pattern, training_cost, skill_path_status,
 )
 from text_fast import TextFastEngine
 
